@@ -142,9 +142,9 @@ if (!empty($count)) {
 ?>
 
 <?php
-$p_id = ''; //投稿ID
-$dbPostData = ''; //投稿内容
-$dbPostGoodNum = ''; //いいねの数
+$p_id = ''; // 投稿ID
+$dbPostData = ''; // 投稿内容
+$dbPostGoodNum = ''; // いいねの数
 
 // get送信がある場合
 if (!empty($_GET['p_id'])) {
