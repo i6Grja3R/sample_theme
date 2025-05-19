@@ -740,3 +740,19 @@ function my_scripts_method()
     );
 }
 add_action('wp_enqueue_scripts', 'my_scripts_method');
+
+
+add_action('init', function () {
+    if (!session_id()) {
+        session_start();
+    }
+});
+
+wp_enqueue_script('like-script', get_template_directory_uri() . '/js/like.js', [], null, true);
+wp_localize_script('like-script', 'like_vars', [
+    'ajax_url' => admin_url('admin-ajax.php'),
+    'nonce'    => wp_create_nonce('like_nonce'),
+]);
+
+// functions.php の中で一度だけ読み込む
+require_once get_template_directory() . '/inc/like-functions.php';
