@@ -744,4 +744,4 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 </script>
 
 
-<!-- ここから回答表示 -->
+<!-- ここからフッター表示 -->

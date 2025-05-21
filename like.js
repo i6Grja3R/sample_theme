@@ -1,10 +1,13 @@
 <script>
+console.log("like.js 読み込み確認"); // ← この行を追加
+
 document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべて読み込まれてから中のコードを実行、jQueryでいう $(document).ready() と同じ意味。
     const buttons = document.querySelectorAll('.quest-likeButton');
     // 各ボタンに click イベントを設定。
     buttons.forEach(button => {
         // ボタンがクリックされたら非同期処理を実行（async 関数）。
         button.addEventListener('click', async () => {
+            console.log('clicked'); // ← ここを追加
             // ボタンの data-postid 属性から、対象の投稿IDを取得。
             const postId = button.getAttribute('data-postid');
 

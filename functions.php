@@ -741,18 +741,35 @@ function my_scripts_method()
 }
 add_action('wp_enqueue_scripts', 'my_scripts_method');
 
-
+// WordPress の「初期化処理（init アクション）」のタイミングで、PHP のセッションがまだ開始されていなければ、session_start() を実行する。
+// ログインユーザーでなくても、セッション ID を使って「一意の識別子（unique_id）」を発行・保持できるようにするため。
+// 「このユーザーはこの投稿にいいねしたか？」という判定を、$_SESSION['unique_id'] で行っているからです。
 add_action('init', function () {
     if (!session_id()) {
         session_start();
     }
 });
 
-wp_enqueue_script('like-script', get_template_directory_uri() . '/js/like.js', [], null, true);
-wp_localize_script('like-script', 'like_vars', [
-    'ajax_url' => admin_url('admin-ajax.php'),
-    'nonce'    => wp_create_nonce('like_nonce'),
-]);
+// フックで囲むのがより安全で一般的
+function sample_theme_enqueue_scripts()
+{
+    // jQuery が必要な場合は有効にする
+    wp_enqueue_script('jquery');
+
+    // like.js を読み込む
+    wp_enqueue_script(
+        'like-script',
+        get_template_directory_uri() . '/assets/js/like.js',
+        array('jquery'), // 依存関係
+        filemtime(get_template_directory() . '/assets/js/like.js'),
+        false // ← フッターではなくヘッダーで読み込む
+    );
+    wp_localize_script('like-script', 'like_vars', array(
+        'ajax_url' => admin_url('admin-ajax.php'), // → Ajaxの送信先（admin-ajax.php）
+        'nonce'    => wp_create_nonce('like_nonce'), // → セキュリティ用トークン、nonce によって Ajax を CSRF から守る
+    ));
+}
+add_action('wp_enqueue_scripts', 'sample_theme_enqueue_scripts');
 
 // functions.php の中で一度だけ読み込む
 require_once get_template_directory() . '/inc/like-functions.php';
