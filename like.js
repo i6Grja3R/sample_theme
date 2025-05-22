@@ -1,6 +1,4 @@
 <script>
-console.log("like.js 読み込み確認"); // ← この行を追加
-
 document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべて読み込まれてから中のコードを実行、jQueryでいう $(document).ready() と同じ意味。
     const buttons = document.querySelectorAll('.quest-likeButton');
     // 各ボタンに click イベントを設定。

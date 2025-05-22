@@ -753,21 +753,20 @@ add_action('init', function () {
 // フックで囲むのがより安全で一般的
 function sample_theme_enqueue_scripts()
 {
-    // jQuery が必要な場合は有効にする
-    wp_enqueue_script('jquery');
-
     // like.js を読み込む
     wp_enqueue_script(
         'like-script',
         get_template_directory_uri() . '/assets/js/like.js',
-        array('jquery'), // 依存関係
-        filemtime(get_template_directory() . '/assets/js/like.js'),
-        false // ← フッターではなくヘッダーで読み込む
+        // [],
+        // WordPressテーマのディレクトリから like.js のサーバー上のファイルパスを取得し、そのファイルの更新日時を取得して、それを JSのバージョン番号として渡している
+        // キャッシュ対策（キャッシュバスティング） のため
+        // filemtime(get_template_directory() . '/assets/js/like.js'),
+        // false // ← フッターではなくヘッダーで読み込む
     );
-    wp_localize_script('like-script', 'like_vars', array(
+    wp_localize_script('like-script', 'like_vars', [
         'ajax_url' => admin_url('admin-ajax.php'), // → Ajaxの送信先（admin-ajax.php）
         'nonce'    => wp_create_nonce('like_nonce'), // → セキュリティ用トークン、nonce によって Ajax を CSRF から守る
-    ));
+    ]);
 }
 add_action('wp_enqueue_scripts', 'sample_theme_enqueue_scripts');
 
