@@ -1,4 +1,4 @@
-<script>
+// console.log('like_vars:', like_vars); // ← この行を追加（確認用）
 document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべて読み込まれてから中のコードを実行、jQueryでいう $(document).ready() と同じ意味。
     const buttons = document.querySelectorAll('.quest-likeButton');
     // 各ボタンに click イベントを設定。
@@ -40,4 +40,3 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
         });
     });
 });
-</script>

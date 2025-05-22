@@ -757,11 +757,11 @@ function sample_theme_enqueue_scripts()
     wp_enqueue_script(
         'like-script',
         get_template_directory_uri() . '/assets/js/like.js',
-        // [],
+        [],
         // WordPressテーマのディレクトリから like.js のサーバー上のファイルパスを取得し、そのファイルの更新日時を取得して、それを JSのバージョン番号として渡している
         // キャッシュ対策（キャッシュバスティング） のため
-        // filemtime(get_template_directory() . '/assets/js/like.js'),
-        // false // ← フッターではなくヘッダーで読み込む
+        filemtime(get_template_directory() . '/assets/js/like.js'),
+        false // ← フッターではなくヘッダーで読み込む
     );
     wp_localize_script('like-script', 'like_vars', [
         'ajax_url' => admin_url('admin-ajax.php'), // → Ajaxの送信先（admin-ajax.php）
