@@ -744,9 +744,19 @@ add_action('wp_enqueue_scripts', 'my_scripts_method');
 // WordPress の「初期化処理（init アクション）」のタイミングで、PHP のセッションがまだ開始されていなければ、session_start() を実行する。
 // ログインユーザーでなくても、セッション ID を使って「一意の識別子（unique_id）」を発行・保持できるようにするため。
 // 「このユーザーはこの投稿にいいねしたか？」という判定を、$_SESSION['unique_id'] で行っているからです。
-add_action('init', function () {
+/* add_action('init', function () {
     if (!session_id()) {
         session_start();
+    }
+}); */
+
+add_action('init', function () {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (empty($_SESSION['unique_id'])) {
+        $_SESSION['unique_id'] = bin2hex(random_bytes(16)); // ランダムな一意のID
     }
 });
 
