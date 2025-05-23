@@ -1,5 +1,5 @@
 <?php
-add_action('wp_ajax_handle_like', 'handle_like_ajax');               // ログインユーザー向け
+add_action('wp_ajax_handle_like_action', 'handle_like_ajax');               // ログインユーザー向け
 add_action('wp_ajax_nopriv_handle_like_action', 'handle_like_ajax'); // 未ログインユーザー向け
 
 function handle_like_ajax()

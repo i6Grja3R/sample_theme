@@ -772,3 +772,5 @@ add_action('wp_enqueue_scripts', 'sample_theme_enqueue_scripts');
 
 // functions.php の中で一度だけ読み込む
 require_once get_template_directory() . '/inc/like-functions.php';
+
+require_once get_template_directory() . '/inc/like-handler.php';
