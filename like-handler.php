@@ -8,7 +8,7 @@ function handle_like_ajax()
     // 第1引数：wp_create_nonce('like_nonce') と 一致、第2引数：POST/GETで送られてくるキー（nonce）
     // check_ajax_referer('like_nonce', 'nonce'); // セキュリティトークン検証
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'like_nonce')) {
-        wp_send_json_error('Nonce検証に失敗しました。');
+        wp_send_json_error(['message' => 'Nonce検証に失敗しました。']);
     }
 
     // 2. POSTパラメータの検証
@@ -19,8 +19,8 @@ function handle_like_ajax()
     $user_id = $_SESSION['unique_id'] ?? '';
 
     // post_id や user_id が無効（ゼロや空）の場合は処理を中断し、Ajax に JSON 形式でエラーを返す。
-    if (empty($unique_id) || empty($user_id)) {
-        wp_send_json_error('不正なリクエストです。');
+    if (!$post_id || !$user_id) {
+        wp_send_json_error(['message' => '不正なリクエストです。']);
     }
 
     // 3. いいねの状態を切り替える
