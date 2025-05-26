@@ -760,6 +760,24 @@ add_action('init', function () {
     }
 });
 
+// クエリ変数の許可（button.php 側で受け取れるように）
+function add_custom_query_vars($vars)
+{
+    $vars[] = 'unique_id';
+    $vars[] = 'user_id';
+    return $vars;
+}
+add_filter('query_vars', 'add_custom_query_vars');
+
+// ✅ 必要に応じてリライトルールを追加（例: /like/xxxx/）
+// 現在のクエリ文字列形式（https://example.com/page?unique_id=abc123）からリライトルール形式（https://example.com/like/abc123）に変えたい場合
+/*
+function add_custom_rewrite_rules() {
+    add_rewrite_rule('^like/([^/]+)/?', 'index.php?pagename=like&unique_id=$matches[1]', 'top');
+}
+add_action('init', 'add_custom_rewrite_rules');
+*/
+
 // フックで囲むのがより安全で一般的
 function sample_theme_enqueue_scripts()
 {

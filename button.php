@@ -1,18 +1,19 @@
 <?php
 // set_query_var() + get_query_var() を使ってテンプレートにデータを渡す
 // バリデーション & フォールバック
-$post_id = intval(get_query_var('post_id')); // intval()でどんな値「文字列」でも整数に変換してから計算
-$user_id = get_query_var('user_id');
+// $post_id = intval(get_query_var('post_id')); // intval()でどんな値「文字列」でも整数に変換してから計算
+// $user_id = get_query_var('user_id');
+$unique_id = get_query_var('unique_id'); // 例: ?unique_id=5b4cd832-fbdf-11ef-bf39-525400c78958
 $user_id = sanitize_text_field($user_id_raw); // ユーザー入力データを安全に処理するために使用
 
 // DBへの問い合わせ
 // データ取得（$is_liked / $good_count の事前取得	無駄なDBアクセスを減らしつつ可読性も向上。）
 // 指定された $user_id のユーザーが、指定された $post_id の投稿に「いいね」しているか確認します。
 // isGood() は true または false を返します。
-$is_liked = isGood($user_id, $post_id);
+$is_liked = isGood($user_id, $unique_id);
 // 指定された投稿IDに対する「いいね」の全レコードをDBから取得します。
 // getGood() は一度だけ呼び、count() にも使い回すことで、無駄なDBアクセスを減らす。
-$good_entries = getGood($post_id);
+$good_entries = getGood($unique_id);
 // 万が一 $good_entries が null や false の場合に備えて安全対策。
 // 配列であればその数（＝いいね数）を取得、それ以外は 0 を返す。
 $good_count = is_array($good_entries) ? count($good_entries) : 0;
@@ -28,7 +29,7 @@ $count_classes = $is_liked ? 'like over' : 'like cancel';
 
 <button
     class="<?php echo esc_attr($button_classes); ?>"
-    data-postid="<?php echo esc_attr($post_id); ?>"
+    data-uniqueid="<?php echo esc_attr($unique_id); ?>"
     aria-label="Like button">
     <svg version="1.1" id="レイヤー_1" class="likeButton-icon <?php echo esc_attr($icon_classes); ?>"
         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px"

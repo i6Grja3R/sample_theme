@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
         // ボタンがクリックされたら非同期処理を実行（async 関数）。
         button.addEventListener('click', async () => {
             console.log('clicked');
-            const postId = button.getAttribute('data-postid');
-            console.log('postId:', postId); // ここを追加
+            const uniqueId = button.getAttribute('data-uniqueid'); // ← ここ変更
+            console.log('uniqueId:', uniqueId); // ← これに変更
             try {
                 const response = await fetch(like_vars.ajax_url, {
                     method: 'POST',
@@ -19,14 +19,18 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
                     body: new URLSearchParams({
                         action: 'handle_like_action',
                         nonce: like_vars.nonce,
-                        post_id: postId
+                        unique_id: uniqueId // ← post_id → unique_id に変更
                     })
                 });
         
-                const responseText = await response.text();
-                console.log('Raw response:', responseText);
+                // const responseText = await response.text();
+                // console.log('Raw response:', responseText);
         
-                const data = JSON.parse(responseText); // ここで JSON パースが失敗したらサーバー側に問題あり
+                // body を「一度」読み込み
+                // const data = JSON.parse(responseText); // ここで JSON パースが失敗したらサーバー側に問題あり
+                const data = await response.json();
+
+                console.log('Response JSON:', data); // ← JSON オブジェクトを直接確認
         
                 if (data.success) {
                     button.classList.toggle('active');
@@ -38,7 +42,8 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
                     console.error('Like failed:', data.message);
                 }
             } catch (error) {
-                console.error('通信エラーまたは JSON パースエラー:', error);
+                // console.error('通信エラーまたは JSON パースエラー:', error);
+                console.error('Error:', error);
             }
         });
     });
