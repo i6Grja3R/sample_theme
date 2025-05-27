@@ -32,7 +32,7 @@ function insertGood($user_id, $unique_id)
     global $wpdb;
     return $wpdb->insert('good', [ // 連想配列の形で、カラム名をキー、対応する値をバリューとして指定します。
         'user_id'      => sanitize_text_field($user_id),
-        'unique_id'    => sanitize_text_field($user_id), // 「いいね」したユーザーの一意のID（UUIDなど）を格納します。ユーザーIDの中に悪意のある文字やタグが混入しないようにサニタイズ（無害化）しています。
+        'unique_id'    => sanitize_text_field($unique_id), // 「いいね」したユーザーの一意のID（UUIDなど）を格納します。ユーザーIDの中に悪意のある文字やタグが混入しないようにサニタイズ（無害化）しています。
         // 'post_id'      => intval($post_id), // 「いいね」された投稿のIDを整数型に変換して格納しています。intval() で数字として扱い、SQLインジェクションや型の不整合を防ぎます。
         'created_date' => current_time('mysql') // 「いいね」した日時をMySQLの日時フォーマット（YYYY-MM-DD HH:MM:SS）で現在時刻を記録しています。
     ]);
