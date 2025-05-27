@@ -39,7 +39,8 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
                         countSpan.textContent = data.count;
                     }
                 } else {
-                    console.error('Like failed:', data.message);
+                    // console.error('Like failed:', data.message);
+                    console.error('Like failed:', data?.data?.message || '原因不明のエラーです');
                 }
             } catch (error) {
                 // console.error('通信エラーまたは JSON パースエラー:', error);

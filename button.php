@@ -3,7 +3,9 @@
 // バリデーション & フォールバック
 // $post_id = intval(get_query_var('post_id')); // intval()でどんな値「文字列」でも整数に変換してから計算
 // $user_id = get_query_var('user_id');
-$unique_id = get_query_var('unique_id'); // 例: ?unique_id=5b4cd832-fbdf-11ef-bf39-525400c78958
+// $unique_id = $args['unique_id']; // 例: ?unique_id=5b4cd832-fbdf-11ef-bf39-525400c78958
+// $unique_id = $args['unique_id'] ?? '';
+$unique_id = isset($args['unique_id']) ? $args['unique_id'] : '';
 $user_id = sanitize_text_field($user_id_raw); // ユーザー入力データを安全に処理するために使用
 
 // DBへの問い合わせ

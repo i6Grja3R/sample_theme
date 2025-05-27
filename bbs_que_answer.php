@@ -74,7 +74,7 @@ foreach ($rows as $row) {
     // set_query_var() は WordPress のグローバルな「テンプレート変数」に値をセットする関数。
     set_query_var('user_id', sanitize_text_field($user_id)); // 文字列なら sanitize_text_field()
     // get_template_part() は require より安全で、テンプレート読み込みの際のパスの扱いやフックの仕組みを利用可能。
-    get_template_part('template-parts/like/button');
+    get_template_part('template-parts/like/button', null, ['unique_id' => $unique_id]);
     echo '</div>';  // アイコン画像
 }
 echo '</div>'; //<div class="quest_container"> の閉じタグ

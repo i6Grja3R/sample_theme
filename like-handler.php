@@ -19,7 +19,7 @@ function handle_like_ajax()
     $user_id = $_SESSION['unique_id'] ?? '';
 
     // post_id や user_id が無効（ゼロや空）の場合は処理を中断し、Ajax に JSON 形式でエラーを返す。
-    if (!$post_id || !$user_id) {
+    if (!$unique_id || !$user_id) {
         wp_send_json_error(['message' => '不正なリクエストです。']);
     }
 
