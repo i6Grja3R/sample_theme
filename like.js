@@ -36,7 +36,8 @@ document.addEventListener('DOMContentLoaded', () => { // DOM（HTML）がすべ�
                     button.classList.toggle('active');
                     const countSpan = button.querySelector('.likeCount');
                     if (countSpan) {
-                        countSpan.textContent = data.count;
+                        // countSpan.textContent = data.count;
+                        countSpan.textContent = data.data.count;
                     }
                 } else {
                     // console.error('Like failed:', data.message);
