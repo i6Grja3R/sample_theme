@@ -65,16 +65,18 @@ foreach ($rows as $row) {
     // echo '</div>';
     echo '<div class="quest_usericon_img"><img src="' . $usericon_src . '">'; // アイコン画像
     echo '<div class="quest_username">' . $row->name . '</div>'; // 名前
-    // 呼び出し側
-    // 現在表示している投稿のID（$post_id）をテンプレートパーツに渡す（button.php にデータを渡す）。
-    // get_the_ID() に頼らず、呼び出し元から明示的に $post_id を渡す＝グローバル変数依存や $_SESSION の多用を避けることで安全かつ明示的に制御できる。
-    // 現在表示している投稿のID（$post_id）をテンプレートパーツに渡す。
-    set_query_var('post_id', get_the_ID());
-    // 型と内容を明確にして意図しない入力を排除。SQLインジェクションやXSSのリスク低減。
-    // set_query_var() は WordPress のグローバルな「テンプレート変数」に値をセットする関数。
-    set_query_var('user_id', sanitize_text_field($user_id)); // 文字列なら sanitize_text_field()
-    // get_template_part() は require より安全で、テンプレート読み込みの際のパスの扱いやフックの仕組みを利用可能。
+
+    // 必要なデータを用意
+    $unique_id = get_post_meta(get_the_ID(), 'unique_id', true); // 投稿IDと同じなら get_the_ID() でも可
+    $user_id = $_COOKIE['like_user_id'] ?? null;
+
+    // サニタイズ（セキュリティ対策）
+    $unique_id = sanitize_text_field($unique_id);
+    $user_id = sanitize_text_field($user_id);
+
+    // テンプレートにデータを渡してボタン描画（AJAX + SVG込み）
     get_template_part('template-parts/like/button', null, ['unique_id' => $unique_id]);
+
     echo '</div>';  // アイコン画像
 }
 echo '</div>'; //<div class="quest_container"> の閉じタグ

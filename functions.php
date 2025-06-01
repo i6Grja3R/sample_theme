@@ -750,6 +750,7 @@ add_action('wp_enqueue_scripts', 'my_scripts_method');
     }
 }); */
 
+/*
 add_action('init', function () {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
@@ -759,46 +760,79 @@ add_action('init', function () {
         $_SESSION['unique_id'] = bin2hex(random_bytes(16)); // ランダムな一意のID
     }
 });
-
-// クエリ変数の許可（button.php 側で受け取れるように）
-function add_custom_query_vars($vars)
-{
-    $vars[] = 'unique_id';
-    $vars[] = 'user_id';
-    return $vars;
-}
-add_filter('query_vars', 'add_custom_query_vars');
-
-// ✅ 必要に応じてリライトルールを追加（例: /like/xxxx/）
-// 現在のクエリ文字列形式（https://example.com/page?unique_id=abc123）からリライトルール形式（https://example.com/like/abc123）に変えたい場合
-/*
-function add_custom_rewrite_rules() {
-    add_rewrite_rule('^like/([^/]+)/?', 'index.php?pagename=like&unique_id=$matches[1]', 'top');
-}
-add_action('init', 'add_custom_rewrite_rules');
 */
 
-// フックで囲むのがより安全で一般的
-function sample_theme_enqueue_scripts()
+
+// ゲスト識別用 UUID をCookieに保存
+add_action('init', function () {
+    if (!isset($_COOKIE['like_user_id'])) {
+        $guest_user_id = wp_generate_uuid4();
+        setcookie('guest_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
+        $_COOKIE['like_user_id'] = $guest_user_id; // PHP側でも即時使えるように
+    }
+});
+
+// JSファイルの読み込みとAJAX用データの埋め込み
+// like.js を読み込み & nonce を渡す（1か所に統一）
+function like_enqueue_scripts()
 {
-    // like.js を読み込む
+    $handle = 'like-script';
+    $script_path = get_template_directory() . '/assets/js/like.js';
+
     wp_enqueue_script(
-        'like-script',
+        $handle,
         get_template_directory_uri() . '/assets/js/like.js',
         [],
-        // WordPressテーマのディレクトリから like.js のサーバー上のファイルパスを取得し、そのファイルの更新日時を取得して、それを JSのバージョン番号として渡している
-        // キャッシュ対策（キャッシュバスティング） のため
-        filemtime(get_template_directory() . '/assets/js/like.js'),
-        false // ← フッターではなくヘッダーで読み込む
+        filemtime($script_path), // キャッシュバスティング用
+        true // フッターで読み込み
     );
-    wp_localize_script('like-script', 'like_vars', [
-        'ajax_url' => admin_url('admin-ajax.php'), // → Ajaxの送信先（admin-ajax.php）
-        'nonce'    => wp_create_nonce('like_nonce'), // → セキュリティ用トークン、nonce によって Ajax を CSRF から守る
+
+    wp_localize_script('$handle', 'like_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('like_nonce'),
     ]);
 }
-add_action('wp_enqueue_scripts', 'sample_theme_enqueue_scripts');
+add_action('wp_enqueue_scripts', 'like_enqueue_scripts');
 
-// functions.php の中で一度だけ読み込む
+// いいね関連の処理を読み込み
+// like関係の処理ファイル読み込み（重複除去）
 require_once get_template_directory() . '/inc/like-functions.php';
-
 require_once get_template_directory() . '/inc/like-handler.php';
+
+// AJAXハンドラ登録
+add_action('wp_ajax_handle_like_action', 'handle_like_ajax');
+add_action('wp_ajax_nopriv_handle_like_action', 'handle_like_ajax');
+
+// トグル対応の AJAX 処理
+function handle_like_ajax()
+{
+    // $_POST['unique_id']：対象となる投稿の一意ID（掲示板の質問IDなど）
+    // $_COOKIE['like_user_id']：Cookieに保存された、ユーザー識別用のID
+    // この2つが存在しない場合はエラーとして処理終了。
+    if (
+        !isset($_POST['unique_id']) || !isset($_COOKIE['like_user_id']) ||
+        !wp_verify_nonce($_POST['nonce'] ?? '', 'like_nonce')
+    ) {
+        wp_send_json_error(['message' => '不正なリクエストです。']);
+    }
+
+    // 入力データを**無害化（サニタイズ）**して、XSSやSQLインジェクションを防ぎます。
+    $unique_id = sanitize_text_field($_POST['unique_id']);
+    $user_id = sanitize_text_field($_COOKIE['like_user_id']);
+
+    // isGood($user_id, $unique_id)： 指定されたユーザーが既にその投稿に「いいね」しているかどうかを判定
+    if (isGood($user_id, $unique_id)) {
+        deleteGood($user_id, $unique_id); // 「いいね済み」の場合 → 取り消し（削除）
+        $liked = false;
+    } else {
+        insertGood($user_id, $unique_id); // まだ「いいね」してない場合 → 登録（追加）
+        $liked = true;
+    }
+
+    // 該当の $unique_id に対する全ユーザーの「いいね」数を取得
+    // getGood() は、指定された unique_id に紐づくレコードを配列で返す関数
+    $count = count(getGood($unique_id));
+    // フロント（JavaScript）に対して成功ステータスと一緒に、最新の「いいね」数を返します。
+    // JavaScript 側では data.count で受け取り、画面を更新できます。
+    wp_send_json_success(['count' => $count, 'liked' => $liked]);
+}

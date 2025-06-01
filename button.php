@@ -1,31 +1,30 @@
 <?php
-// set_query_var() + get_query_var() を使ってテンプレートにデータを渡す
+/*
+Template Name: button
+固定ページ: 「ボタン＋SVG＋いいね数」の表示と状態反映を担う
+*/
+?>
+<?php
+// いいね対象の unique_id を取得（set_query_var() + get_query_var() などから）
 // バリデーション & フォールバック
-// $post_id = intval(get_query_var('post_id')); // intval()でどんな値「文字列」でも整数に変換してから計算
-// $user_id = get_query_var('user_id');
-// $unique_id = $args['unique_id']; // 例: ?unique_id=5b4cd832-fbdf-11ef-bf39-525400c78958
-// $unique_id = $args['unique_id'] ?? '';
-$unique_id = isset($args['unique_id']) ? $args['unique_id'] : '';
-$user_id = sanitize_text_field($user_id_raw); // ユーザー入力データを安全に処理するために使用
+$unique_id = $args['unique_id'] ?? '';
 
-// DBへの問い合わせ
-// データ取得（$is_liked / $good_count の事前取得	無駄なDBアクセスを減らしつつ可読性も向上。）
-// 指定された $user_id のユーザーが、指定された $post_id の投稿に「いいね」しているか確認します。
-// isGood() は true または false を返します。
-$is_liked = isGood($user_id, $unique_id);
-// 指定された投稿IDに対する「いいね」の全レコードをDBから取得します。
-// getGood() は一度だけ呼び、count() にも使い回すことで、無駄なDBアクセスを減らす。
-$good_entries = getGood($unique_id);
-// 万が一 $good_entries が null や false の場合に備えて安全対策。
-// 配列であればその数（＝いいね数）を取得、それ以外は 0 を返す。
+// Cookie からゲストユーザーIDを取得（存在しなければ発行）
+$cookie_name = 'guest_user_id';
+
+$cookie_id = $_COOKIE['like_user_id'] ?? null;
+if (!$cookie_id) {
+    $cookie_id = bin2hex(random_bytes(16));
+    setcookie('like_user_id', $cookie_id, time() + (10 * 365 * 24 * 60 * 60), '/');
+}
+$user_id = $cookie_id;
+
+$is_liked = function_exists('isGood') ? isGood($user_id, $unique_id) : false;
+$good_entries = function_exists('getGood') ? getGood($unique_id) : [];
 $good_count = is_array($good_entries) ? count($good_entries) : 0;
 
-// クラスや属性の安全な出力
-// いいね済みなら 'quest-likeButton active' に。していなければ 'quest-likeButton' のまま。
 $button_classes = 'quest-likeButton' . ($is_liked ? ' active' : '');
-// SVGアイコンの見た目変更用。例えば、liked は赤色のハート、liker は灰色のハートなど。
 $icon_classes = $is_liked ? 'liked' : 'liker';
-// いいね数を表示する <span> に付けるクラス。たとえば、like over は強調表示、like cancel は淡く表示するなど。
 $count_classes = $is_liked ? 'like over' : 'like cancel';
 ?>
 

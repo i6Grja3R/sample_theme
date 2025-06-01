@@ -1,50 +1,64 @@
 <?php
-if (!defined('ABSPATH')) {
-    exit; // WordPress 以外からの直接アクセスを防止
-}
-// inc は **include（含める）**の略で、WordPressテーマやプラグインで「処理専用のファイル」をまとめるディレクトリとしてよく使われます。
-// inc/ 以下のPHPファイルはテンプレートファイルではないので、直接アクセスされない構造にしやすい。というセキュリティ上のメリットがあります。
-// 指定ユーザーが特定の投稿に「いいね」したかどうかを確認する関数。
+/*
+Template Name: lile-functions
+固定ページ: データベース操作
+*/
+?>
+<?php
+if (!defined('ABSPATH')) exit; // WordPress 以外からの直接アクセスを防止
+
+// 引数 $user_id：Cookieなどで一意に識別されたユーザーID（ログインしていないユーザーでも可）。
+// 引数 $unique_id：投稿や質問など、対象のコンテンツを一意に識別するID。
 function isGood($user_id, $unique_id)
 {
     global $wpdb;
-    return $wpdb->get_var(
-        // good テーブルに、該当ユーザーと投稿の組み合わせが存在するかを調べます。
-        $wpdb->prepare("SELECT COUNT(*) FROM good WHERE user_id = %s AND unique_id = %s", $user_id, $unique_id)
-        // 結果が 1 件以上なら true を返します。
-    ) > 0;
+    // 通常、$wpdb->prefix は 'wp_' なので、wp_good というテーブルを指定していることになります。
+    $table = $wpdb->prefix . 'good';
+    // プレースホルダー %s に対して、それぞれ $user_id, $unique_id を安全に埋め込むSQL文を生成します。つまり SQL インジェクション対策になります。
+    // (bool) ...結果の数字（0または1以上）をboolean型（true/false）に変換します。
+    return (bool) $wpdb->get_var($wpdb->prepare( // SQLの実行結果から、最初の1つの値（ここではCOUNTの結果）を取得します。
+        "SELECT COUNT(*) FROM $table WHERE user_id = %s AND unique_id = %s",
+        $user_id,
+        $unique_id
+    ));
 }
 
-// wpdb::get_results() を使用して good テーブルから投稿IDに一致する行をすべて取得し、結果を「オブジェクトの配列」として返すもの。
-function getGood($unique_id)
-{
-    global $wpdb;
-    // get_results() は、SQLクエリの結果が複数行になることを前提にしている。
-    return $wpdb->get_results(
-        // 特定の投稿に対する「いいね」全体（全ユーザー分）を取得。
-        $wpdb->prepare("SELECT * FROM good WHERE unique_id = %s", $unique_id)
-    );
-}
-
-//「ユーザーが投稿に対して『いいね』をした」という情報を、データベースの good テーブルに新しく記録（挿入）します。
+// insertGood() は「誰（user_id）が、どの投稿（unique_id）に、いつ（created_date）いいねしたか」を good テーブルに記録します。
 function insertGood($user_id, $unique_id)
 {
     global $wpdb;
-    return $wpdb->insert('good', [ // 連想配列の形で、カラム名をキー、対応する値をバリューとして指定します。
-        'user_id'      => sanitize_text_field($user_id),
-        'unique_id'    => sanitize_text_field($unique_id), // 「いいね」したユーザーの一意のID（UUIDなど）を格納します。ユーザーIDの中に悪意のある文字やタグが混入しないようにサニタイズ（無害化）しています。
-        // 'post_id'      => intval($post_id), // 「いいね」された投稿のIDを整数型に変換して格納しています。intval() で数字として扱い、SQLインジェクションや型の不整合を防ぎます。
-        'created_date' => current_time('mysql') // 「いいね」した日時をMySQLの日時フォーマット（YYYY-MM-DD HH:MM:SS）で現在時刻を記録しています。
+    // 使用するテーブル名を作成。
+    $table = $wpdb->prefix . 'good';
+    // この行は、$table（= wp_good）テーブルにデータを挿入します
+    $wpdb->insert($table, [
+        'user_id' => $user_id, // いいねしたユーザーの識別子
+        'unique_id' => $unique_id, // いいね対象の一意な識別子（例：投稿IDやUUIDなど）
+        'created_date' => current_time('mysql', 1) // いいねをした日時（WordPressの現在時刻、UTCかローカル）1 を渡すことで「GMT（UTC）」の時刻になります。
     ]);
 }
 
-// 特定のユーザーが特定の投稿に対してつけた「いいね（good）」を削除する処理です。
+// いいねを削除
 function deleteGood($user_id, $unique_id)
 {
     global $wpdb;
-    return $wpdb->delete('good', [
-        'user_id'   => sanitize_text_field($user_id),
-        'unique_id' => sanitize_text_field($user_id) // いいねしたユーザーのID（通常はUUIDやログイン中のセッションIDなど）
-        // 'post_id'   => intval($post_id) // いいねされた投稿のID（数値）
+    // WordPressのデータベースアクセス用オブジェクトを使うための宣言。
+    $table = $wpdb->prefix . 'good';
+    // $user_id と $unique_id が一致するレコードを削除（= いいねの取り消し）。
+    $wpdb->delete($table, [
+        'user_id' => $user_id,
+        'unique_id' => $unique_id
     ]);
+}
+
+// 特定の投稿（unique_id）に対して付けられた「いいね」情報を すべて取得 する関数です。
+function getGoodCount($unique_id)
+{
+    global $wpdb;
+    $table = $wpdb->prefix . 'good';
+    // SQLの結果を配列で取得して返します（複数行ある場合に最適）。
+    return $wpdb->get_results($wpdb->prepare(
+        // SQLインジェクション対策を行いながら、安全に値をSQLに埋め込む方法です。
+        "SELECT * FROM $table WHERE unique_id = %s",
+        $unique_id
+    ));
 }
