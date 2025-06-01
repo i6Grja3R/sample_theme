@@ -5,36 +5,61 @@ Template Name: button
 */
 ?>
 <?php
-// いいね対象の unique_id を取得（set_query_var() + get_query_var() などから）
-// バリデーション & フォールバック
-$unique_id = $args['unique_id'] ?? '';
-
-// Cookie からゲストユーザーIDを取得（存在しなければ発行）
-$cookie_name = 'guest_user_id';
-
-$cookie_id = $_COOKIE['like_user_id'] ?? null;
-if (!$cookie_id) {
-    $cookie_id = bin2hex(random_bytes(16));
-    setcookie('like_user_id', $cookie_id, time() + (10 * 365 * 24 * 60 * 60), '/');
+var_dump(isset($args)); // ← true になる？
+var_dump($args);        // ← 配列になっている？
+?>
+<?php
+// ----------------------------
+// [1] 引数チェック・サニタイズ
+// ----------------------------
+if (!isset($args) || !is_array($args)) {
+    return;
 }
-$user_id = $cookie_id;
+// var_dump($unique_id);
+// バリデーション & フォールバック
+// $unique_id = $args['unique_id'] ?? '';
+$unique_id = isset($args['unique_id']) ? sanitize_text_field($args['unique_id']) : '';
+if (empty($unique_id)) {
+    return; // 不正 or 未定義なら描画しない
+}
 
+// ----------------------------
+// [2] CookieベースのゲストユーザーID取得
+// ----------------------------
+$cookie_name = 'like_user_id';
+$user_id = $_COOKIE[$cookie_name] ?? null;
+
+if (!$user_id) {
+    $user_id = bin2hex(random_bytes(16));
+    setcookie($cookie_name, $user_id, time() + (10 * 365 * 24 * 60 * 60), '/'); // 10年
+}
+
+// ----------------------------
+// [3] いいね状態・件数取得（ユーティリティ関数使用）
+// ----------------------------
 $is_liked = function_exists('isGood') ? isGood($user_id, $unique_id) : false;
 $good_entries = function_exists('getGood') ? getGood($unique_id) : [];
 $good_count = is_array($good_entries) ? count($good_entries) : 0;
 
+// ----------------------------
+// [4] CSSクラスやSVG色の切り替え
+// ----------------------------
 $button_classes = 'quest-likeButton' . ($is_liked ? ' active' : '');
 $icon_classes = $is_liked ? 'liked' : 'liker';
 $count_classes = $is_liked ? 'like over' : 'like cancel';
+$svg_fill = $is_liked ? '#e0245e' : '#888';
 ?>
 
+<!-- ----------------------------
+      [5] ボタン出力
+----------------------------- -->
 <button
     class="<?php echo esc_attr($button_classes); ?>"
     data-uniqueid="<?php echo esc_attr($unique_id); ?>"
     aria-label="Like button">
     <svg version="1.1" id="レイヤー_1" class="likeButton-icon <?php echo esc_attr($icon_classes); ?>"
         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px"
-        y="0px" viewBox="0 0 256 256" style="enable-background:new 0 0 256 256;" xml:space="preserve">
+        y="0px" viewBox="0 0 256 256" style="enable-background:new 0 0 256 256;" xml:space="preserve" fill="<?php echo esc_attr($svg_fill); ?>">
         <style type="text/css">
             .st0 {
                 fill: #FFFFFF;
