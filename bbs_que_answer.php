@@ -67,7 +67,7 @@ foreach ($rows as $row) {
     echo '<div class="quest_username">' . $row->name . '</div>'; // 名前
 
     // 固定ページごとにユニークなIDを生成
-    $unique_id = 'page_' . get_the_ID();
+    $unique_id = 'page_' . get_the_ID(); // ← 投稿IDで一意化
 
     // ゲスト用ユーザーID（Cookieベース）
     $user_id = $_COOKIE['like_user_id'] ?? null;
@@ -77,7 +77,7 @@ foreach ($rows as $row) {
     $user_id = sanitize_text_field($user_id);
 
     // テンプレートにデータを渡してボタン描画（AJAX + SVG込み）
-    get_template_part('template-parts/like/button', null, ['unique_id' => 'page_' . get_the_ID()]);
+    get_template_part('template-parts/like/button', null, ['unique_id' => $unique_id]);
 
     echo '</div>';  // アイコン画像
 }

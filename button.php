@@ -5,8 +5,8 @@ Template Name: button
 */
 ?>
 <?php
-var_dump(isset($args)); // ← true になる？
-var_dump($args);        // ← 配列になっている？
+var_dump($args); // ← true になる？
+var_dump($unique_id);        // ← 配列になっている？
 ?>
 <?php
 // ----------------------------
@@ -54,7 +54,7 @@ $svg_fill = $is_liked ? '#e0245e' : '#888';
       [5] ボタン出力
 ----------------------------- -->
 <button
-    class="<?php echo esc_attr($button_classes); ?>"
+    class="<?php echo esc_attr($button_classes); ?> quest-likeButton"
     data-uniqueid="<?php echo esc_attr($unique_id); ?>"
     aria-label="Like button">
     <svg version="1.1" id="レイヤー_1" class="likeButton-icon <?php echo esc_attr($icon_classes); ?>"

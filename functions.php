@@ -787,7 +787,7 @@ function like_enqueue_scripts()
         true // フッターで読み込み
     );
 
-    wp_localize_script('$handle', 'like_vars', [
+    wp_localize_script($handle, 'like_vars', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce'    => wp_create_nonce('like_nonce'),
     ]);
