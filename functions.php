@@ -767,8 +767,8 @@ add_action('init', function () {
 add_action('init', function () {
     if (!isset($_COOKIE['like_user_id'])) {
         $guest_user_id = wp_generate_uuid4();
-        setcookie('guest_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
-        $_COOKIE['like_user_id'] = $guest_user_id; // PHP側でも即時使えるように
+        setcookie('like_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
+        $_COOKIE['like_user_id'] = $guest_user_id; // 即時使用できるように
     }
 });
 
