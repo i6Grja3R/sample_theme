@@ -6,7 +6,6 @@ Template Name: button
 ?>
 <?php
 var_dump($args); // ← true になる？
-var_dump($unique_id);        // ← 配列になっている？
 ?>
 <?php
 // ----------------------------
