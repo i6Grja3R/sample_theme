@@ -29,6 +29,6 @@ function handle_like_toggle()
 
     wp_send_json_success([
         'liked'  => $liked,
-        'count'  => getGoodCount($unique_id)
+        'count'  => count(getGood($unique_id))
     ]);
 }

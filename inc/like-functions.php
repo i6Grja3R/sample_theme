@@ -51,7 +51,7 @@ function deleteGood($user_id, $unique_id)
 }
 
 // 特定の投稿（unique_id）に対して付けられた「いいね」情報を すべて取得 する関数です。
-function getGoodCount($unique_id)
+function getGood($unique_id)
 {
     global $wpdb;
     $table = $wpdb->prefix . 'good';
