@@ -745,3 +745,4 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 
 
 <!-- ここからフッター表示 -->
+<?php get_footer(); ?>
