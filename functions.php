@@ -783,7 +783,8 @@ function like_enqueue_scripts()
         $handle,
         get_template_directory_uri() . '/assets/js/like.js',
         [],
-        filemtime($script_path), // キャッシュバスティング用
+        // filemtime($script_path), // キャッシュバスティング用
+        filemtime(get_template_directory() . '/assets/js/like.js'),
         true // フッターで読み込み
     );
 
