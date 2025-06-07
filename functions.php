@@ -764,7 +764,9 @@ add_action('init', function () {
 
 
 // ゲスト識別用 UUID をCookieに保存
-add_action('init', function () {
+// add_action('init', ...) は WordPress の初期化処理の一部で実行されるが、この時点では すでにヘッダー送信が終わっていることもある ため、setcookie() が失敗する
+// cookie が正しく保存されない → like_user_id が欠損 → いいね機能が動かない という致命的な問題になるため、WordPress が HTTP ヘッダーを送る「直前」にフックする
+add_action('send_headers', function () {
     if (!isset($_COOKIE['like_user_id'])) {
         $guest_user_id = wp_generate_uuid4();
         setcookie('like_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
@@ -783,8 +785,8 @@ function like_enqueue_scripts()
         $handle,
         get_template_directory_uri() . '/assets/js/like.js',
         [],
-        // filemtime($script_path), // キャッシュバスティング用
-        filemtime(get_template_directory() . '/assets/js/like.js'),
+        filemtime($script_path), // キャッシュバスティング用
+        // filemtime(get_template_directory() . '/assets/js/like.js'),
         true // フッターで読み込み
     );
 

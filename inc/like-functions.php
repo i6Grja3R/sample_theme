@@ -34,7 +34,7 @@ function insertGood($user_id, $unique_id)
         'user_id' => $user_id, // いいねしたユーザーの識別子
         'unique_id' => $unique_id, // いいね対象の一意な識別子（例：投稿IDやUUIDなど）
         'created_date' => current_time('mysql', 1) // いいねをした日時（WordPressの現在時刻、UTCかローカル）1 を渡すことで「GMT（UTC）」の時刻になります。
-    ]);
+    ], ['%s', '%s', '%s']);
 }
 
 // いいねを削除
@@ -47,7 +47,7 @@ function deleteGood($user_id, $unique_id)
     $wpdb->delete($table, [
         'user_id' => $user_id,
         'unique_id' => $unique_id
-    ]);
+    ], ['%s', '%s']);
 }
 
 // 特定の投稿（unique_id）に対して付けられた「いいね」情報を すべて取得 する関数です。

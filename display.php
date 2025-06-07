@@ -32,7 +32,8 @@ function get_template_url($template_number, $check_search)
 function get_template_number()
 {
     global $template;
-    $template_number = $_GET['tn'];
+    // $template_number = $_GET['tn'];
+    $template_number = isset($_GET['tn']) ? $_GET['tn'] : '';
     switch ($template_number) {
         case '2':
             break;
@@ -81,7 +82,8 @@ function get_rss_table_name($template_number)
 }
 function get_current_page()
 {
-    $cp = $_GET['cp'];
+    // $cp = $_GET['cp'];
+    $cp = isset($_GET['cp']) ? $_GET['cp'] : ''; // ページ番号の初期値がある場合
     if (ctype_digit($cp)) {
         $cp = (int) $_GET['cp'];
     } else {
@@ -136,7 +138,7 @@ LIMIT
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
         foreach ($terms as $term) {
-            $url = get_term_link($term)."?tn={$tn}";
+            $url = get_term_link($term) . "?tn={$tn}";
             $out .= "
 <li>
 <a href=\"{$url}\" width: 97px;height: 130px;>
@@ -192,7 +194,7 @@ m DESC
     }
     $out = '<ul class="archive-list">';
     foreach ($ym_array as $y => $y_items) {
-        $out .= '<li class="year">'.$y;
+        $out .= '<li class="year">' . $y;
         $out .= '<ul class="month-archive-list">';
         foreach ($y_items as $m => $c) {
             $url = home_url("{$y}/{$m}?tn={$tn}");
@@ -227,122 +229,137 @@ function display_pagenavi()
     var_dump($a);
     $s = '';
     if (is_search()) {
-      $s = filter_input(INPUT_GET, 's');
-      if (!empty($s)) {
-          $s = "&s={$s}";
-      }
-  }
-for ($i = 1; $i <= $pages; ++$i) {
-  if (1 == $i) {
-      $page_text = '＜＜';
-      echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
-      if ($current_page > 1) {
-          $j = $current_page - 1;
-      } else {
-          $j = 1;
-      }
-      $page_text = '＜';
-      echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
-  }
-  if ($i >= $current_page && ++$display_page_count <= $display_pages) {
-      $page_text = $i;
-      echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
-  }
-  if ($i == $pages) {
-      if ($current_page < $pages) {
-          $j = $current_page + 1;
-      } else {
-          $j = $pages;
-      }
-      $page_text = '＞';
-      echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
-      $page_text = '＞＞';
-      echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
-  }
-}
+        $s = filter_input(INPUT_GET, 's');
+        if (!empty($s)) {
+            $s = "&s={$s}";
+        }
+    }
+    for ($i = 1; $i <= $pages; ++$i) {
+        if (1 == $i) {
+            $page_text = '＜＜';
+            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
+            if ($current_page > 1) {
+                $j = $current_page - 1;
+            } else {
+                $j = 1;
+            }
+            $page_text = '＜';
+            echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
+        }
+        if ($i >= $current_page && ++$display_page_count <= $display_pages) {
+            $page_text = $i;
+            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
+        }
+        if ($i == $pages) {
+            if ($current_page < $pages) {
+                $j = $current_page + 1;
+            } else {
+                $j = $pages;
+            }
+            $page_text = '＞';
+            echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
+            $page_text = '＞＞';
+            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
+        }
+    }
 }
 
 // 3日間ランキング
 function display_3day_ranking()
 {
-global $post;
+    global $post;
 ?>
-  <div class="3day-ranking">
-    <div class="side-title">3days ranking</div>
-    <div class="AMvertical black" style="width: 300px;">
-      <section class="popular-box">
-        <?php
-$args = array(
-'numberposts'   => 12,       //表示数
-'meta_key'      => 'pv_count_3day',
-'orderby'       => 'meta_value_num',
-'order'         => 'DESC',);
-$posts = get_posts($args);
-if ($posts) : ?>
-          <ul class="boxWrap clearfix">
-            <?php foreach( $posts as $post ) : setup_postdata( $post ); ?>
-            <li class="block circle">
-              <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
-                <div class="mosaic-backdrop">
-                  <?php if ( has_post_thumbnail() ) { the_post_thumbnail( array(100, 100)); } ?> </div>
-                <div class="modelName"> <span class="name"><?php the_title(); ?><span id="likeCount3"></span></span>
-                </div>
-              </a>
-              <div class="info topinfo">
-                <p>
-                  <?php //　連番表示 $count = sprintf("%02d",$count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; ?> </p>
-              </div>
-              <?/*php echo getPostViews3days(get_the_ID()); // 記事閲覧回数表示 */?>
-                <?php endforeach; wp_reset_postdata(); ?> </li>
-          </ul>
-          <?php else : ?>
-          <p>アクセスランキングはまだ集計されていません。</p>
-          <?php endif; ?> </section>
+    <div class="3day-ranking">
+        <div class="side-title">3days ranking</div>
+        <div class="AMvertical black" style="width: 300px;">
+            <section class="popular-box">
+                <?php
+                $args = array(
+                    'numberposts'   => 12,       //表示数
+                    'meta_key'      => 'pv_count_3day',
+                    'orderby'       => 'meta_value_num',
+                    'order'         => 'DESC',
+                );
+                $posts = get_posts($args);
+                if ($posts) : ?>
+                    <ul class="boxWrap clearfix">
+                        <?php foreach ($posts as $post) : setup_postdata($post); ?>
+                            <li class="block circle">
+                                <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
+                                    <div class="mosaic-backdrop">
+                                        <?php if (has_post_thumbnail()) {
+                                            the_post_thumbnail(array(100, 100));
+                                        } ?> </div>
+                                    <div class="modelName"> <span class="name"><?php the_title(); ?><span id="likeCount3"></span></span>
+                                    </div>
+                                </a>
+                                <div class="info topinfo">
+                                    <p>
+                                        <?php //　連番表示 $count = sprintf("%02d",$count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
+                                        ?> </p>
+                                </div>
+                                <?/*php echo getPostViews3days(get_the_ID()); // 記事閲覧回数表示 */ ?>
+                            <?php endforeach;
+                        wp_reset_postdata(); ?>
+                            </li>
+                    </ul>
+                <?php else : ?>
+                    <p>アクセスランキングはまだ集計されていません。</p>
+                <?php endif; ?>
+            </section>
+        </div>
     </div>
-  </div>
-  <?php
+<?php
 }
 
 function display_week_ranking()
 {
-global $post;
+    global $post;
 ?>
     <!-- ▼　週間ランキング ▼ -->
     <div class="week-ranking">
-      <div class="side-title">week ranking</div>
-      <div class="main-wrap" style="width: 300px;">
-        <section class="column-inner">
-          <?php
-$args = array(
-'numberposts' => 10, //表示数
-'meta_key' => 'pv_count_week',
-'orderby' => 'meta_value_num',
-'order' => 'DESC',);
+        <div class="side-title">week ranking</div>
+        <div class="main-wrap" style="width: 300px;">
+            <section class="column-inner">
+                <?php
+                $args = array(
+                    'numberposts' => 10, //表示数
+                    'meta_key' => 'pv_count_week',
+                    'orderby' => 'meta_value_num',
+                    'order' => 'DESC',
+                );
 
-$posts = get_posts($args);
-if ($posts) : ?>
-            <ul class="parent_box">
-              <?php foreach( $posts as $post ) : setup_postdata( $post ); ?>
-              <li class="child_box">
-                <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
-                  <div class="mosaic-backdrop">
-                    <?php if ( has_post_thumbnail() ) { the_post_thumbnail( array(100, 100)); } ?> </div>
-                  <div class="masking"> <span class="masktext"><?php the_title(); ?><span id="likeCount3"></span></span>
-                  </div>
-                </a>
-                <div class="info topinfo">
-                  <p>
-                    <?php $count = sprintf("%02d",$count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; ?> </p>
-                </div>
-                <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */?>
-                <?php endforeach; wp_reset_postdata(); ?> </li>
-            </ul>
-            <?php else : ?>
-            <p>アクセスランキングはまだ集計されていません。</p>
-            <?php endif; ?> </section>
-      </div>
+                $posts = get_posts($args);
+                if ($posts) : ?>
+                    <ul class="parent_box">
+                        <?php foreach ($posts as $post) : setup_postdata($post); ?>
+                            <li class="child_box">
+                                <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
+                                    <div class="mosaic-backdrop">
+                                        <?php if (has_post_thumbnail()) {
+                                            the_post_thumbnail(array(100, 100));
+                                        } ?> </div>
+                                    <div class="masking"> <span class="masktext"><?php the_title(); ?><span id="likeCount3"></span></span>
+                                    </div>
+                                </a>
+                                <div class="info topinfo">
+                                    <p><!-- ▼　週間ランキング ▼ -->
+                                        <?php $count = isset($some_array) ? count($some_array) : 0; // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
+                                        ?> </p>
+                                </div>
+                                <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
+                                ?>
+                            <?php endforeach;
+                        wp_reset_postdata(); ?>
+                            </li>
+                    </ul>
+                <?php else : ?>
+                    <p>アクセスランキングはまだ集計されていません。</p>
+                <?php endif; ?>
+            </section>
+        </div>
     </div>
-    <?php
+<?php
 }
 
 //検索欄
@@ -350,81 +367,84 @@ function display_search_form()
 {
     global $tn;
 ?>
-<form method="get" id="searchform" class="searchform" action="<?php echo home_url('/'); ?>">
-              <div class="text-block">
-                <div class="text-form"> <input type="text" placeholder="ブログ内を検索" name="s" class="searchfield" value="" /> <input type="hidden" name="tn" value="<?php echo $tn; ?>"> </div>
-                <div class="form-bottom"> <input type="submit" value="Q" /> </div>
-              </div>
-            </form>
+    <form method="get" id="searchform" class="searchform" action="<?php echo home_url('/'); ?>">
+        <div class="text-block">
+            <div class="text-form"> <input type="text" placeholder="ブログ内を検索" name="s" class="searchfield" value="" /> <input type="hidden" name="tn" value="<?php echo $tn; ?>"> </div>
+            <div class="form-bottom"> <input type="submit" value="Q" /> </div>
+        </div>
+    </form>
     <?php
 }
 
 //最近のコメント
 function display_comment()
 {
-$args = array(
-'author__not_in' => '1',
-'number' => '5',
-'status' => 'approve',
-'type' => 'comment'
-);
-$comments_query = new WP_Comment_Query;
-$comments = $comments_query->query( $args );
-// Comment Loop
-if ( $comments ) {
-?>
+    $args = array(
+        'author__not_in' => '1',
+        'number' => '5',
+        'status' => 'approve',
+        'type' => 'comment'
+    );
+    $comments_query = new WP_Comment_Query;
+    $comments = $comments_query->query($args);
+    // Comment Loop
+    if ($comments) {
+    ?>
         <!-- 表示部分 -->
         <div class="commentlist">
-          <div class="side-title">最近のコメント(comments)</div>
-          <?php
-foreach ( $comments as $comment ) {
-// 記述が長いので $pid に入れておく
-$pid = $comment->comment_post_ID;
-// 必要な文字列データの取得
-$url = get_permalink($pid);
-$img = get_the_post_thumbnail($pid , array('class' => 'myClass'));
-$date = get_comment_date('(Y/n/d)', $comment->comment_ID);
-$title = get_the_title($pid);
-$text = get_comment_text($comment->comment_ID);
-$user_id = $comment->comment_author;
-// デフォルト値で初期化して
-$user_id = '名無しさん(anonymous)';
-
-if (!empty($comment->comment_author)) {
-$user_id = $comment->comment_author;
-} elseif (!empty($comment->user_id)) {
-$user_id = $comment->user_id;
-}
-?>
-            <ul class="mycomment">
-              <li class="imgcomment">
-                <a class="commentheight" href="<?= $url ?>">
-                  <?= $img?>
-                </a>
-                <a class="com_title" href="<?= $url ?>">
-                  <?= $title ?>
-                </a>
-                <div class="commentnumber">
-                  <p class="comment">
-                    <?= mb_strimwidth($text, 0, 38, "･･･") ?>
-                  </p>
-                  <p class="my_author">
-                    <?= $date ?>
-                  </p><br> </div>
-              </li>
-            </ul>
+            <div class="side-title">最近のコメント(comments)</div>
             <?php
-}
-?> </div>
-        <?php
-} else {
-echo 'コメントなし';
-}
-?>
-          <?php
+            foreach ($comments as $comment) {
+                // 記述が長いので $pid に入れておく
+                $pid = $comment->comment_post_ID;
+                // 必要な文字列データの取得
+                $url = get_permalink($pid);
+                $img = get_the_post_thumbnail($pid, array('class' => 'myClass'));
+                $date = get_comment_date('(Y/n/d)', $comment->comment_ID);
+                $title = get_the_title($pid);
+                $text = get_comment_text($comment->comment_ID);
+                $user_id = $comment->comment_author;
+                // デフォルト値で初期化して
+                $user_id = '名無しさん(anonymous)';
+
+                if (!empty($comment->comment_author)) {
+                    $user_id = $comment->comment_author;
+                } elseif (!empty($comment->user_id)) {
+                    $user_id = $comment->user_id;
+                }
+            ?>
+                <ul class="mycomment">
+                    <li class="imgcomment">
+                        <a class="commentheight" href="<?= $url ?>">
+                            <?= $img ?>
+                        </a>
+                        <a class="com_title" href="<?= $url ?>">
+                            <?= $title ?>
+                        </a>
+                        <div class="commentnumber">
+                            <p class="comment">
+                                <?= mb_strimwidth($text, 0, 38, "･･･") ?>
+                            </p>
+                            <p class="my_author">
+                                <?= $date ?>
+                            </p><br>
+                        </div>
+                    </li>
+                </ul>
+            <?php
+            }
+            ?>
+        </div>
+    <?php
+    } else {
+        echo 'コメントなし';
+    }
+    ?>
+<?php
 }
 
-function get_categories_array(){
+function get_categories_array()
+{
     $categories = [];
     foreach (get_categories() as $category) {
         $category->category_link = get_category_link($category->cat_ID);
@@ -448,77 +468,77 @@ function display_rss_post_1()
     global $categories;
     // 表示
     for ($i = 0; $i < $block_per_page; ++$i) {
-  /*echo '<h3>RSS</h3>';*/
-  $contentA = '';
-  $contentB = '';
-  $contentC = '';
-  for ($j = 0; $j < $rss_per_block; ++$j) {
-      $item_index = $i * $rss_per_block + $j;
-      if ($item_index >= count($rss_items)) {
-          break;
-      }
-      $item = $rss_items[$item_index];
-      $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
-      if (empty($item->img)) {
-          $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
-      } else {
-          $img = $item->img;
-      }
-      $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
-  $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
-      if ($j < $limitSect1) {
-          $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
-      } elseif ($j < $limitSect1 + $limitSect2) {
-          $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
-      } else {
-          $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
-      }
-  }
-  echo '<div class="rssBlock">';
-  echo "<ul class=\"wiget-rss\">{$contentA}</ul>";
-  echo "<ul class=\"wiget-rss\">{$contentB}</ul>";
-  echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
-  echo '</div>';
-
-    echo '<h3>投稿</h3>';
-    echo '<div id="entry-content">'; // 記事全体のid
-    for ($k = 0; $k < $group_per_block; ++$k) {
-        // ここから画像とタイトルの処理
-        for ($j = 0; $j < $posts_per_group; ++$j) {
-            $item_index = $i * $group_per_block * $posts_per_group + $k * $posts_per_group + $j;
-            if ($item_index >= count($post_items)) {
+        /*echo '<h3>RSS</h3>';*/
+        $contentA = '';
+        $contentB = '';
+        $contentC = '';
+        for ($j = 0; $j < $rss_per_block; ++$j) {
+            $item_index = $i * $rss_per_block + $j;
+            if ($item_index >= count($rss_items)) {
                 break;
             }
-            $item = $post_items[$item_index];
-            set_other_data($item);
-            // タイトルの保存は省略
-            // ここから追加
-            echo '<div class="entry-post">'; // 記事1つ1つ
-            echo "<figure class=\"entry-thumnail\"><a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})</figure>"; // サムネイル画像
-            echo '<header class="entry-header">';
-            echo "<h2 class=\"entry-title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
-            echo '<p class="post-meta">'; // 日付け、カテゴリー、コメント数
-            echo '<span class="fa-clock fa-fw"></span>'; // 日付けのマーク fontawesomeをbeforeで読み込む
-            echo "<span class=\"published\">{$item->post_date}</span>"; // 日付け
-            echo '<span class="fa-folder fa-fw"></span>'; // カテゴリーのマーク fontawesomeをbeforeで読み込む
-            echo '<span class="category-link">';
-            if ($item->categories) {
-                foreach ($item->categories as $cat_ID) {
-                    $category = $categories[$cat_ID];
-                    echo "<a href=\"{$category->category_link}?tn={$tn}\">{$category->cat_name}</a>";
-                }
+            $item = $rss_items[$item_index];
+            $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
+            if (empty($item->img)) {
+                $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
+            } else {
+                $img = $item->img;
             }
-            echo '</span>'; // カテゴリー
-            echo '<span class="fa-comment fa-fw"></span>'; // コメント数のマーク fontawesomeをbeforeで読み込む
-            echo "<span class=\"comment-count\"><a href=\"{$item->guid}\">{$item->comments}</a></span>"; // コメント数
-            echo '</p>';
-            echo '</header>';
-            echo "<p class=\"entry-snippet\">{$item->post_excerpt}</p>"; // 抜粋
-		    echo '</div>';//記事1つ1つ
+            $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
+            $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
+            if ($j < $limitSect1) {
+                $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
+            } elseif ($j < $limitSect1 + $limitSect2) {
+                $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
+            } else {
+                $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
+            }
         }
+        echo '<div class="rssBlock">';
+        echo "<ul class=\"wiget-rss\">{$contentA}</ul>";
+        echo "<ul class=\"wiget-rss\">{$contentB}</ul>";
+        echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
+        echo '</div>';
+
+        echo '<h3>投稿</h3>';
+        echo '<div id="entry-content">'; // 記事全体のid
+        for ($k = 0; $k < $group_per_block; ++$k) {
+            // ここから画像とタイトルの処理
+            for ($j = 0; $j < $posts_per_group; ++$j) {
+                $item_index = $i * $group_per_block * $posts_per_group + $k * $posts_per_group + $j;
+                if ($item_index >= count($post_items)) {
+                    break;
+                }
+                $item = $post_items[$item_index];
+                set_other_data($item);
+                // タイトルの保存は省略
+                // ここから追加
+                echo '<div class="entry-post">'; // 記事1つ1つ
+                echo "<figure class=\"entry-thumnail\"><a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})</figure>"; // サムネイル画像
+                echo '<header class="entry-header">';
+                echo "<h2 class=\"entry-title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
+                echo '<p class="post-meta">'; // 日付け、カテゴリー、コメント数
+                echo '<span class="fa-clock fa-fw"></span>'; // 日付けのマーク fontawesomeをbeforeで読み込む
+                echo "<span class=\"published\">{$item->post_date}</span>"; // 日付け
+                echo '<span class="fa-folder fa-fw"></span>'; // カテゴリーのマーク fontawesomeをbeforeで読み込む
+                echo '<span class="category-link">';
+                if ($item->categories) {
+                    foreach ($item->categories as $cat_ID) {
+                        $category = $categories[$cat_ID];
+                        echo "<a href=\"{$category->category_link}?tn={$tn}\">{$category->cat_name}</a>";
+                    }
+                }
+                echo '</span>'; // カテゴリー
+                echo '<span class="fa-comment fa-fw"></span>'; // コメント数のマーク fontawesomeをbeforeで読み込む
+                echo "<span class=\"comment-count\"><a href=\"{$item->guid}\">{$item->comments}</a></span>"; // コメント数
+                echo '</p>';
+                echo '</header>';
+                echo "<p class=\"entry-snippet\">{$item->post_excerpt}</p>"; // 抜粋
+                echo '</div>'; //記事1つ1つ
+            }
+        }
+        echo '</div>'; //記事全体のid
     }
-echo '</div>';//記事全体のid
-}
 }
 function display_rss_post_2()
 {
@@ -535,65 +555,65 @@ function display_rss_post_2()
     global $categories;
     // 表示
     for ($i = 0; $i < $block_per_page; ++$i) {
-  /*echo '<h3>RSS</h3>';*/
-  $contentA = '';
-  $contentB = '';
-  $contentC = '';
-  for ($j = 0; $j < $rss_per_block; ++$j) {
-      $item_index = $i * $rss_per_block + $j;
-      if ($item_index >= count($rss_items)) {
-          break;
-      }
-      $item = $rss_items[$item_index];
-      $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
-      if (empty($item->img)) {
-          $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
-      } else {
-          $img = $item->img;
-      }
-      $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
-  $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
-      if ($j < $limitSect1) {
-          $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
-      } elseif ($j < $limitSect1 + $limitSect2) {
-          $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
-      } else {
-          $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
-      }
-  }
-  echo '<div class="rssBlock">';
-  echo "<ul class=\"wiget-rss\">{$contentA}</ul>";
-  echo "<ul class=\"wiget-rss\">{$contentB}</ul>";
-  echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
-  echo '</div>';
+        /*echo '<h3>RSS</h3>';*/
+        $contentA = '';
+        $contentB = '';
+        $contentC = '';
+        for ($j = 0; $j < $rss_per_block; ++$j) {
+            $item_index = $i * $rss_per_block + $j;
+            if ($item_index >= count($rss_items)) {
+                break;
+            }
+            $item = $rss_items[$item_index];
+            $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
+            if (empty($item->img)) {
+                $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
+            } else {
+                $img = $item->img;
+            }
+            $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
+            $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
+            if ($j < $limitSect1) {
+                $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
+            } elseif ($j < $limitSect1 + $limitSect2) {
+                $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
+            } else {
+                $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
+            }
+        }
+        echo '<div class="rssBlock">';
+        echo "<ul class=\"wiget-rss\">{$contentA}</ul>";
+        echo "<ul class=\"wiget-rss\">{$contentB}</ul>";
+        echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
+        echo '</div>';
 
-    echo '<h3>投稿</h3>';
-    echo '<div id="itemWrapper">'; // 記事全体のid
-    for ($k = 0; $k < $group_per_block; ++$k) {
-    // ここから画像とタイトルの処理
-        $images = '';
-        for ($j = 0; $j < $posts_per_group; ++$j) {
-            $item_index = $i * $group_per_block * $posts_per_group + $k * $posts_per_group + $j;
+        echo '<h3>投稿</h3>';
+        echo '<div id="itemWrapper">'; // 記事全体のid
+        for ($k = 0; $k < $group_per_block; ++$k) {
+            // ここから画像とタイトルの処理
+            $images = '';
+            for ($j = 0; $j < $posts_per_group; ++$j) {
+                $item_index = $i * $group_per_block * $posts_per_group + $k * $posts_per_group + $j;
+                if ($item_index >= count($post_items)) {
+                    break;
+                }
+                $item = $post_items[$item_index];
+                set_other_data($item);
+                // ここからページナビまで変更
+                if (1 == $j) {
+                    // 真ん中の記事を保存して、タイトルを設定
+                    $keep_item = $item;
+                }
+                /* 画像をため込む */
+                $images .= "<a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})";
+            }
             if ($item_index >= count($post_items)) {
                 break;
             }
-            $item = $post_items[$item_index];
-            set_other_data($item);
-            // ここからページナビまで変更
-            if (1 == $j) {
-                // 真ん中の記事を保存して、タイトルを設定
-                $keep_item = $item;
-            }
-            /* 画像をため込む */
-            $images .= "<a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})";
-        }
-        if ($item_index >= count($post_items)) {
-            break;
-        }
-        // タイトルの保存は省略
-        // ここから追加
-        $item = $keep_item;
-        // ここから追加
+            // タイトルの保存は省略
+            // ここから追加
+            $item = $keep_item;
+            // ここから追加
             echo '<div class="itemInner">'; // 記事1つ1つ
             echo "<figure class=\"itemThumnail\">{$images}</figure>"; // サムネイル画像
             echo '<header class="itemHead">';
@@ -615,10 +635,10 @@ function display_rss_post_2()
             echo '</p>';
             echo '</header>';
             echo "<p class=\"itemSnippet\">{$item->post_excerpt}</p>"; // 抜粋
-		    echo '</div>';//記事1つ1つ
+            echo '</div>'; //記事1つ1つ
         }
     }
-echo '</div>';//記事全体のid
+    echo '</div>'; //記事全体のid
 }
 function set_other_data($post)
 {
@@ -642,7 +662,7 @@ function set_other_data($post)
         //$post->comments = __('No Comments');
     } else {
         // コメントあり
-        $post->comments = $post->comment_count.'件のコメント';
+        $post->comments = $post->comment_count . '件のコメント';
     }
     // コメントリンク
     $post->comments_link = get_comments_link($post->ID);
