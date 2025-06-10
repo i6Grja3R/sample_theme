@@ -766,7 +766,8 @@ add_action('init', function () {
 // ゲスト識別用 UUID をCookieに保存
 // add_action('init', ...) は WordPress の初期化処理の一部で実行されるが、この時点では すでにヘッダー送信が終わっていることもある ため、setcookie() が失敗する
 // cookie が正しく保存されない → like_user_id が欠損 → いいね機能が動かない という致命的な問題になるため、WordPress が HTTP ヘッダーを送る「直前」にフックする
-add_action('send_headers', function () {
+// add_action('send_headers', function () {
+add_action('init', function () {
     if (!isset($_COOKIE['like_user_id'])) {
         $guest_user_id = wp_generate_uuid4();
         setcookie('like_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
@@ -809,6 +810,9 @@ add_action('wp_ajax_nopriv_handle_like_action', 'handle_like_ajax');
 // トグル対応の AJAX 処理
 function handle_like_ajax()
 {
+    error_log('handle_like_ajax called');
+    error_log('POST: ' . print_r($_POST, true));
+    error_log('COOKIE: ' . print_r($_COOKIE, true));
     // $_POST['unique_id']：対象となる投稿の一意ID（掲示板の質問IDなど）
     // $_COOKIE['like_user_id']：Cookieに保存された、ユーザー識別用のID
     // この2つが存在しない場合はエラーとして処理終了。
@@ -829,6 +833,7 @@ function handle_like_ajax()
         $liked = false;
     } else {
         insertGood($user_id, $unique_id); // まだ「いいね」してない場合 → 登録（追加）
+        error_log('INSERT ID: ' . $wpdb->insert_id); // 挿入された行のIDを確認
         $liked = true;
     }
 

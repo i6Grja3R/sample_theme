@@ -30,11 +30,19 @@ function insertGood($user_id, $unique_id)
     // 使用するテーブル名を作成。
     $table = $wpdb->prefix . 'good';
     // この行は、$table（= wp_good）テーブルにデータを挿入します
-    $wpdb->insert($table, [
+    $result = $wpdb->insert($table, [
         'user_id' => $user_id, // いいねしたユーザーの識別子
         'unique_id' => $unique_id, // いいね対象の一意な識別子（例：投稿IDやUUIDなど）
         'created_date' => current_time('mysql', 1) // いいねをした日時（WordPressの現在時刻、UTCかローカル）1 を渡すことで「GMT（UTC）」の時刻になります。
     ], ['%s', '%s', '%s']);
+
+    error_log("insertGood called with: user_id = $user_id, unique_id = $unique_id");
+
+    if ($result === false) {
+        error_log("INSERT失敗: " . $wpdb->last_error);
+    } else {
+        error_log("INSERT成功: user_id = $user_id, unique_id = $unique_id");
+    }
 }
 
 // いいねを削除
