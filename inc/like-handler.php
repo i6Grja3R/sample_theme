@@ -27,6 +27,7 @@ function handle_like_toggle()
         $liked = true;
     }
 
+    // このコードは関係なさそう
     wp_send_json_success([
         'liked'  => $liked,
         'count'  => count(getGood($unique_id))

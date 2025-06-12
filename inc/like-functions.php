@@ -21,6 +21,9 @@ function isGood($user_id, $unique_id)
         $user_id,
         $unique_id
     ));
+    // $count = $wpdb->get_var($query);
+
+    // return $count > 0;
 }
 
 // insertGood() は「誰（user_id）が、どの投稿（unique_id）に、いつ（created_date）いいねしたか」を good テーブルに記録します。
