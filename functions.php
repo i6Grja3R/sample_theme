@@ -556,7 +556,7 @@ function bbs_quest_confirm()
     // $wpdbでSQLを実行
     global $wpdb;
     // どのようなデータをどのテーブルに登録するか
-    $sql = 'INSERT INTO wp_sortable(text,name,title,stamp,ip) VALUES(%s,%s,%s,%d,%s)';
+    $sql = 'INSERT INTO {$wpdb->prefix}sortable(text,name,title,stamp,ip) VALUES(%s,%s,%s,%d,%s)';
     // セッション変数に登録
     $text = $_SESSION['text'];
     $name = $_SESSION['name'];
@@ -568,7 +568,7 @@ function bbs_quest_confirm()
     // プリペアードステートメントを用意してから、下記のようにresultsで値を取得
     $query_result = $wpdb->query($query);
     // カラム名 unique_id の質問UUID を一度そのデータを読み込んで取得する
-    $sql = 'SELECT unique_id FROM wp_sortable WHERE id = %d';
+    $sql = 'SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d';
     $query = $wpdb->prepare($sql, $wpdb->insert_id);
     $rows = $wpdb->get_results($query);
     $unique_id = $rows[0]->unique_id;
@@ -599,7 +599,7 @@ function bbs_quest_confirm()
         $result['error'] = '登録できませんでした';
         // 条件式が成り立たなければ処理を実行
     } else { // どのテーブルの何をどう更新するか
-        $sql = 'UPDATE wp_sortable SET attach1=%s,attach2=%s,attach3=%s,usericon=%s WHERE id=%d';
+        $sql = 'UPDATE {$wpdb->prefix}sortable SET attach1=%s,attach2=%s,attach3=%s,usericon=%s WHERE id=%d';
         $query = $wpdb->prepare($sql, $filenames[0], $filenames[1], $filenames[2], $filenames[3], $wpdb->insert_id);
         $wpdb->query($query);
         $result['error'] = '';
@@ -624,14 +624,14 @@ function bbs_answer_confirm()
     global $wpdb;
     /* ここから（１） */
     $unique_id = $_SESSION['unique_id'];
-    $sql = 'SELECT * FROM wp_sortable WHERE unique_id = %s';
+    $sql = 'SELECT * FROM {$wpdb->prefix}sortable WHERE unique_id = %s';
     $query = $wpdb->prepare($sql, $unique_id);
     $rows = $wpdb->get_results($query);
     // rows[0]は配列の最初の要素にアクセス
     $parent_id = $rows[0]->id;
     /* ここまで（１） */
     // どのようなデータをどのテーブルに登録するか
-    $sql = 'INSERT INTO wp_sortable(parent_id,text,name,ip) VALUES(%d,%s,%s,%s)';/* （２） */
+    $sql = 'INSERT INTO {$wpdb->prefix}sortable(parent_id,text,name,ip) VALUES(%d,%s,%s,%s)';/* （２） */
     // セッション変数に登録
     $text = $_SESSION['text'];
     $name = $_SESSION['name'];
@@ -651,7 +651,7 @@ function bbs_answer_confirm()
         // 条件式が成り立たなければ処理を実行
     } else { // どのテーブルの何をどう更新するか
         // カラム名 unique_id の質問UUID を一度そのデータを読み込んで取得する
-        $sql = 'SELECT unique_id FROM wp_sortable WHERE id = %d';
+        $sql = 'SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d';
         $query = $wpdb->prepare($sql, $wpdb->insert_id);
         $rows = $wpdb->get_results($query);
         $unique_id = $rows[0]->unique_id;
@@ -677,7 +677,7 @@ function bbs_answer_confirm()
                 file_put_contents($attach_path, $_SESSION['attach']['data'][$i]);
             }
         }
-        $sql = 'UPDATE wp_sortable SET attach1=%s,attach2=%s,attach3=%s,usericon=%s WHERE id=%d';
+        $sql = 'UPDATE {$wpdb->prefix}sortable SET attach1=%s,attach2=%s,attach3=%s,usericon=%s WHERE id=%d';
         $query = $wpdb->prepare($sql, $filenames[0], $filenames[1], $filenames[2], $filenames[3], $wpdb->insert_id);
         $wpdb->query($query);
         $result['error'] = '';
@@ -694,7 +694,7 @@ function bbs_que_list_items()
 {
     global $wpdb;
     $count = $_POST['count'];
-    $sql = 'SELECT * FROM wp_sortable WHERE parent_id IS NULL LIMIT %d,10';
+    $sql = 'SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL LIMIT %d,10';
     $query = $wpdb->prepare($sql, $count);
     $rows = $wpdb->get_results($query);
     $result = [];

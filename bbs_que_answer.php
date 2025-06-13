@@ -7,7 +7,7 @@ header('X-FRAME-OPTIONS: SAMEORIGIN');
 get_header();
 // get_header('menu'); 必要なコードか分からない
 $unique_id = substr($_SERVER['REQUEST_URI'], -36);
-$sql = 'SELECT * FROM sortable WHERE unique_id = %s';
+$sql = 'SELECT * FROM {$wpdb->prefix}sortable WHERE unique_id = %s';
 $query = $wpdb->prepare($sql, $unique_id);
 $rows = $wpdb->get_results($query);
 // アップロードディレクトリ（パス名）を取得する

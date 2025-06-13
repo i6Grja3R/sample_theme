@@ -4,7 +4,7 @@ Template Name: que_list
 固定ページ: 質問一覧画面
 */
 get_header();
-$sql = "SELECT * FROM sortable WHERE parent_id IS NULL AND attach1 LIKE '%.mp4' ORDER BY RAND() LIMIT 5";
+$sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL AND attach1 LIKE '%.mp4' ORDER BY RAND() LIMIT 5";
 $query = $wpdb->prepare($sql);
 $rows = $wpdb->get_results($query);
 $upload_dir = wp_upload_dir();
