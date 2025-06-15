@@ -133,7 +133,8 @@ cc.meta_value DESC
 LIMIT
 20
 ";
-    $query = $wpdb->prepare($sql);
+    // プレースフォルダーがないのに prepare するのは無意味
+    // $query = $wpdb->prepare($sql);
     $terms = $wpdb->get_results($query);
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
