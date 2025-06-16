@@ -134,8 +134,7 @@ LIMIT
 20
 ";
     // プレースフォルダーがないのに prepare するのは無意味
-    // $terms = $wpdb->get_results($sql);
-    // $terms = $wpdb->get_results($query);
+    $terms = $wpdb->get_results($sql);
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
         foreach ($terms as $term) {
