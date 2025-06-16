@@ -28,7 +28,7 @@ var_dump($unique_id);        // ← 配列になっている？
 // [2] CookieベースのゲストユーザーID取得
 // ----------------------------
 $cookie_name = 'like_user_id';
-$user_id = $_COOKIE[$cookie_name] ?? null;
+$user_id = sanitize_text_field($_COOKIE[$cookie_name]) ?? null;
 
 if (!$user_id) {
     $user_id = bin2hex(random_bytes(16));
