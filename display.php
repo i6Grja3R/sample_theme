@@ -344,8 +344,8 @@ function display_week_ranking()
                                 </a>
                                 <div class="info topinfo">
                                     <p><!-- ▼　週間ランキング ▼ -->
-                                        <?php $count = isset($some_array) ? count($some_array) : 0; // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
-                                        ?> </p>
+                                        <?php  /*$count = isset($some_array) ? count($some_array) : 0; // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
+                                         */ ?> </p>
                                 </div>
                                 <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
                                 ?>
