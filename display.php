@@ -32,8 +32,7 @@ function get_template_url($template_number, $check_search)
 function get_template_number()
 {
     global $template;
-    // $template_number = $_GET['tn'];
-    $template_number = isset($_GET['tn']) ? $_GET['tn'] : '';
+    $template_number = $_GET['tn'];
     switch ($template_number) {
         case '2':
             break;
@@ -82,8 +81,7 @@ function get_rss_table_name($template_number)
 }
 function get_current_page()
 {
-    // $cp = $_GET['cp'];
-    $cp = isset($_GET['cp']) ? $_GET['cp'] : ''; // ページ番号の初期値がある場合
+    $cp = $_GET['cp'];
     if (ctype_digit($cp)) {
         $cp = (int) $_GET['cp'];
     } else {
@@ -105,7 +103,6 @@ function display_other_template()
 
 function display_category_ranking()
 {
-    echo '<div>カテゴリーランキング</div>';
     global $wpdb;
     global $tn;
     global $cat;
@@ -133,16 +130,20 @@ cc.meta_value DESC
 LIMIT
 20
 ";
-    // プレースフォルダーがないのに prepare するのは無意味
-    $terms = $wpdb->get_results($sql);
+    $query = $wpdb->prepare($sql);
+    $terms = $wpdb->get_results($query);
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
+        $tag_link_count = 0;
         foreach ($terms as $term) {
             $url = get_term_link($term) . "?tn={$tn}";
+            $tag_link_count++;
             $out .= "
 <li>
-<a href=\"{$url}\" width: 97px;height: 130px;>
-<div class=\"cat-genre-wrap\">{$term->name}</div>
+<!--<span class=\"material-icons\">sell
+</span>-->
+<a href=\"{$url}\" class=\"tag-link-{$tag_link_count}\" style=\"font-size:9pt;\" aria-lavel=\"{$term->name}（{$term->count}項目）\" >
+{$term->name}
 </a>
 <div class=\"Information\">
 </div>
@@ -162,7 +163,7 @@ LIMIT
 
 function display_archive()
 {
-    echo '<div>アーカイブ</div>';
+    /*echo '<div>アーカイブ</div>';*/
     global $wpdb;
     global $tn;
     global $tk;
@@ -176,6 +177,7 @@ wp_posts AS post
 INNER JOIN wp_postmeta AS meta
 ON post.id = meta.post_id
 WHERE
+
 meta.meta_key = %s
 AND post.post_type = 'post'
 AND post.post_status = 'publish'
@@ -206,7 +208,7 @@ m DESC
     $out .= '</ul>';
     echo "
 <p id=\"sampleOutput\"></p>
-<div class=\"widget\">
+<div class=\"widget_archive\">
 <div class=\"side-title\">月別アーカイブ(monthly archive)</div>
 {$out}
 </div>
@@ -282,14 +284,13 @@ function display_3day_ranking()
                 );
                 $posts = get_posts($args);
                 if ($posts) : ?>
-                    <ul class="boxWrap clearfix">
+                    <ul>
                         <?php foreach ($posts as $post) : setup_postdata($post); ?>
-                            <li class="block circle">
-                                <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
-                                    <div class="mosaic-backdrop">
-                                        <?php if (has_post_thumbnail()) {
-                                            the_post_thumbnail(array(100, 100));
-                                        } ?> </div>
+                            <li>
+                                <a href="<?php echo get_permalink(); ?>" style="width: 97px;height: 130px">
+                                    <?php if (has_post_thumbnail()) {
+                                        the_post_thumbnail(array(100, 100));
+                                    } ?>
                                     <div class="modelName"> <span class="name"><?php the_title(); ?><span id="likeCount3"></span></span>
                                     </div>
                                 </a>
@@ -318,12 +319,11 @@ function display_week_ranking()
 ?>
     <!-- ▼　週間ランキング ▼ -->
     <div class="week-ranking">
-        <div class="side-title">week ranking</div>
-        <div class="main-wrap" style="width: 300px;">
+        <div class="main-wrap">
             <section class="column-inner">
                 <?php
                 $args = array(
-                    'numberposts' => 10, //表示数
+                    'numberposts' => 6, //表示数
                     'meta_key' => 'pv_count_week',
                     'orderby' => 'meta_value_num',
                     'order' => 'DESC',
@@ -334,21 +334,36 @@ function display_week_ranking()
                     <ul class="parent_box">
                         <?php foreach ($posts as $post) : setup_postdata($post); ?>
                             <li class="child_box">
-                                <a href="<?php echo get_permalink(); ?>" width: 97px;height: 130px;>
-                                    <div class="mosaic-backdrop">
-                                        <?php if (has_post_thumbnail()) {
-                                            the_post_thumbnail(array(100, 100));
-                                        } ?> </div>
-                                    <div class="masking"> <span class="masktext"><?php the_title(); ?><span id="likeCount3"></span></span>
-                                    </div>
-                                </a>
-                                <div class="info topinfo">
-                                    <p><!-- ▼　週間ランキング ▼ -->
-                                        <?php  /*$count = isset($some_array) ? count($some_array) : 0; // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
-                                         */ ?> </p>
+                                <header class="week-ranking-header">
+                                    <div class="week-ranking date-outer"> <time datetime="<?php the_time('Y-m-d'); ?>T<?php the_time('H:i:sP'); ?>">
+                                            <span class="week-ranking-date"><?php the_time('Y/m/d'); ?></span>
+                                            <span class="week-ranking-time"><?php the_time('H:i'); ?></span>
+                                        </time> </div>
+                                    <a href="<?php echo get_permalink(); ?>" width: 100px;height: 130px;>
+                                        <!--div class="week-ranking masking"-->
+                                        <!--<h3 class="week-ranking masktext">-->
+                                        <?php  //the_title(); 
+                                        ?><!--<span id="likeCount3"></span></h3>
+                    </div>-->
+                                </header>
+                                <div class="week-ranking mosaic-backdrop">
+                                    <div class="index_commentbox">
+                                        <?php if (function_exists("the_ratings")) the_ratings(); ?></div>
+                                    <?php if (has_post_thumbnail()) {
+                                        echo '<div class="week-ranking list-thumbnail">';
+                                        the_post_thumbnail(array(200, 200), array('class' => 'week-ranking mosaic-backdrop'));
+                                    }
+                                    echo '</div>';
+                                    ?>
                                 </div>
-                                <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
-                                ?>
+                                </a>
+                                <div class="week-ranking info topinfo">
+                                    <p>
+                                        <?php $count = sprintf("%02d", $count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
+                                        ?> </p>
+                                    <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
+                                    ?>
+                                </div>
                             <?php endforeach;
                         wp_reset_postdata(); ?>
                             </li>
@@ -368,10 +383,8 @@ function display_search_form()
     global $tn;
 ?>
     <form method="get" id="searchform" class="searchform" action="<?php echo home_url('/'); ?>">
-        <div class="text-block">
-            <div class="text-form"> <input type="text" placeholder="ブログ内を検索" name="s" class="searchfield" value="" /> <input type="hidden" name="tn" value="<?php echo $tn; ?>"> </div>
-            <div class="form-bottom"> <input type="submit" value="Q" /> </div>
-        </div>
+        <div class="text-form"> <input type="text" placeholder="ブログ内を検索" name="s" id="s" value="" /> <input type="hidden" name="tn" value="<?php echo $tn; ?>"> </div>
+        <div class="form-bottom"> <input type="submit" id="searchsubmit" value="Q" /> </div>
     </form>
     <?php
 }
@@ -413,24 +426,26 @@ function display_comment()
                     $user_id = $comment->user_id;
                 }
             ?>
-                <ul class="mycomment">
-                    <li class="imgcomment">
-                        <a class="commentheight" href="<?= $url ?>">
-                            <?= $img ?>
-                        </a>
-                        <a class="com_title" href="<?= $url ?>">
-                            <?= $title ?>
-                        </a>
-                        <div class="commentnumber">
-                            <p class="comment">
-                                <?= mb_strimwidth($text, 0, 38, "･･･") ?>
-                            </p>
-                            <p class="my_author">
-                                <?= $date ?>
-                            </p><br>
-                        </div>
-                    </li>
-                </ul>
+                <div class="recentcomment">
+                    <ul class="mycomment">
+                        <li class="imgcomment">
+                            <a class="commentheight" href="<?= $url ?>">
+                                <?= $img ?>
+                            </a>
+                            <a class="com_title" href="<?= $url ?>">
+                                <?= $title ?>
+                            </a>
+                            <div class="commentnumber">
+                                <p class="comment">
+                                    <?= mb_strimwidth($text, 0, 38, "･･･") ?>
+                                </p>
+                                <p class="my_author">
+                                    <?= $date ?>
+                                </p><br>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
             <?php
             }
             ?>
@@ -500,7 +515,6 @@ function display_rss_post_1()
         echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
         echo '</div>';
 
-        echo '<h3>投稿</h3>';
         echo '<div id="entry-content">'; // 記事全体のid
         for ($k = 0; $k < $group_per_block; ++$k) {
             // ここから画像とタイトルの処理
@@ -515,6 +529,7 @@ function display_rss_post_1()
                 // ここから追加
                 echo '<div class="entry-post">'; // 記事1つ1つ
                 echo "<figure class=\"entry-thumnail\"><a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})</figure>"; // サムネイル画像
+                echo '<div class="entry-card-content">';
                 echo '<header class="entry-header">';
                 echo "<h2 class=\"entry-title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
                 echo '<p class="post-meta">'; // 日付け、カテゴリー、コメント数
@@ -534,7 +549,8 @@ function display_rss_post_1()
                 echo '</p>';
                 echo '</header>';
                 echo "<p class=\"entry-snippet\">{$item->post_excerpt}</p>"; // 抜粋
-                echo '</div>'; //記事1つ1つ
+                echo '</div>';
+                echo '</div>';
             }
         }
         echo '</div>'; //記事全体のid
@@ -587,7 +603,6 @@ function display_rss_post_2()
         echo "<ul class=\"wiget-rss\">{$contentC}</ul>";
         echo '</div>';
 
-        echo '<h3>投稿</h3>';
         echo '<div id="itemWrapper">'; // 記事全体のid
         for ($k = 0; $k < $group_per_block; ++$k) {
             // ここから画像とタイトルの処理
@@ -616,6 +631,7 @@ function display_rss_post_2()
             // ここから追加
             echo '<div class="itemInner">'; // 記事1つ1つ
             echo "<figure class=\"itemThumnail\">{$images}</figure>"; // サムネイル画像
+            echo '<div class="item-outer">';
             echo '<header class="itemHead">';
             echo "<h2 class=\"entry-Title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
             echo '<p class="itemInfo">'; // 日付け、カテゴリー、コメント数
@@ -635,7 +651,8 @@ function display_rss_post_2()
             echo '</p>';
             echo '</header>';
             echo "<p class=\"itemSnippet\">{$item->post_excerpt}</p>"; // 抜粋
-            echo '</div>'; //記事1つ1つ
+            echo '</div>';
+            echo '</div>';
         }
     }
     echo '</div>'; //記事全体のid
@@ -667,4 +684,30 @@ function set_other_data($post)
     // コメントリンク
     $post->comments_link = get_comments_link($post->ID);
 }
+
+function display_main_banner()
+{
+    //配列にしてまとめる(画像リンクとタイトル)
+    //配列にしてまとめる(画像リンクとタイトル)
+    $banner_data = [
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', '2枚絵比較', 'http://www.irasuto.cfbx.jp/画像2タイトル1/'],
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_jiyunotsubasa.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_TanukiMagic.png', '3枚絵比較', 'http://www.irasuto.cfbx.jp/画像3タイトル1/'],
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_cinecaption227.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_nicomoji-plus_v09.png', '掲示板質問1', 'http://www.irasuto.cfbx.jp/informtion/'],
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_nicokaku_v1.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_chogokubosogothic5.png', '掲示板質問2', '掲示板質問1', 'http://www.irasuto.cfbx.jp/entry/'],
+    ];
+
+    $buf = [];
+    foreach ($banner_data as $tmp) {
+        list($img1, $img2, $title, $link) = $tmp;
+        if (intval(date('H')) >= 12) $img1 = $img2;
+        $buf[] = sprintf('<li><a href="%s"><img src="%s" title="%s"></a></li>', $link, $img1, $title);
+    }
 ?>
+    <!-- 表示部分 -->
+    <div id="main-banner">
+        <ul class="menu banner-menu">
+            <?= implode(PHP_EOL, $buf) . PHP_EOL ?>
+        </ul>
+    </div>
+<?php
+}
