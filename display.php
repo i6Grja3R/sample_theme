@@ -123,17 +123,17 @@ SELECT
 FROM
 wp_termmeta
 WHERE
-meta_key = 'category_count_week'
+meta_key = %s
 AND meta_value != 0
 ) AS cc
 ON t.term_id = cc.term_id
 ORDER BY
 cc.meta_value DESC
 LIMIT
-20
+%d
 ";
-    $query = $wpdb->prepare($sql);
-    $terms = $wpdb->get_results($query);
+    $query = $wpdb->prepare($sql, 'category_count_week', 20);
+    $terms = $wpdb->get_results($sql);
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
         $tag_link_count = 0;
