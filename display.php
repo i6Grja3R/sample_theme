@@ -351,18 +351,16 @@ function display_week_ranking()
                                 <div class="week-ranking mosaic-backdrop">
                                     <div class="index_commentbox">
                                         <?php if (function_exists("the_ratings")) the_ratings(); ?></div>
-                                    <?php if (has_post_thumbnail()) {
+                                    <?php // 352行目がこの if の開始タグの場合
+                                    if (has_post_thumbnail()) {
                                         echo '<div class="week-ranking list-thumbnail">';
                                         the_post_thumbnail(array(200, 200), array('class' => 'week-ranking mosaic-backdrop'));
+                                        echo '</div>';
                                     }
-                                    echo '</div>';
                                     ?>
                                 </div>
                                 </a>
                                 <div class="week-ranking info topinfo">
-                                    <p>
-                                        <?php $count = sprintf("%02d", $count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
-                                        ?> </p>
                                     <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
                                     ?>
                                 </div>
