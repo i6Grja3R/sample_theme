@@ -32,7 +32,8 @@ function get_template_url($template_number, $check_search)
 function get_template_number()
 {
     global $template;
-    $template_number = $_GET['tn'];
+    // 修正前: $template_number = $_GET['tn'];
+    $template_number = isset($_GET['tn']) ? $_GET['tn'] : ''; // 35行目
     switch ($template_number) {
         case '2':
             break;
@@ -81,9 +82,10 @@ function get_rss_table_name($template_number)
 }
 function get_current_page()
 {
-    $cp = $_GET['cp'];
+    // 修正前: $cp = $_GET['cp'];
+    $cp = isset($_GET['cp']) ? $_GET['cp'] : ''; // 84行目
     if (ctype_digit($cp)) {
-        $cp = (int) $_GET['cp'];
+        $cp = (int) $cp; // ここを $_GET['cp'] ではなく $cp に変更
     } else {
         $cp = 1;
     }
