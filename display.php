@@ -133,7 +133,7 @@ LIMIT
 %d
 ";
     $query = $wpdb->prepare($sql, 'category_count_week', 20);
-    $terms = $wpdb->get_results($sql);
+    $terms = $wpdb->get_results($query);
     if ($terms) {
         $out = '<ul class="category-ranking clearfix">';
         $tag_link_count = 0;
