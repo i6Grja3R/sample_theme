@@ -764,14 +764,14 @@ add_action('init', function () {
 
 
 // ゲスト識別用 UUID をCookieに保存
-// cookie が正しく保存されない → like_user_id が欠損 → いいね機能が動かない という致命的な問題になるため、WordPress が HTTP ヘッダーを送る「直前」にフックする
+// cookie が正しく保存されない → user_id が欠損 → いいね機能が動かない という致命的な問題になるため、WordPress が HTTP ヘッダーを送る「直前」にフックする
 // init で setcookie() を使うのはタイミング的に遅すぎるため setcookie() の効果が失われ、ブラウザに Cookie が保存されない
 // add_action('init', function () {
 add_action('send_headers', function () {
-    if (!isset($_COOKIE['like_user_id'])) {
+    if (!isset($_COOKIE['user_id'])) {
         $guest_user_id = wp_generate_uuid4();
-        setcookie('like_user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
-        $_COOKIE['like_user_id'] = $guest_user_id; // 即時使用できるように
+        setcookie('user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
+        $_COOKIE['user_id'] = $guest_user_id; // 即時使用できるように
     }
 });
 
@@ -793,7 +793,7 @@ function like_enqueue_scripts()
 
     wp_localize_script($handle, 'like_vars', [
         'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('like_nonce'),
+        'nonce' => wp_create_nonce('like_nonce'),
     ]);
 }
 add_action('wp_enqueue_scripts', 'like_enqueue_scripts');
@@ -814,10 +814,10 @@ function handle_like_ajax()
     error_log('POST: ' . print_r($_POST, true));
     error_log('COOKIE: ' . print_r($_COOKIE, true));
     // $_POST['unique_id']：対象となる投稿の一意ID（掲示板の質問IDなど）
-    // $_COOKIE['like_user_id']：Cookieに保存された、ユーザー識別用のID
+    // $_COOKIE['user_id']：Cookieに保存された、ユーザー識別用のID
     // この2つが存在しない場合はエラーとして処理終了。
     if (
-        !isset($_POST['unique_id']) || !isset($_COOKIE['like_user_id']) ||
+        !isset($_POST['unique_id']) || !isset($_COOKIE['user_id']) ||
         !wp_verify_nonce($_POST['nonce'] ?? '', 'like_nonce')
     ) {
         wp_send_json_error(['message' => '不正なリクエストです。']);
@@ -825,7 +825,7 @@ function handle_like_ajax()
 
     // 入力データを**無害化（サニタイズ）**して、XSSやSQLインジェクションを防ぎます。
     $unique_id = sanitize_text_field($_POST['unique_id']);
-    $user_id = sanitize_text_field($_COOKIE['like_user_id']);
+    $user_id = sanitize_text_field($_COOKIE['user_id']);
 
     // isGood($user_id, $unique_id)： 指定されたユーザーが既にその投稿に「いいね」しているかどうかを判定
     if (isGood($user_id, $unique_id)) {

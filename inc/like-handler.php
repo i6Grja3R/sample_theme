@@ -12,7 +12,7 @@ function handle_like_toggle()
 {
     check_ajax_referer('like_nonce', 'nonce');
 
-    $user_id   = $_COOKIE['guest_user_id'] ?? '';
+    $user_id   = $_COOKIE['user_id'] ?? '';
     $unique_id = $_POST['unique_id'] ?? '';
 
     if (!$user_id || !$unique_id) {

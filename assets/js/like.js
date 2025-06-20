@@ -1,11 +1,12 @@
 // assets/js/like.js
 // 初回訪問時は Cookie がないため、ページリロードなしで機能させたいなら JS も併用（JavaScript 側で Cookie を事前に発行）
 document.addEventListener('DOMContentLoaded', function () {
-    if (!document.cookie.includes('like_user_id')) {
+    if (!document.cookie.includes('user_id')) {
         const guestId = crypto.randomUUID(); // 安全なUUID生成
-        document.cookie = `like_user_id=${guestId}; path=/; max-age=${10 * 365 * 24 * 60 * 60}`;
+        document.cookie = `user_id=${guestId}; path=/; max-age=${10 * 365 * 24 * 60 * 60}`;
     }
 });
+
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.quest-likeButton').forEach(button => {
         button.addEventListener('click', async () => {
