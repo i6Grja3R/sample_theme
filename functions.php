@@ -833,7 +833,6 @@ function handle_like_ajax()
         $liked = false;
     } else {
         insertGood($user_id, $unique_id); // まだ「いいね」してない場合 → 登録（追加）
-        error_log('INSERT ID: ' . $wpdb->insert_id); // 挿入された行のIDを確認
         $liked = true;
     }
 
