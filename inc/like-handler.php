@@ -4,6 +4,10 @@
 */
 ?>
 <?php
+// AJAXハンドラ登録
+add_action('wp_ajax_handle_like_action', 'handle_like_ajax');
+add_action('wp_ajax_nopriv_handle_like_action', 'handle_like_ajax');
+
 // トグル対応の AJAX 処理
 function handle_like_ajax()
 {
