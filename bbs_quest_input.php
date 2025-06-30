@@ -231,12 +231,12 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
                 return response.json();
             })
             .then(json => {
-                if (json.error != "") {
-                    alert(json.error);
+                if (json.data.error != "") {
+                    alert(json.data.error);
                     return;
                 }
-                name_value = json.name;
-                text_value = json.text;
+                name_value = json.data.name;
+                text_value = json.data.text;
                 title_value = json.title;
                 const stamps = document.getElementsByName('stamp');
                 for (var stamp of stamps) {
