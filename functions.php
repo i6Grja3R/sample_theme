@@ -534,8 +534,7 @@ function bbs_answer_submit()
         delete_transient('bbs_answer_' . $user_id);
     }
 
-    header('Content-type: application/json; charset=UTF-8');
-    echo json_encode($result);
+    wp_send_json($result);
     exit;
 }
 add_action('wp_ajax_bbs_answer_submit', 'bbs_answer_submit');
