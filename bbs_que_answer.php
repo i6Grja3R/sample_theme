@@ -84,6 +84,7 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 <div id="js_board_respond" class="board_respond">
     <div id="input_area">
         <form name="answer_Input_form">
+            <input type="hidden" name="unique_id" value="<?php echo esc_attr($unique_id); ?>">
             <div class="placeholder-area">
                 <div class="comments-composer">コメント一覧</div>
                 <textarea id="text" class="rich-label" name="text" placeholder="荒らし行為や誹謗中傷や著作権の侵害はご遠慮ください"></textarea>

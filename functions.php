@@ -443,97 +443,87 @@ function bbs_quest_submit()
 add_action('wp_ajax_bbs_quest_submit', 'bbs_quest_submit');
 add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');
 
-/* 質問タイトルとスタンプ画像なし（回答掲示板) */
+/* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_submit()
 {
-    // 既存のサイト共通ユーザーIDを使用（いいね機能と同じCookie）
-    $user_id = $_COOKIE['user_id'] ?? null;
+    // Cookie から user_id を取得。存在しなければ UUID を生成して Cookie に保存（識別用）
+    $user_id = $_COOKIE['user_id'] ?? wp_generate_uuid4();
+    // user_id を 10年有効な Cookie に保存（次回以降の識別のため）
+    setcookie('user_id', $user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
+    // サーバー側ですぐ使えるよう $_COOKIE にもセット
+    $_COOKIE['user_id'] = $user_id;
 
-    // もしCookieが存在しない場合のフォールバック
-    // （通常はsend_headersで設定済みのはず）
-    if (!$user_id) {
-        error_log('Warning: user_id cookie not found in bbs_answer_submit');
-        // 新しいユーザーIDを生成してCookieに設定
-        $user_id = wp_generate_uuid4();
-        setcookie('user_id', $user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
-        $_COOKIE['user_id'] = $user_id; // 即座に使用できるように設定
-    }
+    // 親質問の unique_id を POST データから取得し、サニタイズ（安全な文字列に変換）
+    $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');
 
-    $unique_id = substr($_SERVER['HTTP_REFERER'], -36);
-    $text = $_POST['text'] ?? '';
-    $name = $_POST['name'] ?? '';
+    // 回答本文と名前を POST データから取得（独自の文字列整形関数でサニタイズ）
+    $text = Chk_StrMode($_POST['text'] ?? '');
+    $name = Chk_StrMode($_POST['name'] ?? '匿名');
 
-    // 入力値のサニタイズ
-    $name = Chk_StrMode($name);
-    $text = Chk_StrMode($text);
+    $error = []; // エラーメッセージ格納用の配列
 
-    $error = []; // エラーメッセージ配列として初期化
+    // --- エラーチェックは別関数で想定（例：NGワードやURL含有チェック） ---
+    // Chk_ngword($name, '・NGワードがあります', $error); など
 
-    // バリデーション処理
-    Chk_ngword($name, '・NGワードが入力されています。', $error);
-    Chk_ngword($text, '・NGワードが入力されています。', $error);
+    // 後でトランジェントに保存する全体データ構造を初期化
+    $answer_data = [
+        'user_id'   => $user_id,       // 投稿者を識別するための ID
+        'unique_id' => $unique_id,     // 親質問のID（親質問の識別子）
+        'name'      => $name,          // 投稿者名
+        'text'      => $text,          // 回答本文
+        'attach'    => [],             // 添付ファイル情報（ファイル名のみ格納）
+        'timestamp' => time()          // 投稿時刻
+    ];
 
-    if (empty($name)) {
-        $name = "匿名";
-    }
+    // ファイル添付がある場合の処理
+    if (!empty($_FILES['attach']['tmp_name'])) {
+        $upload_dir = wp_upload_dir();                      // WordPress のアップロードディレクトリ情報を取得
+        $tmp_dir = $upload_dir['basedir'] . '/tmp/';        // 一時保存用の tmp ディレクトリパス
 
-    Chk_InputMode($text, '・回答文をご記入ください。', $error);
-    CheckUrl($name, '・お名前にＵＲＬは記入できません。', $error);
-    CheckUrl($text, '・回答文にＵＲＬは記入できません。', $error);
+        // tmp ディレクトリが存在しない場合は作成
+        if (!file_exists($tmp_dir)) {
+            wp_mkdir_p($tmp_dir);
+        }
 
-    $result = [];
+        // 各添付ファイルをループ処理
+        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
+            // ファイルが正しくアップロードされ、5MB以下であることを確認
+            if (is_uploaded_file($tmp_name) && $_FILES['attach']['size'][$i] <= 5 * 1024 * 1024) {
+                $original_name = sanitize_file_name($_FILES['attach']['name'][$i]);
+                $mime = mime_content_type($tmp_name);
+                $ext = pathinfo($original_name, PATHINFO_EXTENSION);
 
-    if (empty($error)) {
-        $result['error'] = '';
-        $result['name'] = $name;
-        $result['text'] = $text;
-
-        // トランジェントに保存するデータ
-        $answer_data = [
-            'user_id'   => $user_id,    // 投稿者のユーザーID（自分の投稿判定用）
-            'unique_id' => $unique_id,  // 親質問のID
-            'name'      => $name,
-            'text'      => $text,
-            'attach'    => [], // 添付ファイルデータ
-            'timestamp' => time() // 投稿時刻
-        ];
-
-        // 添付ファイルの処理
-        if (isset($_FILES['attach']) && is_array($_FILES['attach']['tmp_name'])) {
-            foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
-                if (!empty($tmp_name) && is_uploaded_file($tmp_name)) {
-                    // ファイルサイズ制限チェック（例：5MB）
-                    $max_size = 5 * 1024 * 1024; // 5MB
-                    if ($_FILES['attach']['size'][$i] <= $max_size) {
-                        $answer_data['attach'][$i] = [
-                            'name' => sanitize_file_name($_FILES['attach']['name'][$i]),
-                            'type' => $_FILES['attach']['type'][$i],
-                            'size' => $_FILES['attach']['size'][$i],
-                            'data' => file_get_contents($tmp_name),
-                        ];
-                    } else {
-                        $error[] = '・ファイルサイズが大きすぎます（5MB以下）';
-                    }
+                // MIMEと拡張子チェック（例：画像、PDF、動画のみ許可）
+                // 許可する MIME タイプ（ホワイトリスト）
+                $allowed_types = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
+                if (!in_array($mime, $allowed_types)) {
+                    $error[] = '・許可されていないファイル形式です';
+                    continue;
                 }
+
+                // 保存用ファイル名を user_id ベースで生成（衝突防止）
+                $filename = $user_id . "_{$i}." . $ext;
+                $file_path = $tmp_dir . $filename;
+
+                // ファイルを tmp ディレクトリに移動（move_uploaded_file = 安全な移動）
+                move_uploaded_file($tmp_name, $file_path);
+
+                // 添付情報（トランジェント）に保存するためにファイル名を保存（本体は tmp に保存済みなのでファイル本体は保存しない）
+                $answer_data['attach'][$i] = $filename;
             }
         }
-
-        // エラーがなければトランジェントに保存
-        if (empty($error)) {
-            // ユーザーIDベースのキーでトランジェントに保存（10分間有効）
-            $transient_key = 'bbs_answer_' . $user_id;
-            set_transient($transient_key, $answer_data, 60 * 10);
-
-            error_log("Answer data saved to transient: {$transient_key} for user: {$user_id}");
-        } else {
-            $result['error'] = $error;
-        }
-    } else {
-        $result['error'] = $error;
-        // エラー時は既存のトランジェントをクリア
-        delete_transient('bbs_answer_' . $user_id);
     }
 
+    $result = [];
+    $result['error'] = $error;
+    // エラーがなければトランジェントに保存（有効期間：10分）
+    if (empty($error)) {
+        set_transient('bbs_answer_' . $user_id, $answer_data, 10 * MINUTE_IN_SECONDS);
+        $result['name'] = $name;
+        $result['text'] = $text;
+    } else {
+        delete_transient('bbs_answer_' . $user_id); // エラーがある場合は念のためトランジェント削除（セキュリティ的にも良い）
+    }
     wp_send_json($result);
     exit;
 }
@@ -654,87 +644,80 @@ add_action('wp_ajax_nopriv_bbs_quest_confirm', 'bbs_quest_confirm');
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_confirm()
 {
-    // 統一ユーザーIDを取得
+    // Cookie から user_id を取得（存在しない場合はエラー）
     $user_id = $_COOKIE['user_id'] ?? null;
-
     if (!$user_id) {
-        wp_send_json_error(['message' => 'ユーザーIDが見つかりません']);
-        exit;
+        wp_send_json(['error' => 'ユーザーIDが見つかりません']);
     }
 
-    // トランジェントからデータ取得
+    // 投稿データを一時保存していたトランジェントキーを作成
     $transient_key = 'bbs_answer_' . $user_id;
     $answer_data = get_transient($transient_key);
 
+    // トランジェントからデータが取得できない場合（期限切れや未投稿）
     if (!$answer_data) {
-        wp_send_json_error(['message' => '投稿データが見つかりません']);
-        exit;
+        wp_send_json(['error' => '投稿データが見つかりません']);
     }
 
-    // データベースへの保存処理
     global $wpdb;
 
-    // 親質問のIDを取得
-    $unique_id = $answer_data['unique_id'];
-    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE unique_id = %s";
-    $query = $wpdb->prepare($sql, $unique_id);
-    $rows = $wpdb->get_results($query);
-
-    if (empty($rows)) {
-        wp_send_json_error(['message' => '親質問が見つかりません']);
-        exit;
+    // 親質問（親投稿）の ID を取得（unique_id → id）
+    $sql = "SELECT id FROM {$wpdb->prefix}sortable WHERE unique_id = %s";
+    $query = $wpdb->prepare($sql, $answer_data['unique_id']);
+    $parent_id = $wpdb->get_var($query);
+    if (!$parent_id) {
+        wp_send_json(['error' => '親質問が見つかりません']);
     }
 
-    $parent_id = $rows[0]->id;
-
-    // 回答をデータベースに挿入
-    $sql = "INSERT INTO {$wpdb->prefix}sortable(parent_id, text, name, ip, user_id) VALUES(%d, %s, %s, %s, %s)";
-    $query = $wpdb->prepare(
-        $sql,
-        $parent_id,
-        $answer_data['text'],
-        $answer_data['name'],
-        $_SERVER['REMOTE_ADDR'],
-        $user_id // 投稿者のユーザーIDも保存
+    // 回答を sortable テーブルに登録
+    $wpdb->insert(
+        "{$wpdb->prefix}sortable",
+        [
+            'parent_id' => $parent_id,                  // 親ID
+            'text'      => $answer_data['text'],        // 回答本文
+            'name'      => $answer_data['name'],        // 回答者名
+            'ip'        => $_SERVER['REMOTE_ADDR'],     // IPアドレス（任意）
+            'user_id'   => $user_id                     // 投稿者識別用
+        ],
+        ['%d', '%s', '%s', '%s', '%s']                  // プレースホルダ（SQL注入防止）
     );
 
-    $query_result = $wpdb->query($query);
-
-    if ($query_result === false) {
-        wp_send_json_error(['message' => '投稿に失敗しました: ' . $wpdb->last_error]);
-        exit;
-    }
-
+    // 新しく挿入された投稿のIDを取得
     $new_post_id = $wpdb->insert_id;
 
-    // 添付ファイルの処理
+    // 添付ファイル処理：一時保存（/tmp）→ 正式保存（/attach）
     if (!empty($answer_data['attach'])) {
         $upload_dir = wp_upload_dir();
-        $filenames = [];
+        $src_dir = $upload_dir['basedir'] . '/tmp/';      // 一時保存ディレクトリ
+        $dst_dir = $upload_dir['basedir'] . '/attach/';   // 本保存ディレクトリ
 
-        // 新しい投稿のunique_idを取得
+        // 保存先ディレクトリが存在しない場合は作成
+        if (!file_exists($dst_dir)) wp_mkdir_p($dst_dir);
+
+        // 新しく投稿されたデータの unique_id を取得（rename用に使う）
         $sql = "SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d";
         $query = $wpdb->prepare($sql, $new_post_id);
         $new_unique_id = $wpdb->get_var($query);
 
-        foreach ($answer_data['attach'] as $i => $file_data) {
-            $type = explode('/', $file_data['type']);
-            $ext = $type[1] ?? 'tmp';
+        $filenames = []; // DB更新用のファイル名を記録
 
-            if ($i == 3) {
-                $n = 'usericon';
-            } else {
-                $n = $i + 1;
+        // 添付ファイルごとに処理
+        foreach ($answer_data['attach'] as $i => $filename) {
+            $src_path = $src_dir . $filename;
+            $ext = pathinfo($filename, PATHINFO_EXTENSION);
+
+            // ファイル名をユニークにリネーム（例：abcde_1.png, abcde_usericon.jpg）
+            $target_name = "{$new_unique_id}_" . ($i == 3 ? 'usericon' : ($i + 1)) . ".$ext";
+            $dst_path = $dst_dir . $target_name;
+
+            // 一時ファイルが存在すれば移動（rename = move）
+            if (file_exists($src_path)) {
+                rename($src_path, $dst_path); // move and rename
+                $filenames[$i] = $target_name;
             }
-
-            $filename = "{$new_unique_id}_{$n}.{$ext}";
-            $filenames[$i] = $filename;
-            $attach_path = $upload_dir['basedir'] . '/attach/' . $filename;
-
-            file_put_contents($attach_path, $file_data['data']);
         }
 
-        // ファイル名をデータベースに更新
+        // 添付ファイル情報を DB に更新（最大3つ + usericon）
         $sql = "UPDATE {$wpdb->prefix}sortable SET attach1=%s, attach2=%s, attach3=%s, usericon=%s WHERE id=%d";
         $query = $wpdb->prepare(
             $sql,
@@ -747,10 +730,11 @@ function bbs_answer_confirm()
         $wpdb->query($query);
     }
 
-    // 成功時はトランジェントを削除
+    // 投稿完了後はトランジェントを削除（セキュリティ＆クリーンアップ）
     delete_transient($transient_key);
 
-    wp_send_json_success(['message' => '回答が投稿されました']);
+    // 成功レスポンスを返す
+    wp_send_json(['error' => '回答が投稿されました']);
     exit;
 }
 add_action('wp_ajax_bbs_answer_confirm', 'bbs_answer_confirm');
