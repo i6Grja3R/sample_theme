@@ -457,8 +457,8 @@ function bbs_answer_submit()
     $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');
 
     // 回答本文と名前を POST データから取得（独自の文字列整形関数でサニタイズ）
-    $text = Chk_StrMode($_POST['text'] ?? '');
-    $name = Chk_StrMode($_POST['name'] ?? '匿名');
+    $text = sanitize_text_field($_POST['text'] ?? '');
+    $name = sanitize_text_field($_POST['name'] ?? '匿名');
 
     $error = []; // エラーメッセージ格納用の配列
 
