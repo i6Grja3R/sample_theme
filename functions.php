@@ -392,52 +392,85 @@ class MIN_LENGTH
 
 function bbs_quest_submit()
 {
-    session_start();
-    $text = $_POST['text'];
-    $name = $_POST['name'];
-    $title = $_POST['title'];
-    $stamp = $_POST['stamp'];
-    $name = Chk_StrMode($name);
-    $title = Chk_StrMode($title);
-    $text = Chk_StrMode($text);
-    Chk_ngword($name, '・NGワードが入力されています。', $error);
-    Chk_ngword($title, '・NGワードが入力されています。', $error);
-    Chk_ngword($text, '・NGワードが入力されています。', $error);
-    if ($name == "") {
-        $name = "匿名";
-    } // 追加
-    Chk_InputMode($title, '・質問タイトルをご記入ください。', $error);
-    Chk_InputMode($text, '・質問文をご記入ください。', $error);
-    Chk_InputMode($stamp, '・スタンプを選択してください。', $error);
-    CheckUrl($name, '・お名前にＵＲＬは記入できません。', $error); // 追加
-    CheckUrl($title, '・質問タイトルにＵＲＬは記入できません。', $error); // 追加
-    CheckUrl($text, '・質問文にＵＲＬは記入できません。', $error); // 追加
-    $result = [];
-    if (empty($error)) {
-        $result['error'] = '';
-        $result['name'] = $name;
-        $result['title'] = $title;
-        $result['text'] = $text;
-        $_SESSION['name'] = $name;
-        $_SESSION['title'] = $title;
-        $_SESSION['text'] = $text;
-        $_SESSION['stamp'] = $stamp;
-        $_SESSION['attach'] = $_FILES['attach'];
-        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
-            if (!empty($tmp_name)) {
-                $_SESSION['attach']['data'][$i] = file_get_contents($tmp_name);
-            }
-        }
-    } else {
-        $result['error'] = $error;
-        $_SESSION['name'] = '';
-        $_SESSION['title'] = '';
-        $_SESSION['text'] = '';
-        $_SESSION['stamp'] = '';
-        $_SESSION['attach'] = null;
+    // --- セッション開始 ---
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start(); // 送信前にセッションを開始（WordPressでは template_redirect などで開始するのが理想）
     }
-    header('Content-type: application/json; charset=UTF-8');
-    echo json_encode($result);
+
+    // --- Cookieベースで user_id（UUID）を管理 ---
+    $user_id = $_COOKIE['user_id'] ?? wp_generate_uuid4(); // UUIDを生成
+    setcookie('user_id', $user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
+    $_COOKIE['user_id'] = $user_id; // この後の処理で使うために即座に反映
+
+    // --- 入力値を取得・サニタイズ ---
+    $name  = Chk_StrMode($_POST['name'] ?? '');
+    $title = Chk_StrMode($_POST['title'] ?? '');
+    $text  = Chk_StrMode($_POST['text'] ?? '');
+    $stamp = intval($_POST['stamp'] ?? 0);
+
+    $error = [];
+
+    // --- バリデーション ---
+    if (empty($title)) $error[] = '・質問タイトルをご記入ください。';
+    if (empty($text))  $error[] = '・質問文をご記入ください。';
+    if (empty($stamp)) $error[] = '・スタンプを選択してください。';
+    if (preg_match("/https?:|[.,:;]/ui", $name))  $error[] = '・お名前にURLは記入できません。';
+    if (preg_match("/https?:|[.,:;]/ui", $title)) $error[] = '・タイトルにURLは記入できません。';
+    if (preg_match("/https?:|[.,:;]/ui", $text))  $error[] = '・質問文にURLは記入できません。';
+
+    // --- デフォルト名 ---
+    if ($name === '') $name = '匿名';
+
+    // --- 添付ファイル処理（5MB以下・許可形式のみ） ---
+    $tmp_files = [];
+    $upload_dir = wp_upload_dir();
+    $tmp_dir = $upload_dir['basedir'] . '/tmp/';
+    if (!file_exists($tmp_dir)) wp_mkdir_p($tmp_dir);
+
+    if (!empty($_FILES['attach']['tmp_name'])) {
+        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
+            if (!is_uploaded_file($tmp_name)) continue;
+
+            if ($_FILES['attach']['size'][$i] > 5 * 1024 * 1024) {
+                $error[] = '・ファイルサイズが5MBを超えています。';
+                continue;
+            }
+
+            // --- MIMEタイプの検証（finfo使用） ---
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($tmp_name);
+            $allowed_types = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
+            if (!in_array($mime, $allowed_types)) {
+                $error[] = '・許可されていないファイル形式です。';
+                continue;
+            }
+
+            $ext = pathinfo($_FILES['attach']['name'][$i], PATHINFO_EXTENSION);
+            $ext = strtolower(preg_replace('/[^a-z0-9]/', '', $ext));
+            $filename = $user_id . "_{$i}." . $ext;
+            $filepath = $tmp_dir . $filename;
+
+            move_uploaded_file($tmp_name, $filepath);
+            $tmp_files[$i] = $filename;
+        }
+    }
+
+    // --- エラーがなければセッションに保存 ---
+    if (empty($error)) {
+        $_SESSION['quest'] = [
+            'user_id' => $user_id,
+            'name' => $name,
+            'title' => $title,
+            'text' => $text,
+            'stamp' => $stamp,
+            'attach' => $tmp_files,
+        ];
+        wp_send_json(['error' => '']);
+    } else {
+        $_SESSION['quest'] = [];
+        wp_send_json(['error' => $error]);
+    }
+
     exit;
 }
 add_action('wp_ajax_bbs_quest_submit', 'bbs_quest_submit');
@@ -577,65 +610,101 @@ function CheckUrl($checkurl, $mes, &$error)
 
 function bbs_quest_confirm()
 {
-    // 新しいセッションを開始、あるいは既存のセッションを再開する
-    session_start();
-    // 何もせず終わる処理
-    if (empty($_SESSION['text']) || empty($_SESSION['title']) || empty($_SESSION['stamp'])) {
-        exit;
+    // セッション開始（既に開始済みであれば無視）
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
     }
-    // $wpdbでSQLを実行
+
+    // Cookie から user_id を取得（UUIDベース）
+    $user_id = $_COOKIE['user_id'] ?? null;
+    if (!$user_id) {
+        wp_send_json_error(['error' => 'ユーザーIDが見つかりません']);
+    }
+
+    // セッション変数に一時保存されたデータを取得
+    $title = $_SESSION['title'] ?? '';
+    $name  = $_SESSION['name'] ?? '';
+    $text  = $_SESSION['text'] ?? '';
+    $stamp = $_SESSION['stamp'] ?? '';
+
+    // バリデーション（値が空であれば中止）
+    if ($title === '' || $text === '' || $stamp === '') {
+        wp_send_json_error(['error' => 'セッションデータが不足しています']);
+    }
+
     global $wpdb;
-    // どのようなデータをどのテーブルに登録するか
-    $sql = "INSERT INTO {$wpdb->prefix}sortable(text,name,title,stamp,ip) VALUES(%s,%s,%s,%d,%s)";
-    // セッション変数に登録
-    $text = $_SESSION['text'];
-    $name = $_SESSION['name'];
-    $title = $_SESSION['title'];
-    $stamp = $_SESSION['stamp'];
-    // ipアドレスを取得する
+
+    // 投稿データを sortable テーブルに挿入
+    $sql = "INSERT INTO {$wpdb->prefix}sortable (text, name, title, stamp, ip, user_id)
+            VALUES (%s, %s, %s, %d, %s, %s)";
     $ip = $_SERVER['REMOTE_ADDR'];
-    $query = $wpdb->prepare($sql, $text, $name, $title, $stamp, $ip);
-    // プリペアードステートメントを用意してから、下記のようにresultsで値を取得
-    $query_result = $wpdb->query($query);
-    // カラム名 unique_id の質問UUID を一度そのデータを読み込んで取得する
-    $sql = "SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d";
-    $query = $wpdb->prepare($sql, $wpdb->insert_id);
-    $rows = $wpdb->get_results($query);
-    $unique_id = $rows[0]->unique_id;
-    // アップロードディレクトリ（パス名）を取得する
+    $query = $wpdb->prepare($sql, $text, $name, $title, $stamp, $ip, $user_id);
+    $result = $wpdb->query($query);
+
+    if ($result === false) {
+        wp_send_json_error(['error' => '投稿に失敗しました']);
+    }
+
+    // insert_id から unique_id を取得（添付ファイル名の接頭辞に利用）
+    $insert_id = $wpdb->insert_id;
+    $unique_id = $wpdb->get_var(
+        $wpdb->prepare("SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d", $insert_id)
+    );
+
+    // アップロードディレクトリの取得
     $upload_dir = wp_upload_dir();
-    // 『filenames』を記述して配列名を記述し、それに『[]』を代入すればそれは配列として扱われます
+    $tmp_dir    = $upload_dir['basedir'] . '/tmp/';
+    $attach_dir = $upload_dir['basedir'] . '/attach/';
+
+    if (!file_exists($attach_dir)) {
+        wp_mkdir_p($attach_dir); // 添付ファイル正式保存先を作成
+    }
+
     $filenames = [];
-    foreach ($_SESSION['attach']['tmp_name'] as $i => $tmp_name) {
-        if (empty($tmp_name)) {
-            $filenames[$i] = '';
-        } else {
-            $type = explode('/', $_SESSION['attach']['type'][$i]);
-            $ext = $type[1];
-            if (3 == $i) { // 比較した時に3＋1以上なら
-                $n = 'usericon';
+
+    // 添付ファイルの一時ファイル名が session に存在する場合のみ処理
+    if (!empty($_SESSION['attach_files']) && is_array($_SESSION['attach_files'])) {
+        foreach ($_SESSION['attach_files'] as $i => $tmp_filename) {
+            $src_path = $tmp_dir . $tmp_filename;
+            $ext = pathinfo($tmp_filename, PATHINFO_EXTENSION);
+
+            // ファイル名構築（usericon or attach1~3）
+            $suffix = ($i == 3) ? 'usericon' : ($i + 1);
+            $safe_ext = preg_replace('/[^a-z0-9]/i', '', strtolower($ext));
+            $final_filename = "{$unique_id}_{$suffix}.{$safe_ext}";
+
+            $dst_path = $attach_dir . $final_filename;
+
+            if (file_exists($src_path)) {
+                rename($src_path, $dst_path); // 一時→正式移動
+                $filenames[$i] = $final_filename;
             } else {
-                $n = $i + 1;
+                $filenames[$i] = '';
             }
-            $filenames[$i] = "{$unique_id}_{$n}.{$ext}";
-            $attach_path = $upload_dir['basedir'] . '/attach/' . $filenames[$i];
-            // 文字列をファイルに書き込む、文字列データを書き込むファイル名を指定
-            file_put_contents($attach_path, $_SESSION['attach']['data'][$i]);
         }
+
+        // 添付ファイルのファイル名をDBに保存（必要な添付分だけ）
+        $sql = "UPDATE {$wpdb->prefix}sortable
+                SET attach1 = %s, attach2 = %s, attach3 = %s, usericon = %s
+                WHERE id = %d";
+        $wpdb->query(
+            $wpdb->prepare(
+                $sql,
+                $filenames[0] ?? '',
+                $filenames[1] ?? '',
+                $filenames[2] ?? '',
+                $filenames[3] ?? '',
+                $insert_id
+            )
+        );
     }
-    $result = [];
-    // 条件式が成り立った場合処理を実行
-    if (false === $query_result) {
-        $result['error'] = '登録できませんでした';
-        // 条件式が成り立たなければ処理を実行
-    } else { // どのテーブルの何をどう更新するか
-        $sql = "UPDATE {$wpdb->prefix}sortable SET attach1=%s,attach2=%s,attach3=%s,usericon=%s WHERE id=%d";
-        $query = $wpdb->prepare($sql, $filenames[0], $filenames[1], $filenames[2], $filenames[3], $wpdb->insert_id);
-        $wpdb->query($query);
-        $result['error'] = '';
-    }
-    header('Content-type: application/json; charset=UTF-8');
-    echo json_encode($result);
+
+    // セッション変数と Cookie を削除（再投稿防止とセキュリティ）
+    $_SESSION = [];
+    session_destroy();
+    setcookie('user_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN);
+
+    wp_send_json_success(['message' => '投稿が完了しました']);
     exit;
 }
 add_action('wp_ajax_bbs_quest_confirm', 'bbs_quest_confirm');
