@@ -563,14 +563,16 @@ function bbs_answer_submit()
 add_action('wp_ajax_bbs_answer_submit', 'bbs_answer_submit');
 add_action('wp_ajax_nopriv_bbs_answer_submit', 'bbs_answer_submit');
 
-function Chk_ngword($str, $mes, &$error)
+/**
+ * 問題キーワードチェック
+ */
+function Chk_ngword($str, $mes, array &$error)
 {
-    // NGワードリスト配列の定義
     $ng_words = ['死ね', 'アホ', '殺す', 'バカ'];
-    foreach ($ng_words as $ngWordsVal) {
-        // 対象文字列にキーワードが含まれるか
-        if (false !== mb_strpos($str, $ngWordsVal)) {
+    foreach ($ng_words as $ng) {
+        if (mb_strpos($str, $ng) !== false) {
             $error[] = $mes;
+            break;
         }
     }
 }
@@ -592,18 +594,23 @@ function Chk_StrMode($str)
 
     return $str;
 }
-/* 未入力チェックファンクション */
-function Chk_InputMode($str, $mes, &$error)
+/**
+ * 未入力チェック
+ */
+function Chk_InputMode($str, $mes, array &$error)
 {
-    if ('' == $str) {
+    if (trim($str) === '') {
         $error[] = $mes;
     }
 }
 
-/* 以下追加 */
-function CheckUrl($checkurl, $mes, &$error)
+/**
+ * URL混入チェック
+ */
+function CheckUrl($str, $mes, array &$error)
 {
-    if (preg_match("/[\.,:;]/u", $checkurl)) {
+    // URLっぽい文字（:や//）が入っていればエラー
+    if (preg_match('/https?:\/\/|www\./i', $str)) {
         $error[] = $mes;
     }
 }
