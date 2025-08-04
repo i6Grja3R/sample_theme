@@ -390,133 +390,91 @@ class MIN_LENGTH
     public const TEXT = 1;
 }
 
-function bbs_quest_submit()
+// --------------------------------------
+// ③ 投稿内容のサニタイズ不足（XSS防止）
+// strip_tags()/htmlspecialchars の代わりに WordPress 純正の sanitize_text_field() を使い、
+// タグを完全に禁止して安全なプレーンテキストを取得します。
+function Chk_StrMode($str)
 {
-    // セッション開始（WordPressではフックで制御すべき）
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-
-    // 投稿データの受け取り
-    $text  = $_POST['text'] ?? '';
-    $name  = $_POST['name'] ?? '';
-    $title = $_POST['title'] ?? '';
-    $stamp = $_POST['stamp'] ?? '';
-
-    // 投稿データの無害化（HTMLタグ除去＋整形）
-    $name  = Chk_StrMode($name);
-    $title = Chk_StrMode($title);
-    $text  = Chk_StrMode($text);
-
-    // 各種バリデーション（NGワード・未入力・URL禁止など）
-    $error = [];
-    Chk_ngword($name, '・NGワードが入力されています。', $error);
-    Chk_ngword($title, '・NGワードが入力されています。', $error);
-    Chk_ngword($text, '・NGワードが入力されています。', $error);
-    if ($name === '') {
-        $name = '匿名';
-    }
-    Chk_InputMode($title, '・質問タイトルをご記入ください。', $error);
-    Chk_InputMode($text, '・質問文をご記入ください。', $error);
-    Chk_InputMode($stamp, '・スタンプを選択してください。', $error);
-    CheckUrl($name, '・お名前にURLは記入できません。', $error);
-    CheckUrl($title, '・質問タイトルにURLは記入できません。', $error);
-    CheckUrl($text, '・質問文にURLは記入できません。', $error);
-
-    // JSON返却用の配列
-    $result = [];
-
-    if (empty($error)) {
-        // アップロードファイルの保存ディレクトリ（例：wp-content/uploads/tmp）
-        $upload_dir = wp_upload_dir();
-        $tmp_dir = $upload_dir['basedir'] . '/tmp';
-        if (!file_exists($tmp_dir)) {
-            mkdir($tmp_dir, 0755, true);
-        }
-
-        // アップロードファイルの安全な MIME/拡張子ホワイトリスト
-        $allowed_mime_types = [
-            'image/jpeg' => 'jpg',
-            'image/png'  => 'png',
-            'application/pdf' => 'pdf',
-            'video/mp4'  => 'mp4',
-        ];
-
-        // Cookie で UUID を生成・保存（再確認時に参照用）
-        if (empty($_COOKIE['quest_uuid'])) {
-            $uuid = wp_generate_uuid4();
-            setcookie('quest_uuid', $uuid, time() + 600, '/');
-        } else {
-            $uuid = $_COOKIE['quest_uuid'];
-        }
-
-        // 添付ファイル処理（$_FILES['attach'] → tmp に保存しファイル名をセッションに）
-        $filenames = [];
-
-        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
-            if (empty($tmp_name)) {
-                $filenames[$i] = '';
-                continue;
-            }
-
-            // MIMEタイプを finfo で安全に検出
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_file($finfo, $tmp_name);
-            finfo_close($finfo);
-
-            // 拡張子の取得（basenameから pathinfo）
-            $ext = strtolower(pathinfo($_FILES['attach']['name'][$i], PATHINFO_EXTENSION));
-
-            // MIME と拡張子の一致をチェック
-            if (!isset($allowed_mime_types[$mime]) || $allowed_mime_types[$mime] !== $ext) {
-                $error[] = "・許可されていないファイル形式です（$mime / .$ext）";
-                $filenames[$i] = '';
-                continue;
-            }
-
-            // ファイル名をUUIDベースで作成（安全な拡張子のみ）
-            $safe_ext = preg_replace('/[^a-z0-9]/', '', $ext); // 拡張子正規化
-            $filename = "{$uuid}_{$i}.{$safe_ext}";
-            $filenames[$i] = $filename;
-
-            // 一時ファイルとして保存
-            $target_path = $tmp_dir . '/' . $filename;
-            move_uploaded_file($tmp_name, $target_path);
-        }
-
-        // セッションとCookieに保存（投稿内容・一時ファイル名など）
-        $_SESSION['quest_uuid'] = $uuid;
-        $_SESSION['name']  = $name;
-        $_SESSION['title'] = $title;
-        $_SESSION['text']  = $text;
-        $_SESSION['stamp'] = $stamp;
-        $_SESSION['files'] = $filenames;
-
-        // 成功時のJSON出力
-        $result['error'] = '';
-        $result['name'] = $name;
-        $result['title'] = $title;
-        $result['text'] = $text;
-    } else {
-        // エラー時のセッションリセット
-        $_SESSION['name'] = '';
-        $_SESSION['title'] = '';
-        $_SESSION['text'] = '';
-        $_SESSION['stamp'] = '';
-        $_SESSION['files'] = null;
-
-        $result['error'] = $error;
-    }
-
-    // JSON返却
-    header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode($result);
-    exit;
+    // sanitize_text_field: タグ除去・エンティティ化・前後空白トリムなどを一度に実行
+    return sanitize_text_field($str);
 }
 
-// WordPress Ajax フックに登録（ログイン有無問わず）
-add_action('wp_ajax_bbs_quest_submit', 'bbs_quest_submit');
-add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');
+// --------------------------------------
+// bbs_quest_submit(): 質問投稿の「一時ファイル保存＋トランジェント方式」
+// ------------------------------------------------------
+// ④ 一時ファイルの処理とトランジェントの安全化
+// ・MIME検証: finfo_file()
+// ・拡張子検証: pathinfo() + ホワイトリスト
+// ・ファイル本体は /uploads/tmp に保存、トランジェントには「ファイル名のみ」を保存
+// ------------------------------------------------------
+function bbs_quest_submit()
+{
+    // [1] Cookie から user_id を取得 or 新規発行（UUID）
+    $user_id = $_COOKIE['user_id'] ?? wp_generate_uuid4();
+    setcookie('user_id', $user_id, time() + 10 * YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN);
+    $_COOKIE['user_id'] = $user_id; // 即時利用のため superglobal も更新
+
+    // [2] フォームから送信された入力をサニタイズ
+    $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');
+    $name      = Chk_StrMode($_POST['name'] ?? '匿名');
+    $title     = Chk_StrMode($_POST['title'] ?? '');
+    $text      = Chk_StrMode($_POST['text'] ?? '');
+    $stamp     = intval($_POST['stamp'] ?? 0); // スタンプIDは整数にキャスト
+
+    // [3] アップロード用ディレクトリを準備 (/wp-content/uploads/tmp/)
+    $uploads = wp_upload_dir();
+    $tmp_dir = trailingslashit($uploads['basedir']) . 'tmp/';
+    if (! file_exists($tmp_dir)) {
+        wp_mkdir_p($tmp_dir);
+    }
+
+    // [4] 添付ファイルの一時保存 (MIME + 拡張子 両方を検証)
+    $allowed = [
+        'image/jpeg'       => 'jpg',
+        'image/png'        => 'png',
+        'image/gif'        => 'gif',
+        'application/pdf'  => 'pdf',
+        'video/mp4'        => 'mp4',
+    ];
+    $attach_files = [];
+    if (! empty($_FILES['attach']['tmp_name']) && is_array($_FILES['attach']['tmp_name'])) {
+        // finfo を使って本物の MIME タイプを判定
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
+            if (is_uploaded_file($tmp_name)) {
+                $mime = finfo_file($finfo, $tmp_name);
+                // ホワイトリストに存在する MIME のみ許可
+                if (isset($allowed[$mime])) {
+                    $ext      = $allowed[$mime]; // 許可済み拡張子
+                    $tmp_name_safe = $user_id . "_{$i}.{$ext}";
+                    // ファイルを安全に一時ディレクトリへ移動
+                    if (move_uploaded_file($tmp_name, $tmp_dir . $tmp_name_safe)) {
+                        $attach_files[] = $tmp_name_safe;
+                    }
+                }
+            }
+        }
+        finfo_close($finfo);
+    }
+
+    // [5] トランジェントには本文などは含めず「ファイル名のみ」を保存 (10分間有効)
+    $transient_key = 'bbs_quest_' . $user_id;
+    set_transient($transient_key, [
+        'unique_id' => $unique_id,
+        'name'      => $name,
+        'title'     => $title,
+        'text'      => $text,
+        'stamp'     => $stamp,
+        'attach'    => $attach_files,
+        'time'      => time(),
+    ], MINUTE_IN_SECONDS * 10);
+
+    // [6] レスポンスを返す
+    wp_send_json_success(['message' => '確認画面へ進んでください']);
+}
+add_action('wp_ajax_bbs_quest_submit',    'bbs_quest_submit');
+add_action('wp_ajax_nopriv_bbs_quest_submit',    'bbs_quest_submit');
 
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_submit()
