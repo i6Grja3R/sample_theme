@@ -197,18 +197,98 @@ function get_attachment_id_by_url($url)
 }
 
 //画像をサムネイルで出力
-function catch_that_image()
-{
-    global $post;
-    $first_img = '';
-    $output = preg_match_all('/<img.+src=[\'"]([^\'"]+)[\'"].*>/i', $post->post_content, $matches);
-    $first_img_src = $matches[1][0];
-    $attachment_id = get_attachment_id_by_url($first_img_src);
-    $first_img = wp_get_attachment_image($attachment_id, 'rect', false, array('class' => 'archive-thumbnail'));
-    if (empty($first_img)) {
-        $first_img = '<img class="attachment_post_thumbnail" src="' . get_stylesheet_directory_uri() . '/assets/img/common/no-img.jpg" alt="No image" />';
+/** 
+ * 安全なサムネイル取得ユーティリティ
+ * - 1) アイキャッチ
+ * - 2) ブロックの core/image の添付ID
+ * - 3) 本文の <img> (DOM解析)
+ * - 4) フォールバック
+ *
+ * @param int|\WP_Post|null $post 投稿ID or Post or null(=current)
+ * @param string $fallback_url 見つからないときの代替画像URL（テーマ内 no-img 等）
+ * @param string|array $size 画像サイズ（'thumbnail','medium','large','full' など or 配列 [w,h]）
+ * @param string $class 出力<img>に付けるクラス
+ * @return string HTML（<img …>）
+ */
+function bbs_first_image_html_or_fallback($post = null, string $fallback_url = '', $size = 'thumbnail', string $class = 'archive-thumbnail'): string {
+    $post = get_post($post);
+    if (!$post) return $fallback_url ? sprintf('<img src="%s" alt="" class="%s" />', esc_url($fallback_url), esc_attr($class)) : '';
+
+    // 1) アイキャッチがあれば最優先
+    if (has_post_thumbnail($post)) {
+        return get_the_post_thumbnail($post, $size, ['class' => $class]);
     }
-    return $first_img;
+
+    // 2) ブロックエディタの core/image から attachment ID を拾う
+    if (function_exists('has_blocks') && has_blocks($post)) {
+        $blocks = parse_blocks($post->post_content);
+        foreach ($blocks as $b) {
+            if (($b['blockName'] ?? '') === 'core/image') {
+                // ブロック属性に id が入る（添付ID）
+                $id = isset($b['attrs']['id']) ? (int)$b['attrs']['id'] : 0;
+                if ($id > 0) {
+                    $html = wp_get_attachment_image($id, $size, false, ['class' => $class]);
+                    if ($html) return $html;
+                }
+                // id が無い場合は URL を試す
+                $url = $b['attrs']['url'] ?? '';
+                if ($url) {
+                    $att_id = attachment_url_to_postid($url);
+                    if ($att_id) {
+                        $html = wp_get_attachment_image($att_id, $size, false, ['class' => $class]);
+                        if ($html) return $html;
+                    }
+                    // 添付ID化できなくてもURL直書きで表示
+                    return sprintf('<img src="%s" alt="" class="%s" />', esc_url($url), esc_attr($class));
+                }
+            }
+        }
+    }
+
+    // 3) 本文を DOM で解析して <img> の src を拾う（先頭1枚）
+    $content = get_post_field('post_content', $post);
+    if ($content) {
+        // 実体参照などで壊れないように
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'.$content.'</body></html>';
+        $dom = new DOMDocument();
+        // DOMの警告を抑制（壊れたHTMLでも進める）
+        libxml_use_internal_errors(true);
+        if ($dom->loadHTML($html)) {
+            $imgs = $dom->getElementsByTagName('img');
+            if ($imgs->length > 0) {
+                // 同一ホスト優先で探す
+                $site_host = wp_parse_url(home_url(), PHP_URL_HOST);
+                $first_url = '';
+                foreach ($imgs as $img) {
+                    $src = $img->getAttribute('src');
+                    if (!$src) continue;
+                    $host = wp_parse_url($src, PHP_URL_HOST);
+                    if (!$first_url) $first_url = $src; // 第1候補（何でも）
+                    if ($site_host && $host === $site_host) { // 同一ホストが見つかったらそれを採用
+                        $first_url = $src;
+                        break;
+                    }
+                }
+                if ($first_url) {
+                    // 添付IDに変換できるならする
+                    $att_id = attachment_url_to_postid($first_url);
+                    if ($att_id) {
+                        $html = wp_get_attachment_image($att_id, $size, false, ['class' => $class]);
+                        if ($html) return $html;
+                    }
+                    // できなければURL直指定
+                    return sprintf('<img src="%s" alt="" class="%s" />', esc_url($first_url), esc_attr($class));
+                }
+            }
+        }
+        libxml_clear_errors();
+    }
+
+    // 4) 何も無いときはフォールバック
+    if ($fallback_url) {
+        return sprintf('<img src="%s" alt="" class="%s" />', esc_url($fallback_url), esc_attr($class));
+    }
+    return '';
 }
 
 add_filter('use_block_editor_for_post', '__return_false');
@@ -400,91 +480,31 @@ function Chk_StrMode($str)
     return sanitize_text_field($str);
 }
 
-// --------------------------------------
-// bbs_quest_submit(): 質問投稿の「一時ファイル保存＋トランジェント方式」
-// ------------------------------------------------------
-// ④ 一時ファイルの処理とトランジェントの安全化
-// ・MIME検証: finfo_file()
-// ・拡張子検証: pathinfo() + ホワイトリスト
-// ・ファイル本体は /uploads/tmp に保存、トランジェントには「ファイル名のみ」を保存
-// ------------------------------------------------------
-function bbs_quest_submit()
-{
-    // [1] Cookie から user_id を取得 or 新規発行（UUID）
-    $user_id = $_COOKIE['user_id'] ?? wp_generate_uuid4();
-    setcookie('user_id', $user_id, time() + 10 * YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN);
-    $_COOKIE['user_id'] = $user_id; // 即時利用のため superglobal も更新
+// 例：functions.php やプラグインメインファイル
 
-    // [2] フォームから送信された入力をサニタイズ
-    $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');
-    $name      = Chk_StrMode($_POST['name'] ?? '匿名');
-    $title     = Chk_StrMode($_POST['title'] ?? '');
-    $text      = Chk_StrMode($_POST['text'] ?? '');
-    $stamp     = intval($_POST['stamp'] ?? 0); // スタンプIDは整数にキャスト
+// submit 用 nonce 配布
+add_action('wp_enqueue_scripts', function () {
+    if (!wp_script_is('bbs-js-handle', 'enqueued')) return; // そのJSを読み込む画面だけ
+    wp_localize_script('bbs-js-handle', 'bbs_submit_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('bbs_quest_submit'),
+    ]);
+});
 
-    // [3] アップロード用ディレクトリを準備 (/wp-content/uploads/tmp/)
-    $uploads = wp_upload_dir();
-    $tmp_dir = trailingslashit($uploads['basedir']) . 'tmp/';
-    if (! file_exists($tmp_dir)) {
-        wp_mkdir_p($tmp_dir);
-    }
-
-    // [4] 添付ファイルの一時保存 (MIME + 拡張子 両方を検証)
-    $allowed = [
-        'image/jpeg'       => 'jpg',
-        'image/png'        => 'png',
-        'image/gif'        => 'gif',
-        'application/pdf'  => 'pdf',
-        'video/mp4'        => 'mp4',
-    ];
-    $attach_files = [];
-    if (! empty($_FILES['attach']['tmp_name']) && is_array($_FILES['attach']['tmp_name'])) {
-        // finfo を使って本物の MIME タイプを判定
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
-            if (is_uploaded_file($tmp_name)) {
-                $mime = finfo_file($finfo, $tmp_name);
-                // ホワイトリストに存在する MIME のみ許可
-                if (isset($allowed[$mime])) {
-                    $ext      = $allowed[$mime]; // 許可済み拡張子
-                    $tmp_name_safe = $user_id . "_{$i}.{$ext}";
-                    // ファイルを安全に一時ディレクトリへ移動
-                    if (move_uploaded_file($tmp_name, $tmp_dir . $tmp_name_safe)) {
-                        $attach_files[] = $tmp_name_safe;
-                    }
-                }
-            }
-        }
-        finfo_close($finfo);
-    }
-
-    // [5] トランジェントには本文などは含めず「ファイル名のみ」を保存 (10分間有効)
-    $transient_key = 'bbs_quest_' . $user_id;
-    set_transient($transient_key, [
-        'unique_id' => $unique_id,
-        'name'      => $name,
-        'title'     => $title,
-        'text'      => $text,
-        'stamp'     => $stamp,
-        'attach'    => $attach_files,
-        'time'      => time(),
-    ], MINUTE_IN_SECONDS * 10);
-
-    // [6] レスポンスを返す
-    wp_send_json_success(['message' => '確認画面へ進んでください']);
-}
-add_action('wp_ajax_bbs_quest_submit',    'bbs_quest_submit');
-add_action('wp_ajax_nopriv_bbs_quest_submit',    'bbs_quest_submit');
+// confirm 用 nonce 配布（必要な画面だけ）
+add_action('wp_enqueue_scripts', function () {
+    if (!wp_script_is('bbs-js-handle', 'enqueued')) return;
+    wp_localize_script('bbs-js-handle', 'bbs_confirm_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('bbs_quest_confirm'),
+    ]);
+});
 
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_submit()
 {
-    // Cookie から user_id を取得。存在しなければ UUID を生成して Cookie に保存（識別用）
-    $user_id = $_COOKIE['user_id'] ?? wp_generate_uuid4();
-    // user_id を 10年有効な Cookie に保存（次回以降の識別のため）
-    setcookie('user_id', $user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
-    // サーバー側ですぐ使えるよう $_COOKIE にもセット
-    $_COOKIE['user_id'] = $user_id;
+    // AFTER（submit / confirm 共通）
+    $user_id = get_secure_guest_user_id();
 
     // 親質問の unique_id を POST データから取得し、サニタイズ（安全な文字列に変換）
     $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');
@@ -511,12 +531,22 @@ function bbs_answer_submit()
     // ファイル添付がある場合の処理
     if (!empty($_FILES['attach']['tmp_name'])) {
         $upload_dir = wp_upload_dir();                      // WordPress のアップロードディレクトリ情報を取得
-        $tmp_dir = $upload_dir['basedir'] . '/tmp/';        // 一時保存用の tmp ディレクトリパス
+        $basedir = wp_normalize_path( $upload['basedir'] );        // OS差のあるパス記法を統一
 
-        // tmp ディレクトリが存在しない場合は作成
-        if (!file_exists($tmp_dir)) {
-            wp_mkdir_p($tmp_dir);
-        }
+        // ファイルシステムのパス結合は path_join()、末尾は trailingslashit() で正規化
+        $attach_dir = trailingslashit( path_join( $basedir, 'attach' ) );
+
+    // ディレクトリが無ければ作成（WordPress推奨のAPI）
+    if ( ! is_dir( $tmp_dir ) ) {
+    // 失敗時はエラーログ & クライアントにエラーを返すなどの処理を入れる
+    if ( ! wp_mkdir_p( $tmp_dir ) ) {
+        error_log( '[BBS] tmpディレクトリの作成に失敗: ' . $tmp_dir );
+        wp_send_json_error(['error' => '一時保存領域の作成に失敗しました。権限をご確認ください。']);
+    }
+        // ついでに .htaccess を置いて実行ファイルブロック（任意・強く推奨）
+        $ht = "<FilesMatch \"\\.(php|php5|php7|phps|phtml|pl|py|jsp|asp|aspx|sh|cgi)$\">\nDeny from all\n</FilesMatch>\nOptions -Indexes\n";
+        @file_put_contents( trailingslashit($tmp_dir) . '.htaccess', $ht );
+    }
 
         // 各添付ファイルをループ処理
         foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
@@ -615,121 +645,27 @@ function CheckUrl($str, $mes, array &$error)
     }
 }
 
-function bbs_quest_confirm()
-{
-    // セッションを開始（すでに開始済みでなければ）
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-
-    // Cookie から user_id（UUID）を取得
-    $user_id = $_COOKIE['user_id'] ?? null;
-    if (!$user_id) {
-        wp_send_json_error(['error' => 'ユーザーIDが見つかりません']);
-    }
-
-    // セッションから一時保存済みデータを取得
-    $title = $_SESSION['title'] ?? '';
-    $name  = $_SESSION['name'] ?? '';
-    $text  = $_SESSION['text'] ?? '';
-    $stamp = $_SESSION['stamp'] ?? '';
-
-    // 必須フィールドが存在するかをチェック
-    if ($title === '' || $text === '' || $stamp === '') {
-        wp_send_json_error(['error' => 'セッションデータが不足しています']);
-    }
-
-    global $wpdb;
-
-    // 投稿内容を sortable テーブルに保存
-    $sql = "INSERT INTO {$wpdb->prefix}sortable (text, name, title, stamp, ip, user_id)
-            VALUES (%s, %s, %s, %d, %s, %s)";
-    $ip = $_SERVER['REMOTE_ADDR']; // 投稿者のIPアドレス取得
-    $query = $wpdb->prepare($sql, $text, $name, $title, $stamp, $ip, $user_id);
-    $result = $wpdb->query($query); // INSERT 実行
-
-    if ($result === false) {
-        wp_send_json_error(['error' => '投稿に失敗しました']);
-    }
-
-    // 挿入された投稿IDから unique_id を取得（UUIDがDBに自動で付与される場合）
-    $insert_id = $wpdb->insert_id;
-    $unique_id = $wpdb->get_var(
-        $wpdb->prepare("SELECT unique_id FROM {$wpdb->prefix}sortable WHERE id = %d", $insert_id)
-    );
-
-    // ファイルの保存先ディレクトリ
-    $upload_dir = wp_upload_dir();
-    $tmp_dir    = $upload_dir['basedir'] . '/tmp/';
-    $attach_dir = $upload_dir['basedir'] . '/attach/';
-
-    // 保存先ディレクトリが存在しなければ作成
-    if (!file_exists($attach_dir)) {
-        wp_mkdir_p($attach_dir);
-    }
-
-    $filenames = [];
-
-    // 一時保存された添付ファイル名を取得し、本保存ディレクトリへ移動
-    if (!empty($_SESSION['attach_files']) && is_array($_SESSION['attach_files'])) {
-        foreach ($_SESSION['attach_files'] as $i => $tmp_filename) {
-            $src_path = $tmp_dir . $tmp_filename;
-
-            // 安全な拡張子取得（不要な記号など除去）
-            $ext = strtolower(pathinfo($tmp_filename, PATHINFO_EXTENSION));
-            $safe_ext = preg_replace('/[^a-z0-9]/i', '', $ext);
-
-            // ファイル名の suffix（usericon or attach1~3）
-            $suffix = ($i == 3) ? 'usericon' : ($i + 1);
-            $final_filename = "{$unique_id}_{$suffix}.{$safe_ext}";
-            $dst_path = $attach_dir . $final_filename;
-
-            // 一時ファイルが存在する場合のみ移動
-            if (file_exists($src_path)) {
-                rename($src_path, $dst_path); // 本保存ディレクトリへ移動
-                $filenames[$i] = $final_filename;
-            } else {
-                $filenames[$i] = '';
-            }
-        }
-
-        // 添付ファイル名を sortable テーブルに保存
-        $sql = "UPDATE {$wpdb->prefix}sortable
-                SET attach1 = %s, attach2 = %s, attach3 = %s, usericon = %s
-                WHERE id = %d";
-        $wpdb->query(
-            $wpdb->prepare(
-                $sql,
-                $filenames[0] ?? '',
-                $filenames[1] ?? '',
-                $filenames[2] ?? '',
-                $filenames[3] ?? '',
-                $insert_id
-            )
-        );
-    }
-
-    // 投稿完了後：セッションと Cookie を削除（再送信対策・セキュリティ向上）
-    $_SESSION = []; // セッション変数クリア
-    session_destroy(); // セッション破棄
-    setcookie('user_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN); // Cookie 削除
-
-    // 投稿完了メッセージを JSON で返す
-    wp_send_json_success(['message' => '投稿が完了しました']);
-    exit;
-}
-
-// Ajax フック登録（未ログインユーザーでも実行可能）
-add_action('wp_ajax_bbs_quest_confirm', 'bbs_quest_confirm');
-add_action('wp_ajax_nopriv_bbs_quest_confirm', 'bbs_quest_confirm');
-
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_confirm()
 {
-    // Cookie から user_id を取得（存在しない場合はエラー）
-    $user_id = $_COOKIE['user_id'] ?? null;
-    if (!$user_id) {
-        wp_send_json(['error' => 'ユーザーIDが見つかりません']);
+    // UUID形式かを必ず検証する
+    function is_valid_uuid($uuid)
+    {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid);
+    }
+
+    // UUIDであることを検証する
+    $user_id = $_COOKIE['user_id'] ?? '';
+    if (!is_valid_uuid($user_id)) {
+        wp_send_json_error(['message' => '無効なユーザー識別子です']);
+        exit;
+    }
+
+    // UUIDの発行を自サーバで制御
+    if (!isset($_COOKIE['user_id'])) {
+        $user_id = wp_generate_uuid4();
+        setcookie('user_id', $user_id, ...);
+        $_COOKIE['user_id'] = $user_id;
     }
 
     // 投稿データを一時保存していたトランジェントキーを作成

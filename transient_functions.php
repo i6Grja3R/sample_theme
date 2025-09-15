@@ -8,7 +8,7 @@
 add_action('wp_enqueue_scripts', function () {
 
     // ▼ このテンプレートのページだけで実行したい場合（任意）
-    if (function_exists('is_page_template') && !is_page_template('bbs_quest_input.php')) {
+    if (function_exists('is_page_template') && !is_page_template('transient_input.php')) {
         return; // 別ページでは何もしない
     }
 

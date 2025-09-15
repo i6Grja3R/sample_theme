@@ -1,6 +1,6 @@
 <?php
 /*
-Template Name: bbs_quest_input
+Template Name: transient_input
 固定ページ: 質問する
 */
 header('X-FRAME-OPTIONS: SAMEORIGIN'); // クリックジャッキング対策
@@ -192,23 +192,31 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 
     // ステップ1：入力中の見出しと画像
     function change1() {
-        q_text.textContent = "質問する";
-        step_img.src = "<?php echo esc_url(get_template_directory_uri() . '/images/step01.png'); ?>";
-        step_img.alt = "STEP1 入力";
+        if (q_text) q_text.textContent = "質問する";
+        if (step_img) {
+            step_img.src =
+                "<?php echo esc_url(get_template_directory_uri() . '/images/step01.png'); ?>";
+            step_img.alt = "STEP1 入力";
+        }
     }
-
     // ステップ2：確認画面の見出しと画像
     function change2() {
-        q_text.textContent = "確認する";
-        step_img.src = "<?php echo esc_url(get_template_directory_uri() . '/images/step02.png'); ?>";
-        step_img.alt = "STEP2 確認";
+        if (q_text) q_text.textContent = "確認する";
+        if (step_img) {
+            step_img.src =
+                "<?php echo esc_url(get_template_directory_uri() . '/images/step02.png'); ?>";
+            step_img.alt = "STEP2 確認";
+        }
     }
 
     // ステップ3：完了の見出しと画像
     function change3() {
-        q_text.textContent = "完了";
-        step_img.src = "<?php echo esc_url(get_template_directory_uri() . '/images/step03.png'); ?>";
-        step_img.alt = "STEP3 完了";
+        if (q_text) q_text.textContent = "完了";
+        if (step_img) {
+            step_img.src =
+                "<?php echo esc_url(get_template_directory_uri() . '/images/step03.png'); ?>";
+            step_img.alt = "STEP3 完了";
+        }
     }
 
     /* -------------------------------------
@@ -275,54 +283,60 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         const textEl = document.getElementById('text');
 
         // data-* で設定された閾値を取得
-        const titleMax = parseInt(titleEl?.dataset.length || '0', 10);
-        const titleMin = parseInt(titleEl?.dataset.minlength || '0', 10);
-        const textMax = parseInt(textEl?.dataset.length || '0', 10);
-        const textMin = parseInt(textEl?.dataset.minlength || '0', 10);
+        const titleMax = parseInt(titleEl ? .dataset.length || '200', 10);
+        const titleMin = parseInt(titleEl ? .dataset.minlength || '1', 10);
+        const textMax = parseInt(textEl ? .dataset.length || '5000', 10);
+        const textMin = parseInt(textEl ? .dataset.minlength || '1', 10);
 
-        const titleLen = (titleEl?.value || '').length;
-        const textLen = (textEl?.value || '').length;
+        const titleLen = (titleEl ? .value || '').length;
+        const textLen = (textEl ? .value || '').length;
 
         // スタンプ必須（1..8 のいずれかが選択済み）
         const stamps = document.querySelectorAll('input[name="stamp"]');
         let stampOk = false;
-        for (const s of stamps) {
-            if (s.checked) {
-                stampOk = true;
-                break;
-            }
-        }
+        stamps.forEach(s => {
+            if (s.checked) stampOk = true;
+        });
 
         // 文字数の妥当性
-        const titleOk = titleLen >= titleMin && (titleMax ? titleLen <= titleMax : true);
-        const textOk = textLen >= textMin && (textMax ? textLen <= textMax : true);
+        // const titleOk = titleLen >= titleMin && (titleMax ? titleLen <= titleMax : true);
+        // const textOk = textLen >= textMin && (textMax ? textLen <= textMax : true);
 
         // 添付のクライアント側ソフトチェック
         const inputs = document.querySelectorAll('input.attach[type="file"]');
-        let filesCount = 0;
-        let clientFileOk = true;
-        const MAX_FILES = 4; // サーバー側と合わせる
-        const MAX_PER = 5 * 1024 * 1024; // 5MB/件
+        const MAX_FILES = 4,
+            MAX_PER = 5 * 1024 * 1024;
+        // let filesCount = 0;
+        // let clientFileOk = true;
+        // const MAX_FILES = 4; // サーバー側と合わせる
+        // const MAX_PER = 5 * 1024 * 1024; // 5MB/件
+
+        let filesCount = 0,
+            clientFileOk = true;
 
         inputs.forEach(f => {
-            if (f.files && f.files.length) {
+            if (f.files?.length) {
                 filesCount += f.files.length;
-                for (const file of f.files) {
+                for (const file of f.files)
                     if (file.size > MAX_PER) clientFileOk = false;
-                }
             }
         });
         if (filesCount > MAX_FILES) clientFileOk = false;
 
         // すべてOKならボタン活性化
-        const canSubmit = titleOk && textOk && stampOk && clientFileOk;
-        btn.disabled = !canSubmit;
+        // const canSubmit = titleOk && textOk && stampOk && clientFileOk;
+        const titleOk = titleLen >= titleMin && titleLen <= titleMax;
+        const textOk = textLen >= textMin && textLen <= textMax;
+        btn.disabled = !(titleOk && textOk && stampOk && clientFileOk);
     }
 
-    /* -------------------------------------
-     * 送信（submit → サーバー bbs_quest_submit）
-     * ------------------------------------- */
-    let lastInsertId = null; // 確認APIで使うID（サーバーが返す）
+    // 成功後
+    // lastDraftId = json.data?.draft_id || json.draft_id || null; // ★これに変更
+
+    // ---- 共有状態：submit→confirm で使うドラフトID ----
+    let lastDraftId = null;
+
+    // ---- 1) submit：/tmp保存 + transient保存 → draft_id を受け取る ----
 
     async function submit_button_click() {
         const btn = document.getElementById("submit_button");
@@ -330,54 +344,101 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 
         try {
             // 送信用データをフォームから収集
-            const formData = new FormData(input_form);
-            formData.append("action", "bbs_quest_submit"); // WP AJAXアクション
-            if (window.bbs_vars?.nonce) formData.append("nonce", bbs_vars.nonce); // CSRF対策
+            const form = document.getElementById("input_form");
+            const fd = new FormData(form); // WP AJAXアクション
+            fd.append("action", "bbs_quest_submit");
+            if (window.bbs_vars ? .nonce) fd.append("nonce", bbs_vars.nonce); // CSRF対策
 
             // 送信
-            const res = await fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
+            const ajaxUrl = (window.bbs_vars ? .ajax_url) ||
+                "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+            const res = await fetch(ajaxUrl, {
                 method: "POST",
-                body: formData,
+                body: fd,
                 credentials: "same-origin"
             });
-
-            const json = await res.json();
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json().catch(() => null);
 
             // WordPress の標準形: { success: true/false, data: {...} }
             if (!json || json.success !== true) {
                 // エラー配列の最初を出す（なければメッセージ）
-                const msg = json?.data?.errors?.[0] || "送信に失敗しました。";
+                const msg = json ? .data ? .errors ? .[0] || "送信に失敗しました。";
                 alert(msg);
                 return;
             }
 
+            // ← ここで lastDraftId をセット（唯一の真実の場所）
+            lastDraftId = json.data ? .draft_id || json ? .draft_id || null; // ← ココが肝
+            if (!lastDraftId) {
+                alert("ドラフトIDの取得に失敗しました。");
+                return;
+            }
+
             // 成功：サーバーが返す id / files / user_uuid などを取得
-            lastInsertId = json.data?.id ?? null;
+            // lastInsertId = json.data?.id ?? null;
 
             // 画面を確認状態へ
             change2();
-            input_area.style.display = "none";
-            confirm_area.style.display = "block";
+            if (input_area) input_area.style.display = "none";
+            if (confirm_area) confirm_area.style.display = "block";
 
             // 既存の確認画面生成ロジックがある場合はそれを呼び出す
             // （ここでは簡易に「確認へ進みました」だけ表示）
-            confirm_area.textContent = "";
-            const p = document.createElement('p');
-            p.textContent = "入力内容を確認してください（このまま送信で確定します）。";
-            confirm_area.appendChild(p);
+            if (confirm_area) {
+                confirm_area.textContent = "確認中…";
+                const showFd = new FormData();
+                showFd.append("action", "bbs_quest_confirm");
+                showFd.append("mode", "show");
+                showFd.append("draft_id", String(lastDraftId));
+                if (window.bbs_confirm_vars ? .nonce) showFd.append("nonce",
+                    bbs_confirm_vars.nonce);
 
-            // 確定ボタンが無ければ作る（id='confirm_button'）
-            let confirmBtn = document.getElementById('confirm_button');
-            if (!confirmBtn) {
-                confirmBtn = document.createElement('button');
-                confirmBtn.type = 'button';
-                confirmBtn.id = 'confirm_button';
-                confirmBtn.textContent = 'この内容で投稿を確定する';
-                confirm_area.appendChild(confirmBtn);
+                const showUrl = (window.bbs_confirm_vars ? .ajax_url) || ajaxUrl;
+
+                const showRes = await fetch(showUrl, {
+                    method: "POST",
+                    body: showFd,
+                    credentials: "same-origin"
+                });
+                const showJson = await showRes.json().catch(() => null);
+                const data = showJson ? .data ? .data || {};
+
+                confirm_area.textContent = "";
+                const h = document.createElement('h3');
+                h.textContent = "この内容で投稿しますか？";
+                confirm_area.appendChild(h);
+
+                const esc = s => String(s || '').replace(/[<>&]/g, m => ({
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '&': '&amp;'
+                } [m]));
+                const ul = document.createElement('ul');
+
+                ul.innerHTML =
+                    `
+<li><strong>タイトル</strong>：${esc(data.title)}</li>
+<li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
+<li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
+<li><strong>スタンプ</strong>：${esc(data.stamp)}</li>
+<li><strong>添付</strong>：${Array.isArray(data.files) ? data.files.filter(Boolean).length : 0} 件</li>
+`;
+                confirm_area.appendChild(ul);
+
+                // 確定ボタンが無ければ作る（id='confirm_button'）
+                let confirmBtn = document.getElementById('confirm_button');
+                if (!confirmBtn) {
+                    confirmBtn = document.createElement('button');
+                    confirmBtn.type = 'button';
+                    confirmBtn.id = 'confirm_button';
+                    confirmBtn.textContent = 'この内容で投稿を確定する';
+                    confirm_area.appendChild(confirmBtn);
+                }
+                confirmBtn.addEventListener('click', confirm_button_click, {
+                    once: true
+                });
             }
-            confirmBtn.addEventListener('click', confirm_button_click, {
-                once: true
-            });
 
         } catch (err) {
             console.error(err);
@@ -391,48 +452,80 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
      * 確定（confirm → サーバー bbs_quest_confirm）
      *  - mode=commit / id=lastInsertId を送る
      * ------------------------------------- */
+    // 1) グローバル保持用（submitで受け取るドラフトID）
+    let lastDraftId = null;
+
+    // （参考）submit 側の成功処理の一部も直す：draft_id を拾って保持
+    //   const json = await res.json();
+    //   if (!json || json.success !== true) { ... }
+    //   lastDraftId = json.data?.draft_id || json.draft_id || null;  // ← ここがポイント
+
+    // 2) confirm 側：draft_id を送るように修正
     async function confirm_button_click() {
         const btn = document.getElementById('confirm_button');
         toggleLoading(btn, true);
 
         try {
-            if (!lastInsertId) {
-                alert("確認用の投稿IDが取得できていません。先に送信（確認へ）してください。");
+            // draft_id が無いなら送れない
+            if (!lastDraftId) {
+                alert("確認用のドラフトIDが取得できていません。先に『確認へ進む』を押してください。");
                 return;
             }
 
-            const formData = new FormData();
-            formData.append("action", "bbs_quest_confirm"); // WP AJAXアクション
-            formData.append("mode", "commit"); // 確定処理
-            formData.append("id", String(lastInsertId)); // submit で作られたID
-            if (window.bbs_confirm_vars?.nonce) {
-                formData.append("nonce", bbs_confirm_vars.nonce); // confirm 用nonce
-            }
+            const fd = new FormData();
 
-            const res = await fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
+            // 3) 送信ペイロードを作成（id ではなく draft_id を送る）
+            const fd = new FormData();
+            fd.append("action", "bbs_quest_confirm"); // confirm 用フック名
+            fd.append("mode", "commit"); // 最終確定モード
+            fd.append("draft_id", String(lastDraftId)); // ← DBのidではなくdraft_idを送る
+
+            // 4) confirm 用 nonce（無ければ送らない）
+            if (window.bbs_confirm_vars ? .nonce)
+                fd.append("nonce", bbs_confirm_vars.nonce); // confirm 用 nonce
+            const ajaxUrl = (window.bbs_confirm_vars?.ajax_url) || (window.bbs_vars?.ajax_url) || "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+
+            // 5) 送信
+            const res = await fetch(ajaxUrl, {
                 method: "POST",
                 body: formData,
-                credentials: "same-origin"
+                credentials: "same-origin",
             });
+            // ネットワーク or HTTP エラーの見やすい処理
+            if (!res.ok)
+                // const txt = await res.text().catch(() => "");
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt}`);
 
-            const json = await res.json();
-
+            const json = await res.json().catch(() => null);
             if (!json || json.success !== true) {
-                const msg = json?.data?.errors?.[0] || "確定に失敗しました。";
+                // WP 標準: { success: true/false, data: {...} }
+                const msg = json ? .data ? .errors ? .[0] || json ? .data ? .message ||
+                    "確定に失敗しました。";
                 alert(msg);
                 return;
             }
 
-            // 完了UI
-            change3();
-            const buttons = document.querySelectorAll('.post-button');
-            buttons.forEach(x => x.style.display = "none");
+            // 7) 成功UI
+            change3(); // ステップ表示：完了へ
 
-            confirm_area.textContent = "";
-            const ok = document.createElement('p');
-            ok.textContent = "投稿が確定しました。ありがとうございました。";
-            confirm_area.appendChild(ok);
+            // 送信ボタン系を非表示
+            document.querySelectorAll('.post-button').forEach(el => el.style.display =
+                "none");
+            if (confirm_area) {
+                // 確認エリアの表示更新
+                confirm_area.textContent = "";
+                const p = document.createElement('p');
+                p.textContent = json.data ? .message || "投稿が確定しました。ありがとうございました。";
+                confirm_area.appendChild(p);
 
+                // 必要なら返却データを使って追記表示（例：採番ID）
+                if (json.data ? .id) {
+                    const idp = document.createElement('p');
+                    idp.textContent = `受付番号: ${json.data.id}`;
+                    confirm_area.appendChild(idp);
+                }
+            }
         } catch (err) {
             console.error(err);
             alert("通信に失敗しました。時間をおいて再度お試しください。");
@@ -441,15 +534,17 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         }
     }
 
+
     /* -------------------------------------
      * 初期化
      *  - 画像/アイコンのセレクタにイベント付与（既存関数を利用）
      *  - 入力文字数表示とボタン制御をセット
      * ------------------------------------- */
     function init() {
-        // 画像アップロードの既存ヘルパー（あなたの実装を呼び出し）
-        set_attach_event('.image-camera-icon,.usericon-uploads', 3);
-
+        if (typeof set_attach_event === 'function') {
+            // 画像アップロードの既存ヘルパー（あなたの実装を呼び出し）
+            set_attach_event('.image-camera-icon,.usericon-uploads', 3);
+        }
         // 送信ボタンイベント
         const submitBtn = document.getElementById("submit_button");
         if (submitBtn) submitBtn.addEventListener("click", submit_button_click);

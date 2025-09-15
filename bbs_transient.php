@@ -34,11 +34,13 @@
 if (!defined('ABSPATH')) {
     exit;
 }
-require_once __DIR__ . '/bbs_common.php';
+require_once __DIR__ . '/transient_common.php';
 
 // フロントへ submit 用の nonce を配布（任意：既存のJSハンドル名に合わせて変更）
 add_action('wp_enqueue_scripts', function () {
-    if (!wp_script_is('bbs-js-handle', 'enqueued')) return;
+    // あなたのフロントJSのハンドル名に合わせて変更してください
+    $handle = 'bbs-js-handle';
+    if (!wp_script_is($handle, 'enqueued')) return;
     wp_localize_script('bbs-js-handle', 'bbs_vars', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce'    => wp_create_nonce('bbs_quest_submit'),
@@ -281,7 +283,7 @@ add_action('wp_ajax_bbs_quest_submit',        'bbs_quest_submit');           // 
 add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');           // 未ログインユーザー
 ?>
 
---- ここから bbs_quest_confirm （サーバーサイド）のコード -----------
+<!--  ここから bbs_quest_confirm （サーバーサイド）のコード -->
 
 <?php
 /**
@@ -297,6 +299,24 @@ add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');           // 
  *  - CSRF（専用nonce）、匿名UUID（Cookie, v4厳密）、レート制限（IP+UUID）
  *  - 自分のレコードのみ操作可能（id + user_id で限定）
  */
+
+// 直アクセス防止
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+require_once __DIR__ . '/transient_common.php';
+
+// フロントへ submit 用の nonce を配布（任意：既存のJSハンドル名に合わせて変更）
+add_action('wp_enqueue_scripts', function () {
+    // あなたのフロントJSのハンドル名に合わせて変更してください
+    $handle = 'bbs-js-handle';
+    if (!wp_script_is($handle, 'enqueued')) return;
+    wp_localize_script($handle, 'bbs_confirm_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('bbs_quest_confirm'),
+    ]);
+});
 
 // ─────────────────────────────────────────────
 // 必要ならここで共通関数を require してください。

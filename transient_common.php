@@ -1,7 +1,7 @@
 <?php
 
 /**
- * bbs_common.php
+ * transient_common.php
  * 共有ヘルパー（WordPress前提）
  *
  * - 匿名UUID（Cookieベース／UUID v4 厳密検証 & 安全属性）
@@ -170,5 +170,80 @@ if (!function_exists('bbs_require_nonce')) {
         if (empty($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], $action)) {
             wp_send_json_error(['errors' => ['不正なリクエストです（CSRF検出）。']]);
         }
+    }
+}
+
+// transient_common.php（または functions.php）に追加
+if (!function_exists('bbs_first_image_from_content')) {
+    /**
+     * HTML本文から「最初の <img>」の情報を安全に抽出する。
+     * 返り値: ['id'=>int|null,'src'=>string|null,'html'=>string|null]
+     */
+    function bbs_first_image_from_content(string $html): array
+    {
+        // ブロックエディタ/ショートコードの乱れを避けるためWPのパーサを利用
+        // 添付IDが付いた画像ならそれを優先 / 直リンクのみでも拾える
+        $id = null;
+        $src = null;
+        $imgHtml = null;
+
+        // 1) ギャラリーや img ショートコード → 添付IDを優先抽出
+        $shortcodes = [];
+        preg_match_all('/\[(?:gallery|caption|audio|video|img)[^\]]*\]/i', $html, $shortcodes);
+        if (!empty($shortcodes[0])) {
+            // gallery ids="1,2" 等の最初のIDを拾う
+            if (preg_match('/ids\s*=\s*"(\d+(?:\s*,\s*\d+)*)"/i', $shortcodes[0][0], $m)) {
+                $firstId = (int)trim(explode(',', $m[1])[0]);
+                if ($firstId > 0) {
+                    $id  = $firstId;
+                    $imgHtml = wp_get_attachment_image($id, 'medium', false, ['class' => 'archive-thumbnail']);
+                    if ($imgHtml) {
+                        $src = wp_get_attachment_image_url($id, 'medium');
+                        return ['id' => $id, 'src' => $src, 'html' => $imgHtml];
+                    }
+                }
+            }
+        }
+
+        // 2) 投稿本文内の <img> を DOM で解析（正規表現でのスクレイピングは避ける）
+        if (function_exists('wp_kses')) {
+            // 許可タグだけに狭めた簡易DOM化用HTMLを用意
+            $safe = wp_kses($html, ['img' => ['src' => [], 'srcset' => [], 'sizes' => [], 'alt' => [], 'class' => [], 'id' => [], 'width' => [], 'height' => []]]);
+        } else {
+            $safe = $html;
+        }
+
+        // 最初の <img ...> を拾う
+        if (preg_match('/<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>/i', $safe, $m)) {
+            $src = esc_url_raw($m[1]);
+            // data-id="123" のような形があれば拾う
+            if (preg_match('/\bdata-attachment-id=["\'](\d+)["\']/', $m[0], $mm)) {
+                $id = (int)$mm[1];
+            }
+            // 直接IDがなくても OK
+            $imgHtml = wp_kses($m[0], ['img' => ['src' => [], 'srcset' => [], 'sizes' => [], 'alt' => [], 'class' => [], 'id' => [], 'width' => [], 'height' => []]]);
+            return ['id' => $id, 'src' => $src, 'html' => $imgHtml];
+        }
+
+        return ['id' => null, 'src' => null, 'html' => null];
+    }
+}
+
+if (!function_exists('bbs_first_image_html_or_fallback')) {
+    /**
+     * 最初の画像の <img> HTML を返す。見つからない場合は任意の代替画像を返す。
+     */
+    function bbs_first_image_html_or_fallback(string $html, string $fallback_url, string $size = 'medium'): string
+    {
+        $r = bbs_first_image_from_content($html);
+        if ($r['id']) {
+            $img = wp_get_attachment_image($r['id'], $size, false, ['class' => 'archive-thumbnail']);
+            if ($img) return $img;
+        }
+        if ($r['src']) {
+            $esc = esc_url($r['src']);
+            return '<img class="archive-thumbnail" src="' . $esc . '" alt="" />';
+        }
+        return '<img class="archive-thumbnail" src="' . esc_url($fallback_url) . '" alt="No image" />';
     }
 }
