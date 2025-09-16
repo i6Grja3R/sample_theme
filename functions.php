@@ -17,6 +17,11 @@ add_theme_support('post-thumbnails');
 add_filter('gutenberg_can_edit_post_type', '__return_false'); //Gutenbergプラグイン用
 add_filter('use_block_editor_for_post', '__return_false'); //WordPressブロックエディター用
 
+add_action('after_setup_theme', function () {
+    add_theme_support('post-thumbnails');        // 既に入っていれば重複OK
+    add_image_size('rect', 400, 300, true);      // ← 必要な実寸に調整（トリミング true）
+});
+
 //従来のウィジェットエディターに戻す
 function example_theme_support()
 {
@@ -210,7 +215,8 @@ function get_attachment_id_by_url($url)
  * @param string $class 出力<img>に付けるクラス
  * @return string HTML（<img …>）
  */
-function bbs_first_image_html_or_fallback($post = null, string $fallback_url = '', $size = 'thumbnail', string $class = 'archive-thumbnail'): string {
+function bbs_first_image_html_or_fallback($post = null, string $fallback_url = '', $size = 'thumbnail', string $class = 'archive-thumbnail'): string
+{
     $post = get_post($post);
     if (!$post) return $fallback_url ? sprintf('<img src="%s" alt="" class="%s" />', esc_url($fallback_url), esc_attr($class)) : '';
 
@@ -249,7 +255,7 @@ function bbs_first_image_html_or_fallback($post = null, string $fallback_url = '
     $content = get_post_field('post_content', $post);
     if ($content) {
         // 実体参照などで壊れないように
-        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'.$content.'</body></html>';
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' . $content . '</body></html>';
         $dom = new DOMDocument();
         // DOMの警告を抑制（壊れたHTMLでも進める）
         libxml_use_internal_errors(true);
@@ -531,22 +537,22 @@ function bbs_answer_submit()
     // ファイル添付がある場合の処理
     if (!empty($_FILES['attach']['tmp_name'])) {
         $upload_dir = wp_upload_dir();                      // WordPress のアップロードディレクトリ情報を取得
-        $basedir = wp_normalize_path( $upload['basedir'] );        // OS差のあるパス記法を統一
+        $basedir = wp_normalize_path($upload['basedir']);        // OS差のあるパス記法を統一
 
         // ファイルシステムのパス結合は path_join()、末尾は trailingslashit() で正規化
-        $attach_dir = trailingslashit( path_join( $basedir, 'attach' ) );
+        $attach_dir = trailingslashit(path_join($basedir, 'attach'));
 
-    // ディレクトリが無ければ作成（WordPress推奨のAPI）
-    if ( ! is_dir( $tmp_dir ) ) {
-    // 失敗時はエラーログ & クライアントにエラーを返すなどの処理を入れる
-    if ( ! wp_mkdir_p( $tmp_dir ) ) {
-        error_log( '[BBS] tmpディレクトリの作成に失敗: ' . $tmp_dir );
-        wp_send_json_error(['error' => '一時保存領域の作成に失敗しました。権限をご確認ください。']);
-    }
-        // ついでに .htaccess を置いて実行ファイルブロック（任意・強く推奨）
-        $ht = "<FilesMatch \"\\.(php|php5|php7|phps|phtml|pl|py|jsp|asp|aspx|sh|cgi)$\">\nDeny from all\n</FilesMatch>\nOptions -Indexes\n";
-        @file_put_contents( trailingslashit($tmp_dir) . '.htaccess', $ht );
-    }
+        // ディレクトリが無ければ作成（WordPress推奨のAPI）
+        if (! is_dir($tmp_dir)) {
+            // 失敗時はエラーログ & クライアントにエラーを返すなどの処理を入れる
+            if (! wp_mkdir_p($tmp_dir)) {
+                error_log('[BBS] tmpディレクトリの作成に失敗: ' . $tmp_dir);
+                wp_send_json_error(['error' => '一時保存領域の作成に失敗しました。権限をご確認ください。']);
+            }
+            // ついでに .htaccess を置いて実行ファイルブロック（任意・強く推奨）
+            $ht = "<FilesMatch \"\\.(php|php5|php7|phps|phtml|pl|py|jsp|asp|aspx|sh|cgi)$\">\nDeny from all\n</FilesMatch>\nOptions -Indexes\n";
+            @file_put_contents(trailingslashit($tmp_dir) . '.htaccess', $ht);
+        }
 
         // 各添付ファイルをループ処理
         foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
@@ -606,24 +612,7 @@ function Chk_ngword($str, $mes, array &$error)
         }
     }
 }
-/* $str = 名前、タイトル、質問文 */
-function Chk_StrMode($str)
-{
-    // タグを除去
-    $str = strip_tags($str);
-    // 連続する空白をひとつにする
-    $str = preg_replace('/[\x20\xC2\xA0]++/u', "\x20", $str);
-    // 連続する改行をひとつにする
-    $str = preg_replace("/(\x20*[\r\n]\x20*)++/", "\n", $str);
-    // 前後の空白を除去
-    $str = mb_ereg_replace('^(　){0,}', '', $str);
-    $str = mb_ereg_replace('(　){0,}$', '', $str);
-    $str = trim($str);
-    // 特殊文字を HTML エンティティに変換する
-    $str = htmlspecialchars($str);
 
-    return $str;
-}
 /**
  * 未入力チェック
  */
@@ -664,7 +653,7 @@ function bbs_answer_confirm()
     // UUIDの発行を自サーバで制御
     if (!isset($_COOKIE['user_id'])) {
         $user_id = wp_generate_uuid4();
-        setcookie('user_id', $user_id, ...);
+        // setcookie('user_id', $user_id, ...);
         $_COOKIE['user_id'] = $user_id;
     }
 
@@ -870,3 +859,58 @@ add_action('wp_enqueue_scripts', 'like_enqueue_scripts');
 // like関係の処理ファイル読み込み（重複除去）
 require_once get_template_directory() . '/inc/like-functions.php';
 require_once get_template_directory() . '/inc/like-handler.php';
+
+/**
+ * 添付IDを安全に画像HTMLへ。ダメならフォールバック画像を返す。
+ */
+function bbs_safe_attachment_img_or_fallback($attachment_id, $size = 'thumbnail', $attr = [], $fallback_url = '')
+{
+    $html = '';
+
+    // 妥当性チェック：数値・正のID・存在するMIME
+    if (is_numeric($attachment_id) && (int)$attachment_id > 0 && get_post_mime_type($attachment_id)) {
+        $html = wp_get_attachment_image((int)$attachment_id, $size, false, $attr);
+    }
+
+    if (! $html && $fallback_url) {
+        $class = isset($attr['class']) ? esc_attr($attr['class']) : 'noimage';
+        $alt   = isset($attr['alt'])   ? esc_attr($attr['alt'])   : esc_attr__('No image', 'your-textdomain');
+        $html  = sprintf(
+            '<img src="%s" class="%s" alt="%s" />',
+            esc_url($fallback_url),
+            $class,
+            $alt
+        );
+    }
+    return $html;
+}
+
+// functions.php
+if (!function_exists('bbs_safe_attachment_img_or_fallback')) {
+    function bbs_safe_attachment_img_or_fallback($attachment_id, $size = 'thumbnail', $attrs = [], $fallback_url = '')
+    {
+        $attachment_id = (int)$attachment_id;
+        if ($attachment_id > 0 && get_post($attachment_id) && get_post_mime_type($attachment_id)) {
+            return wp_get_attachment_image($attachment_id, $size, false, $attrs);
+        }
+        if ($fallback_url) {
+            $attr_html = '';
+            foreach ((array)$attrs as $k => $v) {
+                $k = esc_attr($k);
+                $v = esc_attr($v);
+                $attr_html .= " {$k}=\"{$v}\"";
+            }
+            $fallback_url = esc_url($fallback_url);
+            return "<img src=\"{$fallback_url}\"{$attr_html} />";
+        }
+        return '';
+    }
+}
+
+// 代表画像を使うならこれが必要
+add_theme_support('post-thumbnails');
+
+// あなたが使っているサイズ名 'rect' を登録する（値は用途に合わせて）
+if (function_exists('add_image_size')) {
+    add_image_size('rect', 400, 300, true); // 例：400x300 のハードクロップ
+}
