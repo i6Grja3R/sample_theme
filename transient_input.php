@@ -283,13 +283,13 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         const textEl = document.getElementById('text');
 
         // data-* で設定された閾値を取得
-        const titleMax = parseInt(titleEl ? .dataset.length || '200', 10);
-        const titleMin = parseInt(titleEl ? .dataset.minlength || '1', 10);
-        const textMax = parseInt(textEl ? .dataset.length || '5000', 10);
-        const textMin = parseInt(textEl ? .dataset.minlength || '1', 10);
+        const titleMax = parseInt(titleEl?.dataset.length || '200', 10);
+        const titleMin = parseInt(titleEl?.dataset.minlength || '1', 10);
+        const textMax = parseInt(textEl?.dataset.length || '5000', 10);
+        const textMin = parseInt(textEl?.dataset.minlength || '1', 10);
 
-        const titleLen = (titleEl ? .value || '').length;
-        const textLen = (textEl ? .value || '').length;
+        const titleLen = (titleEl?.value || '').length;
+        const textLen = (textEl?.value || '').length;
 
         // スタンプ必須（1..8 のいずれかが選択済み）
         const stamps = document.querySelectorAll('input[name="stamp"]');
@@ -347,10 +347,10 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             const form = document.getElementById("input_form");
             const fd = new FormData(form); // WP AJAXアクション
             fd.append("action", "bbs_quest_submit");
-            if (window.bbs_vars ? .nonce) fd.append("nonce", bbs_vars.nonce); // CSRF対策
+            if (window.bbs_vars?.nonce) fd.append("nonce", bbs_vars.nonce); // CSRF対策
 
             // 送信
-            const ajaxUrl = (window.bbs_vars ? .ajax_url) ||
+            const ajaxUrl = (window.bbs_vars?.ajax_url) ||
                 "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
             const res = await fetch(ajaxUrl, {
                 method: "POST",
@@ -363,13 +363,13 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             // WordPress の標準形: { success: true/false, data: {...} }
             if (!json || json.success !== true) {
                 // エラー配列の最初を出す（なければメッセージ）
-                const msg = json ? .data ? .errors ? .[0] || "送信に失敗しました。";
+                const msg = json?.data?.errors?.[0] || "送信に失敗しました。";
                 alert(msg);
                 return;
             }
 
             // ← ここで lastDraftId をセット（唯一の真実の場所）
-            lastDraftId = json.data ? .draft_id || json ? .draft_id || null; // ← ココが肝
+            lastDraftId = json.data?.draft_id || json?.draft_id || null; // ← ココが肝
             if (!lastDraftId) {
                 alert("ドラフトIDの取得に失敗しました。");
                 return;
@@ -391,10 +391,10 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 showFd.append("action", "bbs_quest_confirm");
                 showFd.append("mode", "show");
                 showFd.append("draft_id", String(lastDraftId));
-                if (window.bbs_confirm_vars ? .nonce) showFd.append("nonce",
+                if (window.bbs_confirm_vars?.nonce) showFd.append("nonce",
                     bbs_confirm_vars.nonce);
 
-                const showUrl = (window.bbs_confirm_vars ? .ajax_url) || ajaxUrl;
+                const showUrl = (window.bbs_confirm_vars?.ajax_url) || ajaxUrl;
 
                 const showRes = await fetch(showUrl, {
                     method: "POST",
@@ -402,7 +402,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                     credentials: "same-origin"
                 });
                 const showJson = await showRes.json().catch(() => null);
-                const data = showJson ? .data ? .data || {};
+                const data = showJson?.data?.data || {};
 
                 confirm_area.textContent = "";
                 const h = document.createElement('h3');
@@ -453,7 +453,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
      *  - mode=commit / id=lastInsertId を送る
      * ------------------------------------- */
     // 1) グローバル保持用（submitで受け取るドラフトID）
-    let lastDraftId = null;
+    lastDraftId = null;
 
     // （参考）submit 側の成功処理の一部も直す：draft_id を拾って保持
     //   const json = await res.json();
@@ -472,8 +472,6 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 return;
             }
 
-            const fd = new FormData();
-
             // 3) 送信ペイロードを作成（id ではなく draft_id を送る）
             const fd = new FormData();
             fd.append("action", "bbs_quest_confirm"); // confirm 用フック名
@@ -481,7 +479,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             fd.append("draft_id", String(lastDraftId)); // ← DBのidではなくdraft_idを送る
 
             // 4) confirm 用 nonce（無ければ送らない）
-            if (window.bbs_confirm_vars ? .nonce)
+            if (window.bbs_confirm_vars?.nonce)
                 fd.append("nonce", bbs_confirm_vars.nonce); // confirm 用 nonce
             const ajaxUrl = (window.bbs_confirm_vars?.ajax_url) || (window.bbs_vars?.ajax_url) || "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
 
@@ -500,7 +498,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             const json = await res.json().catch(() => null);
             if (!json || json.success !== true) {
                 // WP 標準: { success: true/false, data: {...} }
-                const msg = json ? .data ? .errors ? .[0] || json ? .data ? .message ||
+                const msg = json?.data?.errors?.[0] || json?.data?.message ||
                     "確定に失敗しました。";
                 alert(msg);
                 return;
@@ -516,11 +514,11 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 // 確認エリアの表示更新
                 confirm_area.textContent = "";
                 const p = document.createElement('p');
-                p.textContent = json.data ? .message || "投稿が確定しました。ありがとうございました。";
+                p.textContent = json.data?.message || "投稿が確定しました。ありがとうございました。";
                 confirm_area.appendChild(p);
 
                 // 必要なら返却データを使って追記表示（例：採番ID）
-                if (json.data ? .id) {
+                if (json.data?.id) {
                     const idp = document.createElement('p');
                     idp.textContent = `受付番号: ${json.data.id}`;
                     confirm_area.appendChild(idp);
