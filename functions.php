@@ -491,6 +491,7 @@ function Chk_StrMode($str)
 // submit 用 nonce 配布
 add_action('wp_enqueue_scripts', function () {
     if (!wp_script_is('bbs-js-handle', 'enqueued')) return; // そのJSを読み込む画面だけ
+
     wp_localize_script('bbs-js-handle', 'bbs_submit_vars', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce'    => wp_create_nonce('bbs_quest_submit'),
@@ -914,3 +915,508 @@ add_theme_support('post-thumbnails');
 if (function_exists('add_image_size')) {
     add_image_size('rect', 400, 300, true); // 例：400x300 のハードクロップ
 }
+
+/**********************************
+       ここから新コード追加
+ **********************************/
+
+/**
+ * ゲスト専用：一時領域（PHP tmp）→ 検証 → move_uploaded_file() で最終保存
+ *            → DBには “相対パスのみ” を保存（WordPress前提）
+ *
+ * ポイント
+ * - ログイン判定を一切しない（常に Cookie の UUID を匿名識別子として使用）
+ * - CSRF検証（nonce）
+ * - 入力のサニタイズ＆必須チェック（空白のみNG・スタンプ白リスト）
+ * - MIME実体（finfo）× 拡張子ホワイトリスト、画像寸法チェック
+ * - 1ファイル/合計サイズの上限
+ * - 最終保存先：/wp-content/uploads/bbs/YYYY/MM/（無ければ作成）
+ * - DBへは uploads 基準の “相対パス” のみ保存
+ * - 途中失敗時は保存済みファイルをクリーンアップ（孤児を残さない）
+ * - レート制限（IP + user_uuid）
+ *
+ * 依存：WordPress（$wpdb, wp_upload_dir() 等）
+ * 呼び方：/wp-admin/admin-ajax.php へ action=bbs_quest_submit で POST
+ * 
+ * bbs_guest_upload_final.php
+ * submit → （PHP tmp）検証 → move_uploaded_file() で最終保存 → DBは相対パスのみ保存
+ * その後の confirm では DB の is_confirmed を 1 に更新するだけ（ファイル移動・再INSERTなし）
+ *
+ * 依存: WordPress ($wpdb, wp_upload_dir, など)
+ */
+
+/**
+ * bbs_quest_submit.php
+ * 「PHP tmp で受ける → サーバーで検証 → move_uploaded_file() で最終保存」
+ * → DB には uploads 基準の相対パスのみ保存（is_confirmed = 0）
+ */
+
+// 直アクセス防止
+if (!defined('ABSPATH')) {
+    exit;
+}
+require_once __DIR__ . '/transient_common.php'; // get_guest_uuid(), bbs_tmp_dir(), bbs_attach_dir() など
+
+// フロントへ submit 用の nonce を配布（任意：既存のJSハンドル名に合わせて変更）
+/* add_action('wp_enqueue_scripts', function () {
+    // あなたのフロントJSのハンドル名に合わせて変更してください
+    $handle = 'bbs-js-handle'; // あなたのJSハンドル名に合わせる
+    if (!wp_script_is($handle, 'enqueued')) return;
+    wp_localize_script('bbs-js-handle', 'bbs_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('bbs_quest_submit'),
+    ]);
+});
+*/
+
+/* ===========================================================
+ * 4) 本体：bbs_quest_submit（AJAXハンドラ）
+ * =========================================================== */
+if (!function_exists('bbs_quest_submit')) {
+    function bbs_quest_submit()
+    {
+        // global $wpdb;                                                            // DB操作用（使わなければ削除可）
+        $errors = [];                                                            // エラー蓄積
+
+        /* --- CSRF 検証 ---------------------------------------------------- */
+        if (empty($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'bbs_quest_submit')) {
+            wp_send_json_error(['errors' => ['不正なリクエストです（CSRF検出）。']]);
+        }
+
+        /* --- 匿名ユーザーUUID（ログイン判定なし） ------------------------ */
+        $user_id = get_guest_uuid();                                             // 以降の識別・レート制限用（権限制御には使用しない）
+
+        /* --- レート制限（IP + user_id、例：10分で20回まで） --------------- */
+        bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
+
+        /* --- 入力取得・サニタイズ ---------------------------------------- */
+        $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');             // 親スレ等のID
+        $name      = sanitize_text_field($_POST['name']      ?? '匿名');         // 表示名
+        $title     = sanitize_text_field($_POST['title']     ?? '');             // タイトル
+        $text      = sanitize_textarea_field($_POST['text']  ?? '');             // 本文（改行を保持）
+        $stamp     = (int)($_POST['stamp'] ?? 0);                                // スタンプ（整数）
+
+        /* --- 長さ上限＆改行正規化 ---------------------------------------- */
+        $title = mb_substr($title, 0, 200);                                      // タイトル上限
+        $name  = mb_substr($name,  0, 50);                                       // 名前上限
+        // $text  = mb_substr($text,  0, 5000);                                     // 本文上限
+        $text  = preg_replace("/\r\n?/", "\n", mb_substr($text, 0, 5000));       // 改行正規化（\r\n, \r→\n）
+
+        /* --- 必須チェック（空白のみもNG） -------------------------------- */
+        // 文字列を受け取り、前後の半角/全角空白・水平/垂直空白を削る
+        $trim = fn(string $s): string => preg_replace(
+            '/^[\h\v\x{3000}]+|[\h\v\x{3000}]+$/u',
+            '',
+            $s
+        );
+        // 必須チェック（空白のみもNG）
+        if ($trim($title) === '') $errors[] = '・質問タイトルをご記入ください。';
+        if ($trim($text)  === '') $errors[] = '・質問文をご記入ください。';
+
+        // フロントは 1〜8 を出している想定（必要に応じて調整）
+        $allowed_stamps = function_exists('bbs_allowed_stamps') ? bbs_allowed_stamps() : [1, 2, 3, 4, 5, 6, 7, 8]; // 仕様に合わせて調整
+        if ($stamp === 0 || !in_array($stamp, $allowed_stamps, true)) {
+            $errors[] = '・スタンプを選択してください。';
+        }
+        if (!empty($errors)) {                                                   // テキスト不備ならファイル処理に入らない
+            wp_send_json_error(['errors' => $errors]);
+        }
+
+        /* --- アップロード検証準備 ---------------------------------------- */
+        $allowed       = bbs_allowed_upload_map();                               // MIME→拡張子ホワイトリスト
+        $max_files     = BBS_MAX_FILES;                                          // 枚数上限
+
+        // $max_per_file  = BBS_MAX_PER_FILE;                                       // 個別上限
+        $max_total     = BBS_MAX_TOTAL;                                          // 合計上限
+
+        $img_w_max     = BBS_IMG_MAX_W;                                          // 画像最大幅
+        $img_h_max     = BBS_IMG_MAX_H;                                          // 画像最大高
+
+        $tmp_dir = bbs_tmp_dir(); // …/uploads/tmp/                              // 最終保存先（存在しなければ作成）
+        $base_tmp = realpath($tmp_dir);
+        $finfo         = new finfo(FILEINFO_MIME_TYPE);                          // 実MIME検出
+        $total         = 0;                                                      // 合計サイズ
+        $saved = [];                                                             // ← 「confirmへ渡す basename の配列」
+        // $to_db         = [];                                                     // DB保存用（相対パス）
+
+        // 今のコメント「保存済み絶対パス（失敗時の掃除用）」は $saved_abs の説明なので入れ替え
+        $saved_abs = []; // ← こちらが「実ファイルの絶対パス（ロールバック用）」
+
+        /* --- 添付ループ --------------------------------------------------- */
+        if (isset($_FILES['attach']) && is_array($_FILES['attach']['tmp_name'])) {
+
+            $files = $_FILES['attach'];
+            $count = count($files['tmp_name']);
+            // ファイル数上限チェック
+            if ($count > $max_files) {
+                $errors[] = '・添付できるファイル数は最大 ' . $max_files . ' 件です。';
+            }
+            for ($i = 0; $i < $count; $i++) {
+
+                $saved[$i] = ''; // スロット整合のため先に空文字
+
+                $tmp = $files['tmp_name'][$i] ?? '';
+
+                /* 0) PHP標準エラーコードの確認 ------------------------- */
+                $err  = $files['error'][$i]    ?? UPLOAD_ERR_NO_FILE;
+
+                /* 1) 未選択スロットはスキップ ------------------------- */
+                if ($err === UPLOAD_ERR_NO_FILE || $tmp === '') continue;
+
+                /* 2) エラー種別ごとのメッセージ ----------------------- */
+                if ($err !== UPLOAD_ERR_OK) {
+                    $map = [
+                        UPLOAD_ERR_INI_SIZE   => '・サーバーの上限を超えました（upload_max_filesize）。',
+                        UPLOAD_ERR_FORM_SIZE  => '・フォームの上限を超えました（MAX_FILE_SIZE）。',
+                        UPLOAD_ERR_PARTIAL    => '・アップロードが途中で中断されました。',
+                        UPLOAD_ERR_NO_TMP_DIR => '・一時フォルダが見つかりません（サーバー設定）。',
+                        UPLOAD_ERR_CANT_WRITE => '・ディスク書き込みに失敗しました。',
+                        UPLOAD_ERR_EXTENSION  => '・拡張によりブロックされました。',
+                    ];
+                    $errors[] = $map[$err] ?? '・アップロードに失敗しました。';
+                    continue;
+                }
+
+                /* 3) 本当にHTTP経由の一時ファイルか ------------------- */
+                if (!is_uploaded_file($tmp)) {
+                    $errors[] = '・不正なアップロードが検出されました。';
+                    continue;
+                }
+
+                /* 4) サイズ（個別/合計） ------------------------------- */
+                /* $size = (int)($files['size'][$i] ?? 0);
+                if ($size <= 0 || $size > $max_per_file) {
+                    $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . (BBS_MAX_PER_FILE / 1024 / 1024) . 'MB）。';
+                    continue;
+                }
+                $total += $size;
+                if ($total > $max_total) {
+                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . (BBS_MAX_TOTAL / 1024 / 1024) . 'MB）。';
+                    break;                                                   // 以降を止める
+                } */
+
+                /* 5) 拡張子の正規化 ----------------------------------- */
+                $orig = sanitize_file_name($files['name'][$i] ?? '');
+                // $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+                $ext = preg_replace('/[^a-z0-9]/', '', strtolower(pathinfo($orig, PATHINFO_EXTENSION)));          // 多重拡張子対策（英数字のみ）
+
+                /* 6) 実MIMEの検出と照合 -------------------------------- */
+                // $detected = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';'))); // "type; charset=..." → "type"
+                $mime = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';')));
+                if (!isset($allowed[$mime]) || !in_array($ext, $allowed[$mime], true)) {
+                    $errors[] = '・許可されていないファイル形式です（拡張子と内容の不一致）。';
+                    continue;
+                }
+
+                /* 7) 種別ごとの上限を決める（デフォルトは画像等と同じ） */
+                $per_limit = BBS_MAX_PER_FILE; // 例: 5MB（画像/PDFなどの既定）
+                if (strpos($mime, 'video/') === 0) {
+                    $per_limit = BBS_MAX_PER_FILE_VIDEO; // 例: 10MB など
+                } elseif ($mime === 'application/pdf') {
+                    $per_limit = BBS_MAX_PER_FILE_PDF;   // 例: 5MB など
+                }
+
+                /* 8) サイズ（個別/合計）— ここで per-type の上限を適用 */
+                $size = (int)($files['size'][$i] ?? 0);
+                if ($size <= 0 || $size > $per_limit) {
+                    $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
+                    continue;
+                }
+                $total += $size;
+                if ($total > $max_total) {
+                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($max_total / 1024 / 1024) . 'MB）。';
+                    break;
+                }
+
+                /* 9) 画像は中身チェック（壊れ/偽装/巨大寸法） */
+                if (strpos($mime, 'image/') === 0) {
+                    $img = @getimagesize($tmp);
+                    if ($img === false || ($img[0] ?? 0) > BBS_IMG_MAX_W || ($img[1] ?? 0) > BBS_IMG_MAX_H) {
+                        $errors[] = '・画像ファイルが壊れているか、サイズが大きすぎます。';
+                        continue;
+                    }
+                }
+
+                /* 8) 予測困難なファイル名（UUID） ---------------------- */
+                $uuid      = wp_generate_uuid4();                           // 例: 550e8400-e29b-41d4-a716-446655440000
+                $save_name = "{$uuid}_{$i}.{$ext}";                         // 例: 550e...-000_0.jpg
+
+                /* 9) 最終保存パスの組み立て ----------------------------- */
+                $dst = trailingslashit($tmp_dir) . $save_name;             // .../uploads/bbs/YYYY/MM/550e...jpg
+                // realpathガード（/uploads/tmp/配下強制）
+                if ($base_tmp === false) {
+                    $errors[] = '・一時ディレクトリの検証に失敗しました。';
+                    continue;
+                }
+
+                /* 10) 保存先ディレクトリのガード ------------------------ */
+                // $base = realpath($final_dir);
+                $real = realpath(dirname($dst));
+                if ($real === false || strpos($real, $base_tmp) !== 0) {
+                    $errors[] = '・保存先の検証に失敗しました。';
+                    continue;
+                }
+
+                /* 11) PHP一時→最終保存へ移動 --------------------------- */
+                if (!@move_uploaded_file($tmp, $dst)) {               // 失敗時は以降に進まない
+                    $errors[] = '・サーバーにファイルを保存できませんでした。';
+                    continue;
+                }
+
+                /* 12) パーミッション調整 ------------------------------- */
+                @chmod($dst, 0644);                                        // 実行権不要
+
+
+                // ★ここが重要：成功した実ファイルをロールバック用に積む
+                $saved_abs[] = $dst;
+
+                /* 13) DB保存用に相対パスへ ------------------------------ */
+                $saved[$i] = basename($dst); // confirmへ渡すのはbasenameのみ                                       // 失敗時掃除のため絶対パスも保持
+                // $to_db[]     = bbs_to_uploads_relative($dest);              // uploads基準の相対パスとして保存
+            }
+        }
+
+        /* --- エラーがあれば保存済みファイルを掃除して終了 ------------------ */
+        if (!empty($errors)) {
+            foreach ($saved_abs as $abs) {
+                @unlink($abs);
+            }                      // 途中まで保存したファイルを削除
+            wp_send_json_error(['errors' => $errors]);
+        }
+
+        /* --- 6) transient へ「下書き」を保存  ----------------------------------- */
+        $draft_id = wp_generate_uuid4();
+        $transient_key = "bbs_quest_{$user_id}_{$draft_id}";
+
+        $payload = [
+            'unique_id' => $unique_id,
+            'name'      => $name,
+            'title'     => $title,
+            'text'      => $text,
+            'stamp'     => $stamp,
+            'files'     => $saved,     // basename の配列
+            'time'      => time(),
+        ];
+
+        // 64KB程度の雑チェック（必要なら調整）
+        $json_for_size = wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json_for_size === false || strlen($json_for_size) > 65535) {
+            // ここで tmpファイルを掃除する場合は saved を回して unlink
+            foreach ($saved as $fn) {
+                if ($fn) @unlink(trailingslashit($tmp_dir) . $fn);
+            }
+            wp_send_json_error(['errors' => ['入力が大きすぎます。内容を短くしてください。']]);
+        }
+
+        $ok = set_transient($transient_key, $payload, 10 * MINUTE_IN_SECONDS);
+        // 確認画面で少し時間がかかるなら 30分〜1時間に伸ばしてもOK
+        if (!$ok) {
+            foreach ($saved as $fn) {
+                if ($fn) @unlink(trailingslashit($tmp_dir) . $fn);
+            }
+            wp_send_json_error(['errors' => ['一時データの保存に失敗しました。']]);
+        }
+
+        /* --- フロントへ draft_id を返す --------------------------------- */
+        wp_send_json_success([
+            'message'  => '下書きを保存しました。確認へ進めます。',
+            'draft_id' => $draft_id,
+            // 'preview'  => $payload, // デバッグ用途なら返してもOK
+        ]);
+    }
+}
+
+/* ===========================================================
+ * 5) Ajaxフック登録
+ * =========================================================== */
+add_action('wp_ajax_bbs_quest_submit',        'bbs_quest_submit');           // ログインユーザー
+add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');           // 未ログインユーザー
+
+//  ここから bbs_quest_confirm （サーバーサイド）のコード 
+
+/**
+ * bbs_quest_confirm.php
+ *
+ * 目的:
+ *  - submit で transient に保存した「下書き」を
+ *    1) プレビュー表示 (mode=show)
+ *    2) 最終確定 (mode=commit) 時に /uploads/tmp → /uploads/attach へ移動し、
+ *       DB へ新規 INSERT（is_confirmed=1）する
+ *
+ * ポリシー:
+ *  - submit では DB に書き込まない（UPDATE もしない）
+ *  - CSRF（専用 nonce）、匿名 UUID、レート制限（IP+UUID）
+ *  - 自分の下書き（draft_id + user_id）のみ操作可能
+ */
+
+// 直アクセス防止
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+require_once __DIR__ . '/transient_common.php'; // get_guest_uuid(), bbs_tmp_dir(), bbs_attach_dir() など
+
+// フロントへ confirm 用の nonce を配布（重複登録に注意） 
+/* add_action('wp_enqueue_scripts', function () { // あなたのフロントJSのハンドル名に合わせて変更してください 
+    $handle = 'bbs-js-handle'; 
+    if (!wp_script_is($handle, 'enqueued')) return; 
+    wp_localize_script($handle, 'bbs_confirm_vars', [ 
+        'ajax_url' => admin_url('admin-ajax.php'), 
+        'nonce' => wp_create_nonce('bbs_quest_confirm'), 
+    ]); 
+});
+*/
+
+// ─────────────────────────────────────────────
+// 必要ならここで共通関数を require してください。
+// require_once __DIR__ . '/bbs_common.php';
+// 本ファイル単体でも動くように、未定義ならヘルパーを定義します。
+// ─────────────────────────────────────────────
+if (!function_exists('bbs_quest_confirm')) {
+    function bbs_quest_confirm()
+    {
+        global $wpdb;
+
+        // 1) CSRF
+        if (empty($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'bbs_quest_confirm')) {
+            wp_send_json_error(['errors' => ['不正なリクエストです（CSRF検出）。']]);
+        }
+
+        // 2) 匿名UUID
+        $user_id  = get_guest_uuid();
+
+        /* --- レート制限（IP + user_id、例：10分で20回まで） --------------- */
+        bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
+
+        /* --- パラメータ ------------------------------------------------------ */
+        $mode = sanitize_text_field($_POST['mode'] ?? 'show'); // 'show' or 'commit'
+        $draft_id = sanitize_text_field($_POST['draft_id'] ?? '');
+        if ($draft_id === '') {
+            wp_send_json_error(['errors' => ['ドラフトIDがありません。']]);
+        }
+
+        // submit と同じ命名規則で transient キーを復元
+        $transient_key = "bbs_quest_{$user_id}_{$draft_id}";
+        $payload = get_transient($transient_key);
+        if (!is_array($payload)) {
+            wp_send_json_error(['errors' => ['下書きが見つからないか、有効期限切れです。']]);
+        }
+
+        // 必要項目を抽出
+        $unique_id = (string)($payload['unique_id'] ?? '');
+        $name = (string)($payload['name'] ?? '匿名');
+        $title = (string)($payload['title'] ?? '');
+        $text = (string)($payload['text'] ?? '');
+        $stamp   = (int)($payload['stamp'] ?? 0);
+        $files = is_array($payload['files'] ?? null) ? $payload['files'] : [];
+
+        if ($mode === 'show') {
+            // プレビュー用：submit時点の入力をそのまま返す
+            wp_send_json_success(['data' => [
+                'unique_id' => $unique_id,
+                'name'      => $name,
+                'title'     => $title,
+                'text'      => $text,
+                'stamp'     => $stamp,
+                'files'     => $files, // basename の配列
+            ]]);
+        }
+
+        if ($mode === 'commit') {
+            $errors = [];
+
+            // 1) 添付ファイルを /uploads/tmp/ → /uploads/attach/ に移動
+            $tmp_dir    = bbs_tmp_dir();        // …/uploads/tmp/
+            $final_dir  = bbs_attach_dir();     // …/uploads/attach/（存在しなければ作成）
+            $base_tmp   = realpath($tmp_dir);
+            $base_final = realpath($final_dir);
+
+            $moved_rel  = []; // DB保存用（uploads相対）
+            foreach ($files as $i => $basename) {
+                if (!$basename) {
+                    $moved_rel[$i] = '';
+                    continue;
+                }
+                $src = trailingslashit($tmp_dir) . $basename;
+                if (!file_exists($src)) {
+                    $errors[] = '・一時ファイルが見つかりませんでした（' . esc_html($basename) . '）。';
+                    continue;
+                }
+
+                // 拡張子はベースネームから
+                $ext = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
+                $uuid = wp_generate_uuid4();
+                $dest_name = "{$uuid}_{$i}.{$ext}";
+                $dest_abs  = trailingslashit($final_dir) . $dest_name;
+
+                // realpathガード：最終保存先が /uploads/attach/ 配下か
+                $real = realpath(dirname($dest_abs));
+                if ($base_final === false || $real === false || strpos($real, $base_final) !== 0) {
+                    $errors[] = '・保存先の検証に失敗しました。';
+                    continue;
+                }
+
+                if (!@rename($src, $dest_abs)) { // move_uploaded_file ではなく rename
+                    $errors[] = '・最終保存への移動に失敗しました。';
+                    continue;
+                }
+                @chmod($dest_abs, 0644);
+
+                // uploads 相対へ
+                $moved_rel[$i] = bbs_to_uploads_relative($dest_abs);
+            }
+
+            if ($errors) {
+                wp_send_json_error(['errors' => $errors]);
+            }
+
+            // 2) DBへ INSERT（ここが初めての保存）
+            $table = $wpdb->prefix . 'sortable';
+            $now   = current_time('mysql', true);
+
+            // JSONにまとめて files カラムへ（スキーマに合わせて）
+            $files_json = wp_json_encode(array_values($moved_rel), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            $ok = $wpdb->insert(
+                $table,
+                [
+                    'unique_id'    => $unique_id,
+                    'user_id'      => $user_id,
+                    'name'         => $name,
+                    'title'        => $title,
+                    'text'         => $text,
+                    'stamp'        => (int)$stamp,
+                    'files'        => $files_json,
+                    'is_confirmed' => 1,
+                    'created_at'   => $now,           // テーブル側がDEFAULTなら省略可
+                    'confirmed_at' => $now,
+                ],
+                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s']
+            );
+
+            if (!$ok) {
+                // 万一失敗したら移動済みファイルを戻す/削除するなどの掃除が望ましい
+                // ここでは削除しておく
+                foreach ($moved_rel as $rel) {
+                    if (!$rel) continue;
+                    $uploads = wp_upload_dir();
+                    $abs = trailingslashit($uploads['basedir']) . $rel;
+                    @unlink($abs);
+                }
+                wp_send_json_error(['errors' => ['DBへの保存に失敗しました。']]);
+            }
+
+            // 3) 下書きを破棄
+            delete_transient($transient_key);
+
+            wp_send_json_success([
+                'message' => '投稿を確定しました。',
+                'id'      => (int)$wpdb->insert_id,
+            ]);
+        }
+
+        wp_send_json_error(['errors' => ['不正なモードです。']]);
+    }
+}
+add_action('wp_ajax_bbs_quest_confirm',        'bbs_quest_confirm');
+add_action('wp_ajax_nopriv_bbs_quest_confirm', 'bbs_quest_confirm');

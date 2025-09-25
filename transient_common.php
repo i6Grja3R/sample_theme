@@ -66,7 +66,7 @@ if (!function_exists('bbs_allowed_upload_map')) {                           // �
             'image/png'        => ['png'],
             // 'image/gif'     => ['gif'], // 使う場合のみ有効化
             'application/pdf'  => ['pdf'],
-            'video/mp4'        => ['mp4'],
+            'video/mp4'        => ['mp4'],   // 動画は極力 mp4 に絞るのが現実的
         ];
     }
 }
@@ -247,3 +247,32 @@ if (!function_exists('bbs_first_image_html_or_fallback')) {
         return '<img class="archive-thumbnail" src="' . esc_url($fallback_url) . '" alt="No image" />';
     }
 }
+
+// すでにあれば再定義しない
+if (!function_exists('bbs_rate_guard')) {
+    /**
+     * IP + user_id でレート制限（$window 秒で最大 $limit 回）
+     * 超過時は wp_send_json_error() で即終了。
+     */
+    function bbs_rate_guard(string $user_id, int $limit = 20, int $window = 600): void
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';          // 取得不可時はダミー
+        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);      // 一意キー
+        $cnt = (int) get_transient($key);                    // 現在カウント
+        if ($cnt >= $limit) {                                // 閾値を超えたら拒否
+            wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
+        }
+        set_transient($key, $cnt + 1, $window);              // 10分維持
+    }
+}
+
+// 種類別の1ファイル上限（バイト）
+if (!defined('BBS_MAX_PER_FILE_IMAGE')) define('BBS_MAX_PER_FILE_IMAGE', 5  * 1024 * 1024); // 画像 5MB
+if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 20 * 1024 * 1024); // 動画 20MB
+if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   10 * 1024 * 1024); // PDF 10MB
+
+// 合計サイズ（動画を許すならやや大きめ推奨）
+if (!defined('BBS_MAX_TOTAL')) define('BBS_MAX_TOTAL', 50 * 1024 * 1024); // 例: 50MB
+
+// 既存の BBS_MAX_PER_FILE があれば “未知MIMEのフォールバック” に使う
+if (!defined('BBS_MAX_PER_FILE')) define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // 従来の一律上限（保険）
