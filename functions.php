@@ -919,6 +919,74 @@ if (function_exists('add_image_size')) {
 /**********************************
        ここから新コード追加
  **********************************/
+// 直アクセス防止（既にあれば重複不要）
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// ★ 子テーマ・親テーマの両対応で安全に require
+$common_file = get_stylesheet_directory() . '/transient_common.php';
+if (!file_exists($common_file)) {
+    $common_file = get_template_directory() . '/transient_common.php';
+}
+if (file_exists($common_file)) {
+    require_once $common_file;
+} else {
+    // 最低限のフォールバック（本番では必ずファイルを置くこと）
+    if (!function_exists('bbs_tmp_dir')) {
+        function bbs_tmp_dir(): string
+        {
+            $up = wp_upload_dir();
+            $dir = trailingslashit($up['basedir']) . 'tmp';
+            if (!is_dir($dir)) wp_mkdir_p($dir);
+            return $dir;
+        }
+    }
+    if (!function_exists('bbs_attach_dir')) {
+        function bbs_attach_dir(): string
+        {
+            $up = wp_upload_dir();
+            $y  = gmdate('Y');
+            $m = gmdate('m');
+            $dir = trailingslashit($up['basedir']) . "attach/{$y}/{$m}";
+            if (!is_dir($dir)) wp_mkdir_p($dir);
+            return $dir;
+        }
+    }
+    if (!function_exists('bbs_to_uploads_relative')) {
+        function bbs_to_uploads_relative(string $abs): string
+        {
+            $up = wp_upload_dir();
+            $base = rtrim($up['basedir'], '/\\') . DIRECTORY_SEPARATOR;
+            return ltrim(str_replace($base, '', $abs), '/\\');
+        }
+    }
+    if (!function_exists('get_guest_uuid')) {
+        function get_guest_uuid(): string
+        {
+            $uuid = sanitize_text_field($_COOKIE['user_id'] ?? '');
+            if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $uuid)) {
+                $uuid = wp_generate_uuid4();
+                @setcookie('user_id', $uuid, time() + 10 * YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+                $_COOKIE['user_id'] = $uuid;
+            }
+            return $uuid;
+        }
+    }
+    if (!function_exists('bbs_rate_guard')) {
+        function bbs_rate_guard(string $user_id, int $limit, int $ttl): void
+        {
+            $ip  = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $key = 'bbs_rate_' . md5($ip . '|' . $user_id);
+            $cnt = (int) get_transient($key);
+            if ($cnt >= $limit) {
+                wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
+            }
+            set_transient($key, $cnt + 1, $ttl);
+        }
+    }
+}
+
 
 /**
  * ゲスト専用：一時領域（PHP tmp）→ 検証 → move_uploaded_file() で最終保存
@@ -952,9 +1020,9 @@ if (function_exists('add_image_size')) {
  */
 
 // 直アクセス防止
-if (!defined('ABSPATH')) {
+/* if (!defined('ABSPATH')) {
     exit;
-}
+}*/
 require_once __DIR__ . '/transient_common.php'; // get_guest_uuid(), bbs_tmp_dir(), bbs_attach_dir() など
 
 // フロントへ submit 用の nonce を配布（任意：既存のJSハンドル名に合わせて変更）
@@ -1022,25 +1090,54 @@ if (!function_exists('bbs_quest_submit')) {
             wp_send_json_error(['errors' => $errors]);
         }
 
-        /* --- アップロード検証準備 ---------------------------------------- */
+        /* --- アップロード検証準備（ループの外） ---------------------------------------- */
         $allowed       = bbs_allowed_upload_map();                               // MIME→拡張子ホワイトリスト
         $max_files     = BBS_MAX_FILES;                                          // 枚数上限
 
         // $max_per_file  = BBS_MAX_PER_FILE;                                       // 個別上限
-        $max_total     = BBS_MAX_TOTAL;                                          // 合計上限
+        // $max_total     = BBS_MAX_TOTAL;                                          // 合計上限
+        // $img_w_max     = BBS_IMG_MAX_W;                                          // 画像最大幅
+        // $img_h_max     = BBS_IMG_MAX_H;                                          // 画像最大高
 
-        $img_w_max     = BBS_IMG_MAX_W;                                          // 画像最大幅
-        $img_h_max     = BBS_IMG_MAX_H;                                          // 画像最大高
+        $hard_total     = BBS_MAX_TOTAL; // 既存の固定総上限（保険の天井）
+        $dyn_total_cap  = 0;             // ← 種類別上限の合計（動的に積み上げる）
+        $total          = 0;             // 受け取った実サイズ合計
 
         $tmp_dir = bbs_tmp_dir(); // …/uploads/tmp/                              // 最終保存先（存在しなければ作成）
         $base_tmp = realpath($tmp_dir);
         $finfo         = new finfo(FILEINFO_MIME_TYPE);                          // 実MIME検出
-        $total         = 0;                                                      // 合計サイズ
+
         $saved = [];                                                             // ← 「confirmへ渡す basename の配列」
         // $to_db         = [];                                                     // DB保存用（相対パス）
 
         // 今のコメント「保存済み絶対パス（失敗時の掃除用）」は $saved_abs の説明なので入れ替え
         $saved_abs = []; // ← こちらが「実ファイルの絶対パス（ロールバック用）」
+
+        // ループ内（MIME確定後あたりで）
+        $per_limit = BBS_MAX_PER_FILE;                 // 画像/PDF等の既定（例: 5MB）
+        if (strpos($mime, 'video/') === 0) {
+            $per_limit = BBS_MAX_PER_FILE_VIDEO;       // 動画の個別上限（例: 10MB）
+        } elseif ($mime === 'application/pdf') {
+            $per_limit = BBS_MAX_PER_FILE_PDF;         // PDFの個別上限（例: 5MB）
+        }
+
+        // 個別上限チェック
+        $size = (int)($files['size'][$i] ?? 0);
+        if ($size <= 0 || $size > $per_limit) {
+            $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
+            continue;
+        }
+
+        // 合計サイズと「動的な合計上限」の更新
+        $total        += $size;
+        $dyn_total_cap += $per_limit;
+
+        // 合計チェック：ハード上限と動的上限の小さい方を超えたらNG
+        $effective_total_cap = min($hard_total, $dyn_total_cap);
+        if ($total > $effective_total_cap) {
+            $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($effective_total_cap / 1024 / 1024) . 'MB）。';
+            break;
+        }
 
         /* --- 添付ループ --------------------------------------------------- */
         if (isset($_FILES['attach']) && is_array($_FILES['attach']['tmp_name'])) {
@@ -1084,12 +1181,12 @@ if (!function_exists('bbs_quest_submit')) {
                 }
 
                 /* 4) サイズ（個別/合計） ------------------------------- */
-                /* $size = (int)($files['size'][$i] ?? 0);
-                if ($size <= 0 || $size > $max_per_file) {
+                $size = (int)($files['size'][$i] ?? 0);
+                if ($size <= 0) {
                     $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . (BBS_MAX_PER_FILE / 1024 / 1024) . 'MB）。';
                     continue;
                 }
-                $total += $size;
+                /* $total += $size;
                 if ($total > $max_total) {
                     $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . (BBS_MAX_TOTAL / 1024 / 1024) . 'MB）。';
                     break;                                                   // 以降を止める
@@ -1117,14 +1214,18 @@ if (!function_exists('bbs_quest_submit')) {
                 }
 
                 /* 8) サイズ（個別/合計）— ここで per-type の上限を適用 */
-                $size = (int)($files['size'][$i] ?? 0);
-                if ($size <= 0 || $size > $per_limit) {
+                if ($size > $per_limit) {
                     $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
                     continue;
                 }
-                $total += $size;
-                if ($total > $max_total) {
-                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($max_total / 1024 / 1024) . 'MB）。';
+                // 合計サイズと「種類別の合計上限」を更新
+                $total        += $size;
+                $dyn_total_cap += $per_limit;
+
+                // 固定総上限と種類別合計上限の小さい方でチェック
+                $effective_total_cap = min($hard_total, $dyn_total_cap);
+                if ($total > $effective_total_cap) {
+                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($effective_total_cap / 1024 / 1024) . 'MB）。';
                     break;
                 }
 
@@ -1250,11 +1351,11 @@ add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');           // 
  */
 
 // 直アクセス防止
-if (!defined('ABSPATH')) {
+/* if (!defined('ABSPATH')) {
     exit;
-}
+}*/
 
-require_once __DIR__ . '/transient_common.php'; // get_guest_uuid(), bbs_tmp_dir(), bbs_attach_dir() など
+// require_once __DIR__ . '/transient_common.php'; // get_guest_uuid(), bbs_tmp_dir(), bbs_attach_dir() など
 
 // フロントへ confirm 用の nonce を配布（重複登録に注意） 
 /* add_action('wp_enqueue_scripts', function () { // あなたのフロントJSのハンドル名に合わせて変更してください 
