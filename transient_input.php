@@ -211,6 +211,16 @@ $ajax_url      = admin_url('admin-ajax.php');
         q_text.textContent = "質問する";
         step_img.src = "<?php echo esc_url(get_template_directory_uri() . '/images/step01.png'); ?>";
         step_img.alt = "STEP1 入力";
+
+        if (confirm_area) confirm_area.style.display = "none";
+        if (input_area) input_area.style.display = "block";
+
+        // プレビュー時に保持した値を復元（file は復元しない）
+        if (window.lastPreviewData) {
+            populateFormFromData(window.lastPreviewData);
+        }
+        // もし「戻ったら添付も消したい」運用ならこちらを有効化
+        // clearAllAttachments();
     }
 
     function change2() {
@@ -253,6 +263,44 @@ $ajax_url      = admin_url('admin-ajax.php');
         '"': "&quot;",
         "'": "&#39;"
     })[m]);
+
+    /* ------------------------------
+     * フォームへ値を流し込むヘルパー
+     *  - previewデータ等から入力値を復元
+     *  - file input は仕様上復元不可（ブラウザ制約）
+     * ------------------------------ */
+    function populateFormFromData(data) {
+        // テキスト系
+        const titleEl = document.getElementById('title');
+        const textEl = document.getElementById('text');
+        const nameEl = document.getElementById('name');
+
+        if (titleEl) titleEl.value = data.title ?? '';
+        if (textEl) textEl.value = data.text ?? '';
+        if (nameEl) nameEl.value = data.name ?? '';
+
+        // スタンプ（1..8想定）
+        if (typeof data.stamp !== 'undefined') {
+            const s = document.querySelector(`input[name="stamp"][value="${String(data.stamp)}"]`);
+            if (s) s.checked = true;
+        }
+
+        // カウンタやバリデーション再評価
+        if (typeof validation === 'function') validation();
+    }
+
+    // すべての添付をクリア（本当に input の値を空にするのが重要）
+    function clearAllAttachments() {
+        document.querySelectorAll('input.attach[type="file"]').forEach(inp => {
+            inp.value = '';
+        });
+        // プレビューUIを消す（あれば）
+        document.querySelectorAll('.upload-slot .preview, .preview-thumbs').forEach(p => {
+            p.innerHTML = '';
+        });
+        // 送信可否の再評価
+        if (typeof validation === 'function') validation();
+    }
 
     /* -------------------------------------
      * 文字数表示（タイトル/本文/名前の .input 要素）
@@ -392,6 +440,7 @@ $ajax_url      = admin_url('admin-ajax.php');
 
             // 画面を確認状態へ
             change2();
+            confirm_area.appendChild(create_button_parts(1)); // ← 戻る/進むボタンが生える
             input_area.style.display = "none";
             confirm_area.style.display = "block";
             confirm_area.textContent = "";
@@ -431,7 +480,16 @@ $ajax_url      = admin_url('admin-ajax.php');
                 return;
             }
 
-            const data = showJson.data?.data ?? showJson.data ?? {};
+            // ここで data を作る
+            // すでにあるはず：const data = showJson.data?.data ?? showJson.data ?? {};
+            window.lastPreviewData = {
+                title: data.title ?? '',
+                text: data.text ?? '',
+                name: data.name ?? '',
+                stamp: data.stamp
+            };
+
+            // 以下、確認画面の描画（ul.innerHTML = `...${esc(data.title)}...` など）
 
             const h = document.createElement('h3');
             h.textContent = "この内容で投稿しますか？";
@@ -542,11 +600,22 @@ $ajax_url      = admin_url('admin-ajax.php');
      * 初期化
      * ------------------------------ */
     function init() {
+        // ▼ ここに追加（.attachclear ボタンへハンドラを付ける）
+        document.querySelectorAll('.attachclear').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault(); // 多重送信などの事故防止
+                clearAllAttachments(); // 一括クリア
+                if (typeof validation === 'function') validation(); // ついでに再判定
+            });
+        });
+        // ▲ 追加ここまで
+
+        // 他の初期化
         if (typeof set_attach_event === 'function') {
             set_attach_event('.image-camera-icon,.usericon-uploads', 3);
         }
-        const submitBtn = document.getElementById("submit_button");
-        if (submitBtn) submitBtn.addEventListener("click", submit_button_click);
+        const submitBtn = document.getElementById('submit_button');
+        if (submitBtn) submitBtn.addEventListener('click', submit_button_click);
 
         change1();
 
@@ -557,5 +626,6 @@ $ajax_url      = admin_url('admin-ajax.php');
 
         validation();
     }
+
     window.addEventListener("DOMContentLoaded", init);
 </script>
