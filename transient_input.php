@@ -64,7 +64,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     </div>
 
     <div id="input_area"><!-- 入力エリア -->
-        <form id="input_form" name="input_form" enctype="multipart/form-data"><!-- ファイル送信用にenctype指定 -->
+        <form id="input_form" method="post" name="input_form" enctype="multipart/form-data"><!-- ファイル送信用にenctype指定 -->
             <div class="image-partial"><!-- 添付ファイル群 -->
                 <h2>
                     動画・画像をアップロード (Upload video / image)
@@ -401,129 +401,154 @@ $ajax_url      = admin_url('admin-ajax.php');
     async function submit_button_click() {
         const btn = document.getElementById("submit_button");
         toggleLoading(btn, true);
+        const formData = new FormData(input_form);
+        formData.append("action", "bbs_quest_submit");
+        if (window.bbs_vars?.nonce) formData.append("nonce", bbs_vars.nonce);
 
+        // ← この位置に入れる
+        console.log('files in form:',
+            Array.from(document.querySelectorAll('input.attach[type="file"]'))
+            .map(i => Array.from(i.files).map(f => f.name))
+        );
+
+        // ▼ ここから追加：file入力を確実に積む
+        // ※ フォームに入っている場合でもブラウザ依存で漏れることがあるため保険で積み直し
         try {
-            const formData = new FormData(input_form);
-            formData.append("action", "bbs_quest_submit");
-            if (window.bbs_vars?.nonce) formData.append("nonce", bbs_vars.nonce);
+            formData.delete('attach[]'); // 同名が既に入っていたら一旦クリア（無ければ無視される）
 
-            const res = await fetch(AJAX_URL, {
-                method: "POST",
-                body: formData,
-                credentials: "same-origin"
+            document.querySelectorAll('input.attach[type="file"]').forEach(inp => {
+                if (inp.files && inp.files.length > 0) {
+                    for (const f of inp.files) {
+                        formData.append('attach[]', f, f.name); // PHP側は $_FILES['attach'] を参照
+                    }
+                }
             });
 
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt}`);
-            }
+            // // デバッグするなら（あとで消してください）
+            // for (const [k, v] of formData.entries()) {
+            //   console.log('FD', k, v instanceof File ? `(file) ${v.name} ${v.size}B` : v);
+            // }
+        } catch (e) {
+            console.warn('append files fallback failed:', e);
+        }
+        // ▲ ここまで追加
 
-            let json;
-            try {
-                json = await res.json();
-            } catch {
-                throw new Error("submit応答(JSON)の解析に失敗しました。");
-            }
+        const res = await fetch(AJAX_URL, {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        });
 
-            if (!json || json.success !== true) {
-                const msg = json?.data?.errors?.[0] || json?.data?.message || "送信に失敗しました。";
-                alert(msg);
-                return;
-            }
+        if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt}`);
+        }
 
-            // ★ドラフトIDを保持
-            lastDraftId = json.data?.draft_id || json.draft_id || null;
-            if (!lastDraftId) {
-                alert("ドラフトIDの取得に失敗しました。");
-                return;
-            }
+        let json;
+        try {
+            json = await res.json();
+        } catch {
+            throw new Error("submit応答(JSON)の解析に失敗しました。");
+        }
 
-            // 画面を確認状態へ
-            change2();
-            confirm_area.appendChild(create_button_parts(1)); // ← 戻る/進むボタンが生える
-            input_area.style.display = "none";
-            confirm_area.style.display = "block";
-            confirm_area.textContent = "";
+        if (!json || json.success !== true) {
+            const msg = json?.data?.errors?.[0] || json?.data?.message || "送信に失敗しました。";
+            alert(msg);
+            return;
+        }
 
-            // --- プレビュー要求（mode=show） ---
-            const showFd = new FormData();
-            showFd.append("action", "bbs_quest_confirm");
-            showFd.append("mode", "show");
-            showFd.append("draft_id", String(lastDraftId));
-            if (window.bbs_confirm_vars?.nonce) {
-                showFd.append("nonce", bbs_confirm_vars.nonce);
-            }
+        // ★ドラフトIDを保持
+        lastDraftId = json.data?.draft_id || json.draft_id || null;
+        if (!lastDraftId) {
+            alert("ドラフトIDの取得に失敗しました。");
+            return;
+        }
 
-            const showRes = await fetch(AJAX_URL, {
-                method: "POST",
-                body: showFd,
-                credentials: "same-origin"
-            });
+        // 画面を確認状態へ
+        change2();
+        confirm_area.appendChild(create_button_parts(1)); // ← 戻る/進むボタンが生える
+        input_area.style.display = "none";
+        confirm_area.style.display = "block";
+        confirm_area.textContent = "";
 
-            if (!showRes.ok) {
-                const txt = await showRes.text().catch(() => "");
-                alert(`プレビュー取得に失敗しました (HTTP ${showRes.status}).\n${txt}`);
-                return;
-            }
+        // --- プレビュー要求（mode=show） ---
+        const showFd = new FormData();
+        showFd.append("action", "bbs_quest_confirm");
+        showFd.append("mode", "show");
+        showFd.append("draft_id", String(lastDraftId));
+        if (window.bbs_confirm_vars?.nonce) {
+            showFd.append("nonce", bbs_confirm_vars.nonce);
+        }
 
-            let showJson;
-            try {
-                showJson = await showRes.json();
-            } catch {
-                alert("プレビュー応答(JSON)の解析に失敗しました。");
-                return;
-            }
+        const showRes = await fetch(AJAX_URL, {
+            method: "POST",
+            body: showFd,
+            credentials: "same-origin"
+        });
 
-            if (!showJson || showJson.success !== true) {
-                const msg = showJson?.data?.errors?.[0] || showJson?.data?.message || "プレビューの取得に失敗しました。";
-                alert(msg);
-                return;
-            }
+        if (!showRes.ok) {
+            const txt = await showRes.text().catch(() => "");
+            alert(`プレビュー取得に失敗しました (HTTP ${showRes.status}).\n${txt}`);
+            return;
+        }
 
-            // ここで data を作る
-            // すでにあるはず：const data = showJson.data?.data ?? showJson.data ?? {};
-            window.lastPreviewData = {
-                title: data.title ?? '',
-                text: data.text ?? '',
-                name: data.name ?? '',
-                stamp: data.stamp
-            };
+        let showJson;
+        try {
+            showJson = await showRes.json();
+        } catch {
+            alert("プレビュー応答(JSON)の解析に失敗しました。");
+            return;
+        }
 
-            // 以下、確認画面の描画（ul.innerHTML = `...${esc(data.title)}...` など）
+        if (!showJson || showJson.success !== true) {
+            const msg = showJson?.data?.errors?.[0] || showJson?.data?.message || "プレビューの取得に失敗しました。";
+            alert(msg);
+            return;
+        }
 
-            const h = document.createElement('h3');
-            h.textContent = "この内容で投稿しますか？";
-            confirm_area.appendChild(h);
+        // ここで data を作る
+        // すでにあるはず：const data = showJson.data?.data ?? showJson.data ?? {};
+        window.lastPreviewData = {
+            title: data.title ?? '',
+            text: data.text ?? '',
+            name: data.name ?? '',
+            stamp: data.stamp
+        };
 
-            const ul = document.createElement('ul');
-            ul.innerHTML = `
+        // 以下、確認画面の描画（ul.innerHTML = `...${esc(data.title)}...` など）
+
+        const h = document.createElement('h3');
+        h.textContent = "この内容で投稿しますか？";
+        confirm_area.appendChild(h);
+
+        const ul = document.createElement('ul');
+        ul.innerHTML = `
         <li><strong>タイトル</strong>：${esc(data.title)}</li>
         <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
         <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
         <li><strong>スタンプ</strong>：${esc(data.stamp)}</li>
         <li><strong>添付</strong>：${Array.isArray(data.files) ? data.files.filter(Boolean).length : 0} 件</li>
       `;
-            confirm_area.appendChild(ul);
+        confirm_area.appendChild(ul);
 
-            // 確定ボタン（なければ作る）
-            let confirmBtn = document.getElementById('confirm_button');
-            if (!confirmBtn) {
-                confirmBtn = document.createElement('button');
-                confirmBtn.type = 'button';
-                confirmBtn.id = 'confirm_button';
-                confirmBtn.textContent = 'この内容で投稿を確定する';
-                confirm_area.appendChild(confirmBtn);
-            }
-            confirmBtn.addEventListener('click', confirm_button_click, {
-                once: true
-            });
-
-        } catch (err) {
-            console.error(err);
-            alert("通信に失敗しました。時間をおいて再度お試しください。");
-        } finally {
-            toggleLoading(btn, false);
+        // 確定ボタン（なければ作る）
+        let confirmBtn = document.getElementById('confirm_button');
+        if (!confirmBtn) {
+            confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.id = 'confirm_button';
+            confirmBtn.textContent = 'この内容で投稿を確定する';
+            confirm_area.appendChild(confirmBtn);
         }
+        confirmBtn.addEventListener('click', confirm_button_click, {
+            once: true
+        });
+
+    } catch (err) {
+        console.error(err);
+        alert("通信に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+        toggleLoading(btn, false);
     }
 
     /* ------------------------------

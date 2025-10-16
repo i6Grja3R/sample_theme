@@ -933,9 +933,18 @@ $parent_common = trailingslashit(get_template_directory())   . 'transient_common
 
 if (file_exists($child_common)) {
     require_once $child_common;
+    error_log('[BBS] transient_common.php loaded from CHILD theme');
 } elseif (file_exists($parent_common)) {
     require_once $parent_common;
+    error_log('[BBS] transient_common.php loaded from PARENT theme');
+} else {
+    error_log('[BBS] transient_common.php NOT found — will use fallbacks');
 }
+
+/** ここで一度 “require後の時点” で存在チェック（まだ無ければログ） */
+if (!function_exists('bbs_tmp_dir'))   error_log('[BBS] bbs_tmp_dir missing after require');
+if (!function_exists('bbs_attach_dir')) error_log('[BBS] bbs_attach_dir missing after require');
+// …必要なら他も
 
 /** ↓ここから下は常に実行してOK。未定義のものだけ埋める（二重定義防止） */
 if (!function_exists('bbs_tmp_dir')) {
@@ -995,6 +1004,12 @@ if (!function_exists('bbs_rate_guard')) {
     }
 }
 
+/** ここで “最終的に使えるようになったか” を確認 */
+if (function_exists('bbs_tmp_dir'))   error_log('[BBS] bbs_tmp_dir READY');
+if (function_exists('bbs_attach_dir')) error_log('[BBS] bbs_attach_dir READY');
+// …必要なら他も
+
+// ここから bbs_quest_submit()/bbs_quest_confirm() の定義
 
 /**
  * ゲスト専用：一時領域（PHP tmp）→ 検証 → move_uploaded_file() で最終保存
