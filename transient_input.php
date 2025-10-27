@@ -873,22 +873,51 @@ $ajax_url      = admin_url('admin-ajax.php');
      * 初期化
      * ------------------------------ */
     function init() {
-        // set_attach_event を呼ぶ（ユーザーアイコン枠が index=3 の例）
-        if (typeof set_attach_event === 'function') {
-            set_attach_event('.image-camera-icon,.usericon-uploads', 3);
-        }
+        console.log('[BBS] init START');
 
         const submitBtn = document.getElementById('submit_button');
-        if (submitBtn) submitBtn.addEventListener('click', submit_button_click);
-
-        change1();
+        console.log('[BBS] submit_button =', submitBtn);
+        if (submitBtn) {
+            submitBtn.addEventListener('click', () => console.log('[BBS] submit_button CLICKED'));
+            submitBtn.addEventListener('click', validation); // ついでに押下時にも呼ぶ（暫定）
+        }
 
         document.addEventListener('input', (e) => {
-            display_text_length(e);
-            validation();
+            console.log('[BBS] input EVENT on', e.target?.id || e.target?.name || e.target?.tagName);
+            try {
+                validation();
+            } catch (err) {
+                console.error('[BBS] validation threw', err);
+            }
         });
 
-        validation();
+        // 初期一回呼び
+        try {
+            validation();
+        } catch (err) {
+            console.error('[BBS] validation threw on init', err);
+        }
+
+        console.log('[BBS] init END');
     }
-    window.addEventListener('DOMContentLoaded', init);
+
+    // ❹ DOM 準備時に init が本当に走ったか
+    window.addEventListener('DOMContentLoaded', () => {
+        console.log('[BBS] DOMContentLoaded');
+        try {
+            init();
+        } catch (err) {
+            console.error('[BBS] init threw', err);
+        }
+    });
+
+    // ❺ 念のため、1秒後にも強制呼び
+    setTimeout(() => {
+        console.log('[BBS] force-call validation (timeout)');
+        try {
+            validation();
+        } catch (err) {
+            console.error('[BBS] validation threw (timeout)', err);
+        }
+    }, 1000);
 </script>
