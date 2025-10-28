@@ -545,6 +545,22 @@ $ajax_url      = admin_url('admin-ajax.php');
             return false;
         };
 
+        // スロット別の許可判定（usericonIndex は jpg/png のみ）
+        const isAllowedForSlot = (slotIndex, file) => {
+            const isIcon = (slotIndex === Number(usericonIndex));
+            const name = String(file.name || '').toLowerCase();
+            const type = String(file.type || '');
+
+            if (isIcon) {
+                // ユーザーアイコン枠は jpg/png のみ
+                const okExt = /\.(jpg|jpeg|png)$/i.test(name);
+                const okMime = type === 'image/jpeg' || type === 'image/png';
+                return okExt && okMime;
+            }
+            // それ以外の枠は従来どおり（画像・動画・PDFを許可）
+            return isAllowed(file);
+        };
+
         // プレビュー描画
         const renderPreview = (slotIndex, file) => {
             const v = viewers[slotIndex];
@@ -605,9 +621,14 @@ $ajax_url      = admin_url('admin-ajax.php');
                 return;
             }
 
-            // タイプチェック
-            if (!isAllowed(file)) {
-                alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
+            // タイプチェック（ユーザーアイコン枠だけ jpg/png 限定）
+            if (!isAllowedForSlot(slotIndex, file)) {
+                const isIcon = (slotIndex === Number(usericonIndex));
+                if (isIcon) {
+                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
+                } else {
+                    alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
+                }
                 return;
             }
 
@@ -813,13 +834,6 @@ $ajax_url      = admin_url('admin-ajax.php');
                 return;
             }
 
-            // 画面を確認状態へ
-            change2();
-            confirm_area.textContent = "";
-            confirm_area.style.display = "block";
-            input_area.style.display = "none";
-            confirm_area.appendChild(create_button_parts(1)); // 戻る/確定ボタン
-
             // --- プレビュー要求（mode=show） ---
             const showFd = new FormData();
             showFd.append("action", "bbs_quest_confirm");
@@ -851,7 +865,7 @@ $ajax_url      = admin_url('admin-ajax.php');
                 return;
             }
 
-            // ここで data を作る
+            // ここで data を作る（※ここは今のままでOK）
             const data = showJson.data?.data ?? showJson.data ?? {};
             window.lastPreviewData = {
                 title: data.title ?? '',
@@ -860,34 +874,32 @@ $ajax_url      = admin_url('admin-ajax.php');
                 stamp: data.stamp
             };
 
-            // 以下、確認画面の描画（ul.innerHTML = `...${esc(data.title)}...` など）
+            // === ここから UI 切替と描画（プレビュー成功後に行う） ===
+            change2();
 
+            confirm_area.classList.remove('hideItems'); // ← これ重要（!important対策）
+            confirm_area.style.display = "block";
+            input_area.style.display = "none";
+            confirm_area.innerHTML = ""; // 一旦クリア
+
+            // 見出し
             const h = document.createElement('h3');
             h.textContent = "この内容で投稿しますか？";
             confirm_area.appendChild(h);
 
+            // プレビュー
             const ul = document.createElement('ul');
             ul.innerHTML = `
-        <li><strong>タイトル</strong>：${esc(data.title)}</li>
-        <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
-        <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
-        <li><strong>スタンプ</strong>：${esc(data.stamp)}</li>
-        <li><strong>添付</strong>：${Array.isArray(data.files) ? data.files.filter(Boolean).length : 0} 件</li>
-      `;
+  <li><strong>タイトル</strong>：${esc(data.title)}</li>
+  <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
+  <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
+  <li><strong>スタンプ</strong>：${esc(data.stamp)}</li>
+  <li><strong>添付</strong>：${Array.isArray(data.files) ? data.files.filter(Boolean).length : 0} 件</li>
+`;
             confirm_area.appendChild(ul);
 
-            // 確定ボタン（なければ作る）
-            let confirmBtn = document.getElementById('confirm_button');
-            if (!confirmBtn) {
-                confirmBtn = document.createElement('button');
-                confirmBtn.type = 'button';
-                confirmBtn.id = 'confirm_button';
-                confirmBtn.textContent = 'この内容で投稿を確定する';
-                confirm_area.appendChild(confirmBtn);
-            }
-            confirmBtn.addEventListener('click', confirm_button_click, {
-                once: true
-            });
+            // ボタン（戻る／確定）を最後にまとめて追加
+            confirm_area.appendChild(create_button_parts(1));
 
         } catch (err) {
             console.error(err);
@@ -985,10 +997,16 @@ $ajax_url      = admin_url('admin-ajax.php');
     function init() {
         console.log('[BBS] init START');
 
+        // 🔽 ここにデバッグ出力を入れる
+        console.log('attach=', document.querySelectorAll('input.attach[type="file"]').length);
+        console.log('viewer=', document.querySelectorAll('.viewer').length);
+        console.log('fileAreas=', document.querySelectorAll('.image-camera-icon, .usericon-uploads').length);
+
         // 🔽★ ここに追加：ファイルアップロードのイベント登録
         if (typeof set_attach_event === 'function') {
-            // fileAreaSelector と usericonIndex はあなたの設計に合わせて調整
-            set_attach_event('.image-camera-icon', 3);
+            // 1〜3番目: .image-camera-icon / 4番目(アイコン): .usericon-uploads
+            // 第2引数 3 は「4つめスロットがユーザーアイコン」の意味
+            set_attach_event('.image-camera-icon, .usericon-uploads', 3);
         }
         // 🔼★ここまで追加
 
