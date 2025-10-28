@@ -117,7 +117,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         data-length="<?php echo defined('MAX_LENGTH::TEXT') ? MAX_LENGTH::TEXT : 5000; ?>"
                         data-minlength="<?php echo defined('MIN_LENGTH::TEXT') ? MIN_LENGTH::TEXT : 1; ?>"
                         placeholder="荒らし行為や誹謗中傷や著作権の侵害はご遠慮ください"></textarea>
-                    <div></div>
+                    <div class="msg_partial"></div> <!-- ←★ここに class を追加 -->
                 </div>
             </div>
 
@@ -128,7 +128,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         data-length="<?php echo defined('MAX_LENGTH::TITLE') ? MAX_LENGTH::TITLE : 200; ?>"
                         data-minlength="<?php echo defined('MIN_LENGTH::TITLE') ? MIN_LENGTH::TITLE : 1; ?>"
                         placeholder="<?php echo defined('MIN_LENGTH::TITLE') ? MIN_LENGTH::TITLE : 1; ?>文字以上で入力してください">
-                    <div></div>
+                    <div class="msg_partial"></div> <!-- ←★ここも同様 -->
                 </div>
             </div>
 
@@ -165,7 +165,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         data-length="<?php echo defined('MAX_LENGTH::NAME') ? MAX_LENGTH::NAME : 50; ?>"
                         data-minlength="<?php echo defined('MIN_LENGTH::NAME') ? MIN_LENGTH::NAME : 0; ?>"
                         placeholder="未入力の場合は匿名で表示されます">
-                    <div></div>
+                    <div class="msg_partial"></div> <!-- ←★ここも追加 -->
                 </div>
             </div>
 
@@ -307,27 +307,94 @@ $ajax_url      = admin_url('admin-ajax.php');
      *  - data-length / data-minlength 属性を利用
      *  - 直後の <div> に「残り/超過」を表示
      * ------------------------------------- */
+    // 文字数カウンタ（最小・最大の両方に対応）
     function display_text_length(e) {
+        // id が text / title / name のときだけ処理
+        if (!e || !e.target || !['text', 'title', 'name'].includes(e.target.id)) return;
+
         const el = e.target;
-        if (!el.classList || !el.classList.contains('input')) return;
-        const max = parseInt(el.dataset.length || '0', 10);
-        if (!max) return;
+        const msg = el.nextElementSibling; // 各 input/textarea の直後の <div class="msg_partial">
+        if (!msg) return;
 
+        // maxlength / minlength は data-* と HTML 属性のどちらでもOKにする
+        // ← ココが重要：data-length / data-minlength も確実に拾う
+        const getMax = (el) => {
+            const a = parseInt(el.getAttribute('maxlength') || '0', 10) || 0;
+            const d = parseInt(el.dataset.length || '0', 10) || 0; // data-length
+            return a || d; // どちらか入っていればOK
+        };
+        const getMin = (el) => {
+            const a = parseInt(el.getAttribute('minlength') || '0', 10) || 0;
+            const d = parseInt(el.dataset.minlength || '0', 10) || 0; // data-minlength
+            return a || d;
+        };
+
+        const max = getMax(el);
+        const min = getMin(el);
         const len = el.value.length;
-        const counter = el.nextElementSibling;
-        if (!counter) return;
 
-        if (len <= max) {
+        // 表示ノード準備
+        // 数字だけ色を付ける helper
+        const strong = (num) => {
+            const s = document.createElement('strong');
+            s.textContent = String(num);
+            s.style.color = '#e52d77'; // ← ★数字だけピンク
+            return s;
+        };
+
+        msg.className = 'msg_partial';
+        msg.style.color = ''; // ベース文字色
+        msg.replaceChildren();
+
+        // 判定順：超過 → 不足 → 残り（上限設定がある時） → 何もしない
+        if (max && len > max) {
+            const over = len - max;
+            msg.style.color = 'red';
+            msg.append(
+                '超過 ', strong(over), ' 文字です（最大 ', strong(max), ' 文字）。'
+            );
+            el.classList.add('is-over');
+        } else if (min && len < min) {
+            const lack = min - len;
+            msg.style.color = '#d9534f'; // 注意色
+            msg.append(
+                'あと ', strong(lack), ' 文字必要です（最低 ', strong(min), ' 文字）。'
+            );
+            el.classList.remove('is-over');
+        } else if (max) {
             const remain = max - len;
-            counter.textContent = `残り ${remain} 文字`;
-            counter.style.color = remain === 0 ? '#d9534f' : '';
+            msg.append('残り ', strong(remain), ' 文字入力できます。');
+            el.classList.remove('is-over');
         } else {
-            counter.textContent = `超過 ${len - max} 文字`;
-            counter.style.color = '#d9534f';
+            msg.textContent = '';
+            el.classList.remove('is-over');
         }
-        if (len > max) el.classList.add('is-over');
-        else el.classList.remove('is-over');
+
+        // カウンタ更新のたびに送信可否も再評価
+        if (typeof validation === 'function') validation();
     }
+
+    // （任意）初期表示時に現在値でカウンタを出す
+    function updateAllCountersOnce() {
+        ['title', 'text', 'name'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            // “入力イベント” を発火して同じ処理系に乗せる
+            display_text_length({
+                target: el
+            });
+        });
+    }
+
+    // すでにあなたの init があるなら、その中のリスナーだけ確認：
+    // document.addEventListener('input', (e) => {
+    //   display_text_length(e);
+    //   validation();
+    // });
+
+    // 初回に 1 回だけ全フィールドのカウンタを描画したい場合は、
+    // DOMContentLoaded か init() の最後などで呼びます。
+    // window.addEventListener('DOMContentLoaded', updateAllCountersOnce);
 
     /* -------------------------------------
      * 送信ボタン活性/非活性制御
@@ -415,6 +482,229 @@ $ajax_url      = admin_url('admin-ajax.php');
      * グローバル: draft_id
      * ------------------------------ */
     let lastDraftId = null; // ← ここで 1 回だけ定義（以降は上書きのみ）
+
+    /* ------------------------------
+     * 添付ファイル安全版イベント関数
+     * ------------------------------ */
+    function set_attach_event(fileAreaSelector, usericonIndex) {
+        // 許可する拡張子とMIME（最低限のクライアント側バリデーション。最終判定はサーバ）
+        const ALLOWED = {
+            'image': ['image/jpeg', 'image/png'],
+            'video': ['video/mp4'],
+            'pdf': ['application/pdf']
+        };
+        const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4', 'pdf'];
+
+        // スロット別の最大サイズ(MB)
+        const MAX_MB_USERICON = 5;
+        const MAX_MB_DEFAULT = 15;
+
+        // 各スロットに紐づく一時URLを覚えておいて clear 時に解放する
+        const urlBucket = new Map(); // key: input[type=file] element, value: Array<objectURL>
+
+        // 要素の収集
+        // 各スロットの並び順は input.attach[type="file"] / .viewer / .image-camera-icon or .usericon-uploads が同じインデックスで並んでいる前提です。ズレていると表示がおかしくなるので、HTML側の順番をそろえてください。
+        const attachInputs = document.querySelectorAll('input.attach[type="file"]');
+        const viewers = document.querySelectorAll('.viewer');
+
+        // 「カメラ画像エリア」（=ファイル未選択時に見えているエリア）
+        // fileAreaSelector には '.image-camera-icon,.usericon-uploads' のようにカンマ区切りで渡してください
+        const fileAreas = document.querySelectorAll(fileAreaSelector);
+
+        // clear ボタン（各スロットに1つ想定）
+        const clearBtns = document.querySelectorAll('.attachclear');
+
+        // objectURL を安全に解放
+        const revokeAllFor = (inp) => {
+            const list = urlBucket.get(inp);
+            if (Array.isArray(list)) {
+                for (const u of list) {
+                    try {
+                        URL.revokeObjectURL(u);
+                    } catch {}
+                }
+            }
+            urlBucket.set(inp, []);
+        };
+
+        // シンプルな拡張子取得
+        const getExt = (name) => (name.split('.').pop() || '').toLowerCase();
+
+        // クイックな MIME/拡張子チェック
+        const isAllowed = (file) => {
+            const ext = getExt(file.name);
+            if (!ALLOWED_EXT.includes(ext)) return false;
+
+            const type = String(file.type || '');
+            if (!type) return false;
+
+            if (type.startsWith('image/')) return ALLOWED.image.includes(type);
+            if (type.startsWith('video/')) return ALLOWED.video.includes(type);
+            if (type === 'application/pdf') return true; // 上で拡張子も見ているのでOK
+
+            return false;
+        };
+
+        // プレビュー描画
+        const renderPreview = (slotIndex, file) => {
+            const v = viewers[slotIndex];
+            if (!v) return;
+
+            // 既存プレビューはクリア（URLも解放）
+            v.innerHTML = '';
+
+            const url = URL.createObjectURL(file);
+
+            // タイプごとに安全な要素を作成（autoplay なし、controls は video のみ）
+            let el = null;
+            if (file.type.startsWith('image/')) {
+                el = document.createElement('img');
+                el.alt = '';
+            } else if (file.type === 'application/pdf') {
+                el = document.createElement('iframe');
+                el.setAttribute('title', 'PDF preview');
+            } else if (file.type.startsWith('video/')) {
+                el = document.createElement('video');
+                el.setAttribute('controls', ''); // 再生はユーザー操作のみ
+                el.preload = 'metadata';
+            } else {
+                return; // 想定外
+            }
+
+            // レイアウト（旧コード準拠）
+            const isIcon = (slotIndex === Number(usericonIndex));
+            el.style.height = isIcon ? '90px' : '301px';
+            el.style.width = isIcon ? '90px' : '535px';
+            if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
+                el.style.objectFit = isIcon ? 'contain' : 'fill';
+            }
+
+            el.src = url;
+            v.appendChild(el);
+            v.style.display = 'block';
+
+            // 生成URLを記憶
+            const arr = urlBucket.get(attachInputs[slotIndex]) || [];
+            arr.push(url);
+            urlBucket.set(attachInputs[slotIndex], arr);
+        };
+
+        // スロットごとに処理を束ねる
+        const setFileToSlot = (slotIndex, file) => {
+            const inp = attachInputs[slotIndex];
+            const fileArea = fileAreas[slotIndex];
+            const viewer = viewers[slotIndex];
+
+            if (!inp || !viewer || !fileArea) return;
+
+            // サイズ上限
+            const isIcon = (slotIndex === Number(usericonIndex));
+            const maxBytes = (isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT) * 1024 * 1024;
+            if (file.size > maxBytes) {
+                alert(`ファイルサイズが上限(${isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT}MB)を超えています。`);
+                return;
+            }
+
+            // タイプチェック
+            if (!isAllowed(file)) {
+                alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
+                return;
+            }
+
+            // カメラエリアを隠し、プレビューを描画
+            fileArea.classList.add('hideItems');
+            renderPreview(slotIndex, file);
+
+            // 送信可否の再評価（あれば）
+            if (typeof validation === 'function') validation();
+        };
+
+        // input[type=file] の change
+        attachInputs.forEach((inp, idx) => {
+            // 初期化
+            urlBucket.set(inp, []);
+
+            inp.addEventListener('change', () => {
+                // 旧URLを解放
+                revokeAllFor(inp);
+
+                const file = inp.files && inp.files[0];
+                const fileArea = fileAreas[idx];
+                const viewer = viewers[idx];
+                if (!file) {
+                    // 何も選んでいない ⇒ カメラエリアを戻す
+                    if (viewer) {
+                        viewer.innerHTML = '';
+                        viewer.style.display = 'none';
+                    }
+                    if (fileArea) fileArea.classList.remove('hideItems');
+                    if (typeof validation === 'function') validation();
+                    return;
+                }
+                setFileToSlot(idx, file);
+            });
+        });
+
+        // clear ボタン
+        clearBtns.forEach((btn, idx) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                const inp = attachInputs[idx];
+                const fileArea = fileAreas[idx];
+                const viewer = viewers[idx];
+                if (!inp || !viewer || !fileArea) return;
+
+                // input クリア
+                inp.value = '';
+
+                // プレビューを消す＆objectURL解放
+                viewer.innerHTML = '';
+                viewer.style.display = 'none';
+                revokeAllFor(inp);
+
+                // カメラエリアを復活
+                fileArea.classList.remove('hideItems');
+
+                if (typeof validation === 'function') validation();
+            });
+        });
+
+        // D&D (ファイルエリアへのドラッグ＆ドロップ)
+        fileAreas.forEach((fa, idx) => {
+            if (!fa) return;
+
+            // ドラッグ見た目
+            fa.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fa.classList.add('dragover');
+            });
+            fa.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+            });
+
+            fa.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+
+                const files = e.dataTransfer && e.dataTransfer.files;
+                if (!files || !files.length) return;
+
+                const file = files[0];
+
+                // input.files にも反映（送信のため）
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                const inp = attachInputs[idx];
+                if (inp) inp.files = dt.files;
+
+                // 旧URLを解放の上プレビュー
+                if (inp) revokeAllFor(inp);
+                setFileToSlot(idx, file);
+            });
+        });
+    }
 
     /* ------------------------------
      * 確認画面ボタン生成関数（追加）
@@ -678,229 +968,6 @@ $ajax_url      = admin_url('admin-ajax.php');
         }
     }
 
-    /* ------------------------------
-     * 添付ファイル安全版イベント関数
-     * ------------------------------ */
-    function set_attach_event(fileAreaSelector, usericonIndex) {
-        // 許可する拡張子とMIME（最低限のクライアント側バリデーション。最終判定はサーバ）
-        const ALLOWED = {
-            'image': ['image/jpeg', 'image/png'],
-            'video': ['video/mp4'],
-            'pdf': ['application/pdf']
-        };
-        const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4', 'pdf'];
-
-        // スロット別の最大サイズ(MB)
-        const MAX_MB_USERICON = 5;
-        const MAX_MB_DEFAULT = 15;
-
-        // 各スロットに紐づく一時URLを覚えておいて clear 時に解放する
-        const urlBucket = new Map(); // key: input[type=file] element, value: Array<objectURL>
-
-        // 要素の収集
-        // 各スロットの並び順は input.attach[type="file"] / .viewer / .image-camera-icon or .usericon-uploads が同じインデックスで並んでいる前提です。ズレていると表示がおかしくなるので、HTML側の順番をそろえてください。
-        const attachInputs = document.querySelectorAll('input.attach[type="file"]');
-        const viewers = document.querySelectorAll('.viewer');
-
-        // 「カメラ画像エリア」（=ファイル未選択時に見えているエリア）
-        // fileAreaSelector には '.image-camera-icon,.usericon-uploads' のようにカンマ区切りで渡してください
-        const fileAreas = document.querySelectorAll(fileAreaSelector);
-
-        // clear ボタン（各スロットに1つ想定）
-        const clearBtns = document.querySelectorAll('.attachclear');
-
-        // objectURL を安全に解放
-        const revokeAllFor = (inp) => {
-            const list = urlBucket.get(inp);
-            if (Array.isArray(list)) {
-                for (const u of list) {
-                    try {
-                        URL.revokeObjectURL(u);
-                    } catch {}
-                }
-            }
-            urlBucket.set(inp, []);
-        };
-
-        // シンプルな拡張子取得
-        const getExt = (name) => (name.split('.').pop() || '').toLowerCase();
-
-        // クイックな MIME/拡張子チェック
-        const isAllowed = (file) => {
-            const ext = getExt(file.name);
-            if (!ALLOWED_EXT.includes(ext)) return false;
-
-            const type = String(file.type || '');
-            if (!type) return false;
-
-            if (type.startsWith('image/')) return ALLOWED.image.includes(type);
-            if (type.startsWith('video/')) return ALLOWED.video.includes(type);
-            if (type === 'application/pdf') return true; // 上で拡張子も見ているのでOK
-
-            return false;
-        };
-
-        // プレビュー描画
-        const renderPreview = (slotIndex, file) => {
-            const v = viewers[slotIndex];
-            if (!v) return;
-
-            // 既存プレビューはクリア（URLも解放）
-            v.innerHTML = '';
-
-            const url = URL.createObjectURL(file);
-
-            // タイプごとに安全な要素を作成（autoplay なし、controls は video のみ）
-            let el = null;
-            if (file.type.startsWith('image/')) {
-                el = document.createElement('img');
-                el.alt = '';
-            } else if (file.type === 'application/pdf') {
-                el = document.createElement('iframe');
-                el.setAttribute('title', 'PDF preview');
-            } else if (file.type.startsWith('video/')) {
-                el = document.createElement('video');
-                el.setAttribute('controls', ''); // 再生はユーザー操作のみ
-                el.preload = 'metadata';
-            } else {
-                return; // 想定外
-            }
-
-            // レイアウト（旧コード準拠）
-            const isIcon = (slotIndex === Number(usericonIndex));
-            el.style.height = isIcon ? '90px' : '301px';
-            el.style.width = isIcon ? '90px' : '535px';
-            if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
-                el.style.objectFit = isIcon ? 'contain' : 'fill';
-            }
-
-            el.src = url;
-            v.appendChild(el);
-            v.style.display = 'block';
-
-            // 生成URLを記憶
-            const arr = urlBucket.get(attachInputs[slotIndex]) || [];
-            arr.push(url);
-            urlBucket.set(attachInputs[slotIndex], arr);
-        };
-
-        // スロットごとに処理を束ねる
-        const setFileToSlot = (slotIndex, file) => {
-            const inp = attachInputs[slotIndex];
-            const fileArea = fileAreas[slotIndex];
-            const viewer = viewers[slotIndex];
-
-            if (!inp || !viewer || !fileArea) return;
-
-            // サイズ上限
-            const isIcon = (slotIndex === Number(usericonIndex));
-            const maxBytes = (isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT) * 1024 * 1024;
-            if (file.size > maxBytes) {
-                alert(`ファイルサイズが上限(${isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT}MB)を超えています。`);
-                return;
-            }
-
-            // タイプチェック
-            if (!isAllowed(file)) {
-                alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
-                return;
-            }
-
-            // カメラエリアを隠し、プレビューを描画
-            fileArea.classList.add('hideItems');
-            renderPreview(slotIndex, file);
-
-            // 送信可否の再評価（あれば）
-            if (typeof validation === 'function') validation();
-        };
-
-        // input[type=file] の change
-        attachInputs.forEach((inp, idx) => {
-            // 初期化
-            urlBucket.set(inp, []);
-
-            inp.addEventListener('change', () => {
-                // 旧URLを解放
-                revokeAllFor(inp);
-
-                const file = inp.files && inp.files[0];
-                const fileArea = fileAreas[idx];
-                const viewer = viewers[idx];
-                if (!file) {
-                    // 何も選んでいない ⇒ カメラエリアを戻す
-                    if (viewer) {
-                        viewer.innerHTML = '';
-                        viewer.style.display = 'none';
-                    }
-                    if (fileArea) fileArea.classList.remove('hideItems');
-                    if (typeof validation === 'function') validation();
-                    return;
-                }
-                setFileToSlot(idx, file);
-            });
-        });
-
-        // clear ボタン
-        clearBtns.forEach((btn, idx) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-
-                const inp = attachInputs[idx];
-                const fileArea = fileAreas[idx];
-                const viewer = viewers[idx];
-                if (!inp || !viewer || !fileArea) return;
-
-                // input クリア
-                inp.value = '';
-
-                // プレビューを消す＆objectURL解放
-                viewer.innerHTML = '';
-                viewer.style.display = 'none';
-                revokeAllFor(inp);
-
-                // カメラエリアを復活
-                fileArea.classList.remove('hideItems');
-
-                if (typeof validation === 'function') validation();
-            });
-        });
-
-        // D&D (ファイルエリアへのドラッグ＆ドロップ)
-        fileAreas.forEach((fa, idx) => {
-            if (!fa) return;
-
-            // ドラッグ見た目
-            fa.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                fa.classList.add('dragover');
-            });
-            fa.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                fa.classList.remove('dragover');
-            });
-
-            fa.addEventListener('drop', (e) => {
-                e.preventDefault();
-                fa.classList.remove('dragover');
-
-                const files = e.dataTransfer && e.dataTransfer.files;
-                if (!files || !files.length) return;
-
-                const file = files[0];
-
-                // input.files にも反映（送信のため）
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                const inp = attachInputs[idx];
-                if (inp) inp.files = dt.files;
-
-                // 旧URLを解放の上プレビュー
-                if (inp) revokeAllFor(inp);
-                setFileToSlot(idx, file);
-            });
-        });
-    }
-
     // ❶ スクリプトタグが実際に読み込まれたか
     console.log('[BBS] script tag LOADED');
 
@@ -918,6 +985,13 @@ $ajax_url      = admin_url('admin-ajax.php');
     function init() {
         console.log('[BBS] init START');
 
+        // 🔽★ ここに追加：ファイルアップロードのイベント登録
+        if (typeof set_attach_event === 'function') {
+            // fileAreaSelector と usericonIndex はあなたの設計に合わせて調整
+            set_attach_event('.image-camera-icon', 3);
+        }
+        // 🔼★ここまで追加
+
         const submitBtn = document.getElementById('submit_button');
         console.log('[BBS] submit_button =', submitBtn);
         if (submitBtn) {
@@ -929,7 +1003,8 @@ $ajax_url      = admin_url('admin-ajax.php');
         document.addEventListener('input', (e) => {
             console.log('[BBS] input EVENT on', e.target?.id || e.target?.name || e.target?.tagName);
             try {
-                validation();
+                display_text_length(e); // ←★ 追加：文字数カウンタ更新	
+                validation(); // ←既存の送信可否チェック
             } catch (err) {
                 console.error('[BBS] validation threw', err);
             }
@@ -943,9 +1018,19 @@ $ajax_url      = admin_url('admin-ajax.php');
                 validation();
             });
         });
-        // 🔼★ここまで追記
 
-        // 初期一回呼び
+        // ★ 3) 初期表示時にもカウンタを一度だけ更新
+        ['text', 'title', 'name'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                console.log(`[BBS] init display_text_length for ${id}`);
+                display_text_length({
+                    target: el
+                });
+            }
+        });
+
+        // ★ 4) 初期バリデーション
         try {
             validation();
         } catch (err) {
