@@ -343,60 +343,64 @@ $ajax_url      = admin_url('admin-ajax.php');
         const titleEl = document.getElementById('title');
         const textEl = document.getElementById('text');
 
-        const titleMax = parseInt(titleEl?.dataset.length || '0', 10);
-        const titleMin = parseInt(titleEl?.dataset.minlength || '0', 10);
-        const textMax = parseInt(textEl?.dataset.length || '0', 10);
-        const textMin = parseInt(textEl?.dataset.minlength || '0', 10);
+        // ★ dataset だけでなく HTML 属性の maxlength/minlength も見る
+        const getLimit = (el, name, fallback = '0') =>
+            parseInt(el?.getAttribute(name) || el?.dataset?.[name] || fallback, 10) || 0;
+
+        const titleMax = getLimit(titleEl, 'maxlength'); // maxlength or data-length
+        const titleMin = getLimit(titleEl, 'minlength'); // minlength or data-minlength
+        const textMax = getLimit(textEl, 'maxlength');
+        const textMin = getLimit(textEl, 'minlength');
 
         const titleLen = (titleEl?.value || '').length;
         const textLen = (textEl?.value || '').length;
 
+        // ★スタンプは change イベントのほうが確実。判定はここでOK
         const stamps = document.querySelectorAll('input[name="stamp"]');
         let stampOk = false;
-        for (const s of stamps) {
+        for (const s of stamps)
             if (s.checked) {
                 stampOk = true;
                 break;
             }
-        }
 
-        const titleOk = titleLen >= titleMin && (titleMax ? titleLen <= titleMax : true);
-        const textOk = textLen >= textMin && (textMax ? textLen <= textMax : true);
+        const titleOk = (titleMin ? titleLen >= titleMin : true) && (titleMax ? titleLen <= titleMax : true);
+        const textOk = (textMin ? textLen >= textMin : true) && (textMax ? textLen <= textMax : true);
 
+        // 添付ざっくりチェック（最終判定はサーバ）
         const inputs = document.querySelectorAll('input.attach[type="file"]');
         let filesCount = 0;
         let clientFileOk = true;
         const MAX_FILES = 4;
-        const MAX_PER = 5 * 1024 * 1024;
+        const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
 
         inputs.forEach(f => {
             if (f.files?.length) {
                 filesCount += f.files.length;
-                for (const file of f.files) {
+                for (const file of f.files)
                     if (file.size > MAX_PER) clientFileOk = false;
-                }
             }
         });
         if (filesCount > MAX_FILES) clientFileOk = false;
 
-        // btn.disabled = !(titleOk && textOk && stampOk && clientFileOk);
+        const enabled = (titleOk && textOk && stampOk && clientFileOk);
+        btn.disabled = !enabled;
 
-        // 既存の判定ロジックそのまま…
-
-        btn.disabled = !(titleOk && textOk && stampOk && clientFileOk);
-
-        // ★デバッグ出力（暫定）
-        console.log('validation called');
-
-        /*console.log('[validation] disabled?', btn.disabled, {
+        // ★詳細ログ（コンソールに出ます）
+        console.table({
             titleLen,
-            textLen,
+            titleMin,
+            titleMax,
             titleOk,
+            textLen,
+            textMin,
+            textMax,
             textOk,
             stampOk,
             filesCount,
-            clientFileOk
-        });*/
+            clientFileOk,
+            '=> enabled': enabled
+        });
     }
 
     /* ------------------------------
@@ -411,6 +415,45 @@ $ajax_url      = admin_url('admin-ajax.php');
      * グローバル: draft_id
      * ------------------------------ */
     let lastDraftId = null; // ← ここで 1 回だけ定義（以降は上書きのみ）
+
+    /* ------------------------------
+     * 確認画面ボタン生成関数（追加）
+     * ------------------------------ */
+    function create_button_parts(formType = 1) {
+        const old = document.getElementById('confirm_button');
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'post-button';
+
+        // 入力画面へ戻るボタン
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'answer-previous';
+        back.textContent = '入力画面へ戻る';
+        back.addEventListener('click', () => {
+            if (typeof change1 === 'function') change1();
+            if (typeof input_area !== 'undefined' && input_area) input_area.style.display = 'block';
+            if (typeof confirm_area !== 'undefined' && confirm_area) {
+                confirm_area.textContent = '';
+                confirm_area.style.display = 'none';
+            }
+        });
+        wrap.appendChild(back);
+
+        // 投稿確定ボタン
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.id = 'confirm_button';
+        go.className = 'answer-following';
+        go.textContent = 'この内容で投稿を確定する';
+        go.addEventListener('click', confirm_button_click, {
+            once: true
+        });
+        wrap.appendChild(go);
+
+        return wrap;
+    }
 
     /* ------------------------------
      * 送信（submit → bbs_quest_submit）
@@ -879,7 +922,8 @@ $ajax_url      = admin_url('admin-ajax.php');
         console.log('[BBS] submit_button =', submitBtn);
         if (submitBtn) {
             submitBtn.addEventListener('click', () => console.log('[BBS] submit_button CLICKED'));
-            submitBtn.addEventListener('click', validation); // ついでに押下時にも呼ぶ（暫定）
+            submitBtn.addEventListener('click', validation); // 任意（押下時に再判定したいなら）
+            submitBtn.addEventListener('click', submit_button_click); // ★これが必須！
         }
 
         document.addEventListener('input', (e) => {
@@ -890,6 +934,16 @@ $ajax_url      = admin_url('admin-ajax.php');
                 console.error('[BBS] validation threw', err);
             }
         });
+
+        // 🔽★ ここを追記：スタンプ（ラジオ）変更でもバリデーションを再実行
+        const stampRadios = document.querySelectorAll('input[name="stamp"]');
+        stampRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                console.log('[BBS] stamp change detected');
+                validation();
+            });
+        });
+        // 🔼★ここまで追記
 
         // 初期一回呼び
         try {
