@@ -864,10 +864,10 @@ $ajax_url      = admin_url('admin-ajax.php');
     // ❷ validation 定義の直前と直後
     console.log('[BBS] defining validation...');
 
-    function validation() {
+    /* function validation() {
         console.log('[BBS] validation CALLED');
         // ...（あなたの元の中身）...
-    }
+    } */
     console.log('[BBS] validation DEFINED =', typeof validation);
     /* ------------------------------
      * 初期化
