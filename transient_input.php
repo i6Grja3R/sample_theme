@@ -877,28 +877,133 @@ $ajax_url      = admin_url('admin-ajax.php');
             // === ここから UI 切替と描画（プレビュー成功後に行う） ===
             change2();
 
-            confirm_area.classList.remove('hideItems'); // ← これ重要（!important対策）
-            confirm_area.style.display = "block";
-            input_area.style.display = "none";
-            confirm_area.innerHTML = ""; // 一旦クリア
+            // hideItems を外し、描画用に初期化
+            confirm_area.classList.remove('hideItems');
+            confirm_area.style.display = 'block';
+            input_area.style.display = 'none';
+            confirm_area.innerHTML = ''; // いったん空に
 
             // 見出し
-            const h = document.createElement('h3');
-            h.textContent = "この内容で投稿しますか？";
-            confirm_area.appendChild(h);
+            {
+                const h = document.createElement('h3');
+                h.textContent = 'この内容で投稿しますか？';
+                confirm_area.appendChild(h);
+            }
 
-            // プレビュー
-            const ul = document.createElement('ul');
-            ul.innerHTML = `
-  <li><strong>タイトル</strong>：${esc(data.title)}</li>
-  <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
-  <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
-  <li><strong>スタンプ</strong>：${esc(data.stamp)}</li>
-  <li><strong>添付</strong>：${Array.isArray(data.files) ? data.files.filter(Boolean).length : 0} 件</li>
-`;
-            confirm_area.appendChild(ul);
+            // テキスト系（タイトル/本文/名前）
+            {
+                const meta = document.createElement('ul');
+                meta.innerHTML = `
+    <li><strong>タイトル</strong>：${esc(data.title)}</li>
+    <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
+    <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
+  `;
+                confirm_area.appendChild(meta);
+            }
 
-            // ボタン（戻る／確定）を最後にまとめて追加
+            // スタンプ画像のプレビュー（stamp1〜stamp8 を /images/stamp#.png として想定）
+            if (data.stamp) {
+                const stampBox = document.createElement('div');
+                stampBox.className = 'confirm-stamp';
+                stampBox.style.margin = '12px 0';
+
+                const label = document.createElement('div');
+                label.textContent = '選択したスタンプ';
+                label.style.fontWeight = 'bold';
+                stampBox.appendChild(label);
+
+                const img = document.createElement('img');
+                img.src = "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp" + String(data.stamp) + ".png";
+                img.alt = 'stamp ' + data.stamp;
+                img.style.width = '80px';
+                img.style.height = '80px';
+                img.style.objectFit = 'contain';
+                stampBox.appendChild(img);
+
+                confirm_area.appendChild(stampBox);
+            }
+
+            // 添付ファイルのプレビュー（/uploads/tmp に置いている前提）
+            {
+                const filesWrap = document.createElement('div');
+                filesWrap.style.marginTop = '12px';
+
+                const title = document.createElement('div');
+                title.textContent = '添付ファイル';
+                title.style.fontWeight = 'bold';
+                filesWrap.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.style.display = 'grid';
+                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))';
+                grid.style.gap = '12px';
+                filesWrap.appendChild(grid);
+
+                // PHP で tmp の公開URLを生成
+                const TMP_BASE_URL = "<?php $u = wp_upload_dir();
+                                        echo esc_url(trailingslashit($u['baseurl']) . 'tmp/'); ?>";
+                const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
+
+                // サーバが返した配列から「空・null・'null'」を除外
+                const safeFiles = Array.isArray(data.files) ?
+                    data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') :
+                    [];
+
+                safeFiles.forEach((fname) => {
+                    // すでに http(s) で始まる場合はそれを優先（将来の仕様変更に強くするため）
+                    const isUrl = /^https?:\/\//i.test(fname);
+                    const url = isUrl ? fname : (TMP_BASE_URL + encodeURIComponent(fname));
+                    const ext = getExt(fname);
+
+                    const card = document.createElement('div');
+                    card.style.border = '1px solid #ddd';
+                    card.style.borderRadius = '8px';
+                    card.style.padding = '8px';
+                    card.style.background = '#fff';
+
+                    let el = null;
+                    if (['jpg', 'jpeg', 'png'].includes(ext)) {
+                        el = document.createElement('img');
+                        el.src = url;
+                        el.alt = fname;
+                        el.style.width = '100%';
+                        el.style.height = '150px';
+                        el.style.objectFit = 'cover';
+                        el.loading = 'lazy';
+                    } else if (ext === 'mp4') {
+                        el = document.createElement('video');
+                        el.src = url;
+                        el.controls = true;
+                        el.style.width = '100%';
+                        el.style.height = '150px';
+                    } else if (ext === 'pdf') {
+                        el = document.createElement('iframe');
+                        el.src = url;
+                        el.width = '100%';
+                        el.height = '150';
+                        // PDF埋め込み可否はブラウザ依存。だめならリンクだけでも出す
+                        const link = document.createElement('div');
+                        link.style.marginTop = '6px';
+                        link.innerHTML = `<a href="${url}" target="_blank" rel="noopener">PDFを別タブで開く</a>`;
+                        card.appendChild(link);
+                    } else {
+                        // 想定外の拡張子はリンクのみ
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = fname;
+                        card.appendChild(link);
+                    }
+
+                    if (el) card.appendChild(el);
+                    grid.appendChild(card);
+                });
+
+                confirm_area.appendChild(filesWrap);
+            }
+
+            // 戻る／確定ボタン（この1行でOK。二重に confirm_button を作らない）
             confirm_area.appendChild(create_button_parts(1));
 
         } catch (err) {
