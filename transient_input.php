@@ -874,137 +874,224 @@ $ajax_url      = admin_url('admin-ajax.php');
                 stamp: data.stamp
             };
 
-            // === ここから UI 切替と描画（プレビュー成功後に行う） ===
+            // === ここから「確認画面」描画 ===
             change2();
-
-            // hideItems を外し、描画用に初期化
             confirm_area.classList.remove('hideItems');
             confirm_area.style.display = 'block';
             input_area.style.display = 'none';
-            confirm_area.innerHTML = ''; // いったん空に
+            confirm_area.innerHTML = ''; // 一旦クリア
 
             // 見出し
-            {
-                const h = document.createElement('h3');
-                h.textContent = 'この内容で投稿しますか？';
-                confirm_area.appendChild(h);
+            const h3 = document.createElement('h3');
+            h3.textContent = 'この内容で投稿しますか？';
+            confirm_area.appendChild(h3);
+
+            // 一時URLのベース（tmp 配下に置いている前提）
+            const TMP_BASE_URL = "<?php $u = wp_upload_dir();
+                                    echo esc_url(trailingslashit($u['baseurl']) . 'tmp/'); ?>";
+
+            // files を安全に整形（空文字/null を除去）
+            const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
+            const safeFiles = Array.isArray(data.files) ?
+                data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') : [];
+
+            // ===== スロットの実際の選択状況から「メディア」と「ユーザーアイコン」を切り分ける =====
+            const attachInputs = document.querySelectorAll('input.attach[type="file"]');
+            // 先頭3つが「動画・画像をアップロード」、4つ目が「画像アイコン」スロット
+            const mediaSlotInputs = Array.from(attachInputs).slice(0, 3);
+            const iconInput = attachInputs[3] || null;
+
+            // メディア側で実際に選ばれている数（1スロット=1ファイル想定）
+            const mediaCount = mediaSlotInputs.reduce((n, inp) => n + ((inp && inp.files && inp.files.length) ? 1 : 0), 0);
+            // 画像アイコンが実際に選ばれているか
+            const iconSelected = !!(iconInput && iconInput.files && iconInput.files.length);
+
+            // data.files（=safeFiles）の並びは「フォームに積んだ順」（=DOM順）で返ってくる前提。
+            // したがって、先頭から mediaCount 件がメディア、続く1件（あれば）がアイコン。
+            let mediaFiles = safeFiles.slice(0, mediaCount);
+            let userIconName = iconSelected ? safeFiles[mediaCount] : null;
+
+            // 念のためのフォールバック（サーバ側で順序が崩れた等）
+            if (mediaFiles.length === 0 && safeFiles.length) {
+                // 画像/動画/pdfをメディアとして拾う
+                mediaFiles = safeFiles.filter(f => /\.(jpe?g|png|mp4|pdf)$/i.test(f));
+                // アイコン候補（jpg/png）
+                const iconCand = safeFiles.find(f => /\.(jpe?g|png)$/i.test(f) && !mediaFiles.slice(0, 3).includes(f));
+                if (!userIconName && iconCand) userIconName = iconCand;
             }
 
-            // テキスト系（タイトル/本文/名前）
-            {
-                const meta = document.createElement('ul');
-                meta.innerHTML = `
-    <li><strong>タイトル</strong>：${esc(data.title)}</li>
-    <li><strong>本文</strong>：<pre style="white-space:pre-wrap;margin:0">${esc(data.text)}</pre></li>
-    <li><strong>お名前</strong>：${esc(data.name || '匿名')}</li>
-  `;
-                confirm_area.appendChild(meta);
-            }
+            // メディア要素を作るヘルパー
+            const makeMediaEl = (fname) => {
+                const ext = getExt(fname);
+                const url = TMP_BASE_URL + encodeURIComponent(fname);
+                let el;
+                if (['jpg', 'jpeg', 'png'].includes(ext)) {
+                    el = document.createElement('img');
+                    el.src = url;
+                    el.alt = fname;
+                    el.style.width = '100%';
+                    el.style.height = '220px';
+                    el.style.objectFit = 'cover';
+                } else if (ext === 'mp4') {
+                    el = document.createElement('video');
+                    el.src = url;
+                    el.controls = true;
+                    el.style.width = '100%';
+                    el.style.height = '220px';
+                } else if (ext === 'pdf') {
+                    el = document.createElement('iframe');
+                    el.src = url;
+                    el.width = '100%';
+                    el.height = '220';
+                } else {
+                    // 想定外はスキップ
+                    return null;
+                }
+                const card = document.createElement('div');
+                card.style.border = '1px solid #ddd';
+                card.style.borderRadius = '8px';
+                card.style.padding = '6px';
+                card.appendChild(el);
+                return card;
+            };
 
-            // スタンプ画像のプレビュー（stamp1〜stamp8 を /images/stamp#.png として想定）
+            // ===== 1. 先頭エリア：添付 + 質問文 =====
+            // 2カラムのグリッドを作成
+            const firstGrid = document.createElement('div');
+            firstGrid.style.display = 'grid';
+            firstGrid.style.gridTemplateColumns = '1fr 1fr';
+            firstGrid.style.gap = '12px';
+
+            // 質問文ボックス
+            const makeTextBox = () => {
+                const box = document.createElement('div');
+                box.style.border = '1px solid #ddd';
+                box.style.borderRadius = '8px';
+                box.style.padding = '10px';
+                const ttl = document.createElement('div');
+                ttl.textContent = '質問文';
+                ttl.style.fontWeight = 'bold';
+                ttl.style.marginBottom = '6px';
+                const body = document.createElement('div');
+                body.style.whiteSpace = 'pre-wrap';
+                body.textContent = data.text ?? '';
+                box.appendChild(ttl);
+                box.appendChild(body);
+                return box;
+            };
+
+            if (mediaFiles.length >= 3) {
+                // 1段目: 添付0, 添付1
+                const el0 = makeMediaEl(mediaFiles[0]);
+                if (el0) firstGrid.appendChild(el0);
+                const el1 = makeMediaEl(mediaFiles[1]);
+                if (el1) firstGrid.appendChild(el1);
+                // 2段目: 添付2, 質問文
+                const el2 = makeMediaEl(mediaFiles[2]);
+                if (el2) firstGrid.appendChild(el2);
+                firstGrid.appendChild(makeTextBox());
+            } else if (mediaFiles.length === 2) {
+                // 1段目: 添付0, 質問文
+                const el0 = makeMediaEl(mediaFiles[0]);
+                if (el0) firstGrid.appendChild(el0);
+                firstGrid.appendChild(makeTextBox());
+                // 2段目: 添付1, 空白（バランス用）
+                const el1 = makeMediaEl(mediaFiles[1]);
+                if (el1) firstGrid.appendChild(el1);
+                const spacer = document.createElement('div');
+                firstGrid.appendChild(spacer);
+            } else if (mediaFiles.length === 1) {
+                // 1段目: 添付0, 質問文
+                const el0 = makeMediaEl(mediaFiles[0]);
+                if (el0) firstGrid.appendChild(el0);
+                firstGrid.appendChild(makeTextBox());
+            } else {
+                // 添付なし: 質問文だけを2カラム幅で表示
+                const textOnly = makeTextBox();
+                textOnly.style.gridColumn = '1 / span 2';
+                firstGrid.appendChild(textOnly);
+            }
+            confirm_area.appendChild(firstGrid);
+
+            // ===== 2. タイトル + スタンプ =====
+            const titleRow = document.createElement('div');
+            titleRow.style.display = 'grid';
+            titleRow.style.gridTemplateColumns = '1fr auto';
+            titleRow.style.alignItems = 'center';
+            titleRow.style.gap = '12px';
+            titleRow.style.marginTop = '14px';
+
+            const titleBox = document.createElement('div');
+            const tHdr = document.createElement('div');
+            tHdr.textContent = '質問タイトル';
+            tHdr.style.fontWeight = 'bold';
+            const tBody = document.createElement('div');
+            tBody.textContent = data.title ?? '';
+            titleBox.appendChild(tHdr);
+            titleBox.appendChild(tBody);
+            titleRow.appendChild(titleBox);
+
+            // スタンプ画像（あれば）
             if (data.stamp) {
-                const stampBox = document.createElement('div');
-                stampBox.className = 'confirm-stamp';
-                stampBox.style.margin = '12px 0';
-
-                const label = document.createElement('div');
-                label.textContent = '選択したスタンプ';
-                label.style.fontWeight = 'bold';
-                stampBox.appendChild(label);
-
-                const img = document.createElement('img');
-                img.src = "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp" + String(data.stamp) + ".png";
-                img.alt = 'stamp ' + data.stamp;
-                img.style.width = '80px';
-                img.style.height = '80px';
-                img.style.objectFit = 'contain';
-                stampBox.appendChild(img);
-
-                confirm_area.appendChild(stampBox);
+                const stampImg = document.createElement('img');
+                stampImg.src = "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp" + String(data.stamp) + ".png";
+                stampImg.alt = 'stamp ' + data.stamp;
+                stampImg.style.width = '48px';
+                stampImg.style.height = '48px';
+                titleRow.appendChild(stampImg);
             }
+            confirm_area.appendChild(titleRow);
 
-            // 添付ファイルのプレビュー（/uploads/tmp に置いている前提）
-            {
-                const filesWrap = document.createElement('div');
-                filesWrap.style.marginTop = '12px';
+            // ===== 3. 画像アイコン + 名前 =====
+            const userRow = document.createElement('div');
+            userRow.style.display = 'grid';
+            userRow.style.gridTemplateColumns = 'auto 1fr';
+            userRow.style.alignItems = 'center';
+            userRow.style.gap = '12px';
+            userRow.style.marginTop = '14px';
 
-                const title = document.createElement('div');
-                title.textContent = '添付ファイル';
-                title.style.fontWeight = 'bold';
-                filesWrap.appendChild(title);
+            // アイコン
+            const iconWrap = document.createElement('div');
+            const iconImg = document.createElement('img');
+            iconImg.style.width = '90px';
+            iconImg.style.height = '90px';
+            iconImg.style.objectFit = 'cover';
+            <?php if (isset($noimage_url)) : ?>
+                iconImg.src = <?php echo json_encode(esc_url($noimage_url)); ?>;
+            <?php else : ?>
+                iconImg.src = '';
+            <?php endif; ?>
 
-                const grid = document.createElement('div');
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))';
-                grid.style.gap = '12px';
-                filesWrap.appendChild(grid);
-
-                // PHP で tmp の公開URLを生成
-                const TMP_BASE_URL = "<?php $u = wp_upload_dir();
-                                        echo esc_url(trailingslashit($u['baseurl']) . 'tmp/'); ?>";
-                const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
-
-                // サーバが返した配列から「空・null・'null'」を除外
-                const safeFiles = Array.isArray(data.files) ?
-                    data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') :
-                    [];
-
-                safeFiles.forEach((fname) => {
-                    // すでに http(s) で始まる場合はそれを優先（将来の仕様変更に強くするため）
-                    const isUrl = /^https?:\/\//i.test(fname);
-                    const url = isUrl ? fname : (TMP_BASE_URL + encodeURIComponent(fname));
-                    const ext = getExt(fname);
-
-                    const card = document.createElement('div');
-                    card.style.border = '1px solid #ddd';
-                    card.style.borderRadius = '8px';
-                    card.style.padding = '8px';
-                    card.style.background = '#fff';
-
-                    let el = null;
-                    if (['jpg', 'jpeg', 'png'].includes(ext)) {
-                        el = document.createElement('img');
-                        el.src = url;
-                        el.alt = fname;
-                        el.style.width = '100%';
-                        el.style.height = '150px';
-                        el.style.objectFit = 'cover';
-                        el.loading = 'lazy';
-                    } else if (ext === 'mp4') {
-                        el = document.createElement('video');
-                        el.src = url;
-                        el.controls = true;
-                        el.style.width = '100%';
-                        el.style.height = '150px';
-                    } else if (ext === 'pdf') {
-                        el = document.createElement('iframe');
-                        el.src = url;
-                        el.width = '100%';
-                        el.height = '150';
-                        // PDF埋め込み可否はブラウザ依存。だめならリンクだけでも出す
-                        const link = document.createElement('div');
-                        link.style.marginTop = '6px';
-                        link.innerHTML = `<a href="${url}" target="_blank" rel="noopener">PDFを別タブで開く</a>`;
-                        card.appendChild(link);
-                    } else {
-                        // 想定外の拡張子はリンクのみ
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.target = '_blank';
-                        link.rel = 'noopener';
-                        link.textContent = fname;
-                        card.appendChild(link);
-                    }
-
-                    if (el) card.appendChild(el);
-                    grid.appendChild(card);
-                });
-
-                confirm_area.appendChild(filesWrap);
+            if (userIconName && /\.(jpe?g|png)$/i.test(userIconName)) {
+                iconImg.src = TMP_BASE_URL + encodeURIComponent(userIconName);
             }
+            iconWrap.appendChild(iconImg);
+            userRow.appendChild(iconWrap);
 
-            // 戻る／確定ボタン（この1行でOK。二重に confirm_button を作らない）
+            // 名前
+            const nameBox = document.createElement('div');
+            const nHdr = document.createElement('div');
+            nHdr.textContent = '名前';
+            nHdr.style.fontWeight = 'bold';
+            const nBody = document.createElement('div');
+            nBody.textContent = data.name || '匿名';
+            nameBox.appendChild(nHdr);
+            nameBox.appendChild(nBody);
+            userRow.appendChild(nameBox);
+
+            confirm_area.appendChild(userRow);
+
+            // ===== 4. 戻る／確定ボタン =====
             confirm_area.appendChild(create_button_parts(1));
+
+            // 念のため、確定ボタンに once 付きのハンドラを付与（create_button_parts内で付けているなら不要）
+            const confirmBtn = document.getElementById('confirm_button');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', confirm_button_click, {
+                    once: true
+                });
+            }
+            // === ここまで「確認画面」描画 ===
 
         } catch (err) {
             console.error(err);
