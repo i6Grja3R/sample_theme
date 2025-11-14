@@ -197,6 +197,17 @@ $ajax_url      = admin_url('admin-ajax.php');
     };
 </script>
 <script>
+    // 安全エンドポイントURLを作る
+    function tmpGetUrl(fname) {
+        const p = new URLSearchParams({
+            action: "bbs_tmp_get",
+            draft_id: String(lastDraftId),
+            file: fname,
+            nonce: (window.bbs_confirm_vars?.nonce || "")
+        });
+        return (AJAX_URL + "?" + p.toString());
+    }
+
     /* -------------------------------------
      * ステップ表示の切替（UIのみ）
      * ------------------------------------- */
@@ -886,44 +897,53 @@ $ajax_url      = admin_url('admin-ajax.php');
             h3.textContent = 'この内容で投稿しますか？';
             confirm_area.appendChild(h3);
 
-            // 一時URLのベース（tmp 配下に置いている前提）
-            const TMP_BASE_URL = "<?php $u = wp_upload_dir();
-                                    echo esc_url(trailingslashit($u['baseurl']) . 'tmp/'); ?>";
-
             // files を安全に整形（空文字/null を除去）
             const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
             const safeFiles = Array.isArray(data.files) ?
                 data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') : [];
 
             // ===== スロットの実際の選択状況から「メディア」と「ユーザーアイコン」を切り分ける =====
+
+            // 1) まず safeFiles を作る（空/null/文字列"null"を排除）
+            const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
+            const safeFiles = Array.isArray(data.files) ?
+                data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') :
+                [];
+
+            // 2) スロットの選択状況を DOM から取得
+            //    先頭3つが「動画・画像」、4つ目が「画像アイコン」の前提（あなたのHTMLに合わせています）
             const attachInputs = document.querySelectorAll('input.attach[type="file"]');
-            // 先頭3つが「動画・画像をアップロード」、4つ目が「画像アイコン」スロット
-            const mediaSlotInputs = Array.from(attachInputs).slice(0, 3);
-            const iconInput = attachInputs[3] || null;
-
-            // メディア側で実際に選ばれている数（1スロット=1ファイル想定）
-            const mediaCount = mediaSlotInputs.reduce((n, inp) => n + ((inp && inp.files && inp.files.length) ? 1 : 0), 0);
-            // 画像アイコンが実際に選ばれているか
-            const iconSelected = !!(iconInput && iconInput.files && iconInput.files.length);
-
-            // data.files（=safeFiles）の並びは「フォームに積んだ順」（=DOM順）で返ってくる前提。
-            // したがって、先頭から mediaCount 件がメディア、続く1件（あれば）がアイコン。
-            let mediaFiles = safeFiles.slice(0, mediaCount);
-            let userIconName = iconSelected ? safeFiles[mediaCount] : null;
-
-            // 念のためのフォールバック（サーバ側で順序が崩れた等）
-            if (mediaFiles.length === 0 && safeFiles.length) {
-                // 画像/動画/pdfをメディアとして拾う
-                mediaFiles = safeFiles.filter(f => /\.(jpe?g|png|mp4|pdf)$/i.test(f));
-                // アイコン候補（jpg/png）
-                const iconCand = safeFiles.find(f => /\.(jpe?g|png)$/i.test(f) && !mediaFiles.slice(0, 3).includes(f));
-                if (!userIconName && iconCand) userIconName = iconCand;
+            // 4スロット想定：0..2 = media, 3 = icon（3番目が存在しない場合もあるのでガード）
+            const slotSelected = [false, false, false, false];
+            for (let i = 0; i < 4; i++) {
+                const inp = attachInputs[i];
+                slotSelected[i] = !!(inp && inp.files && inp.files.length > 0);
             }
+
+            // 3) safeFiles を “スロット順” に順当に割り当てる
+            //    例：slotSelected = [true,true,false,true] かつ safeFiles = ['A','B','C']
+            //    → slot0='A', slot1='B', slot2=未選択, slot3='C' という割当になる
+            const slotFiles = [null, null, null, null];
+            let cursor = 0;
+            for (let i = 0; i < 4; i++) {
+                if (slotSelected[i] && cursor < safeFiles.length) {
+                    slotFiles[i] = safeFiles[cursor++];
+                }
+            }
+            // ここで slotFiles[0..2] がメディア側、slotFiles[3] がアイコン側の「実際のファイル名（tmp名）」になる
+
+            // 4) media と icon に分解（null を除外）
+            const mediaFiles = slotFiles.slice(0, 3).filter(Boolean);
+            const userIconName = slotFiles[3] || null;
+
+            // --- ここから先は “並び描画” のロジックは今までのままでOK ---
+            // （2件のときは 1段目：media[0] + 質問文、2段目：media[1] + 空白、というあなたの既存処理で固定表示になります）
 
             // メディア要素を作るヘルパー
             const makeMediaEl = (fname) => {
                 const ext = getExt(fname);
-                const url = TMP_BASE_URL + encodeURIComponent(fname);
+                // const url = TMP_BASE_URL + encodeURIComponent(fname);
+                const url = tmpGetUrl(fname);
                 let el;
                 if (['jpg', 'jpeg', 'png'].includes(ext)) {
                     el = document.createElement('img');
@@ -1063,8 +1083,9 @@ $ajax_url      = admin_url('admin-ajax.php');
             <?php endif; ?>
 
             if (userIconName && /\.(jpe?g|png)$/i.test(userIconName)) {
-                iconImg.src = TMP_BASE_URL + encodeURIComponent(userIconName);
+                iconImg.src = tmpGetUrl(userIconName);
             }
+
             iconWrap.appendChild(iconImg);
             userRow.appendChild(iconWrap);
 

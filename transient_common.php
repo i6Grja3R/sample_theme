@@ -276,3 +276,250 @@ if (!defined('BBS_MAX_TOTAL')) define('BBS_MAX_TOTAL', 50 * 1024 * 1024); // 例
 
 // 既存の BBS_MAX_PER_FILE があれば “未知MIMEのフォールバック” に使う
 if (!defined('BBS_MAX_PER_FILE')) define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // 従来の一律上限（保険）
+
+// --- ① 一時ディレクトリを“非公開”で初期化 ---
+// ===== 1) 一時ディレクトリの“非公開”初期化 =====
+if (!defined('BBS_TMP_SUBDIR')) {
+    define('BBS_TMP_SUBDIR', 'tmp'); // /uploads/tmp
+}
+
+if (!function_exists('bbs_tmp_dir')) {
+    function bbs_tmp_dir(): string
+    {
+        $up  = wp_upload_dir();
+        $dir = trailingslashit($up['basedir']) . BBS_TMP_SUBDIR;
+        if (!is_dir($dir)) {
+            wp_mkdir_p($dir);
+        }
+        return $dir;
+    }
+}
+
+if (!function_exists('bbs_tmp_bootstrap')) {
+    function bbs_tmp_bootstrap(): void
+    {
+        $dir = bbs_tmp_dir();
+
+        // 1) index.html（空ファイル）を置く
+        $index = trailingslashit($dir) . 'index.html';
+        if (!file_exists($index)) {
+            @file_put_contents($index, "<!doctype html><title></title>");
+        }
+
+        // 2) .htaccess：直リンク禁止（LiteSpeed/Apache）
+        $ht = trailingslashit($dir) . '.htaccess';
+        if (!file_exists($ht)) {
+            $rules = <<<HT
+# BBS tmp: deny direct access
+Options -Indexes
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Deny from all
+</IfModule>
+
+# 念のためキャッシュ禁止（互換）
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-store, no-cache, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</IfModule>
+HT;
+            @file_put_contents($ht, $rules);
+        }
+    }
+}
+
+// WordPress 起動ごとに存在を担保（軽い処理）
+add_action('init', 'bbs_tmp_bootstrap');
+
+// ===============================
+// ② 一時ファイルの安全配信エンドポイント（直リンク禁止）
+//    /wp-admin/admin-ajax.php?action=bbs_tmp_get&draft_id=...&file=...&nonce=...
+// ===============================
+add_action('wp_ajax_bbs_tmp_get', 'bbs_tmp_get');          // ログイン時
+add_action('wp_ajax_nopriv_bbs_tmp_get', 'bbs_tmp_get');   // 未ログイン時も許可するなら
+
+function bbs_tmp_get()
+{
+    // ---- 1) パラメータ取得＆最低限のバリデーション ----
+    $nonce    = isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '';
+    $draft_id = isset($_REQUEST['draft_id']) ? (string) $_REQUEST['draft_id'] : '';
+    $file_in  = isset($_REQUEST['file']) ? (string) $_REQUEST['file'] : '';
+
+    // Nonce 検証（JS から送っているものと同じ action 名に合わせる）
+    // 例：wp_localize_script('bbs-confirm', 'bbs_confirm_vars', ['nonce' => wp_create_nonce('bbs_confirm_nonce')]);
+    if (!wp_verify_nonce($nonce, 'bbs_confirm_nonce')) {
+        status_header(403);
+        exit('Invalid nonce');
+    }
+
+    // draft_id は [a-zA-Z0-9_-] 程度に制限（UUID想定ならハイフンOK）
+    if ($draft_id === '' || !preg_match('/^[A-Za-z0-9_-]{6,64}$/', $draft_id)) {
+        status_header(400);
+        exit('Bad draft_id');
+    }
+
+    // file は basename 化し、許可文字のみに制限（拡張子はあとでMIMEでも見る）
+    $file = basename($file_in);
+    if ($file === '' || !preg_match('/^[A-Za-z0-9._-]{1,200}$/', $file)) {
+        status_header(400);
+        exit('Bad file name');
+    }
+
+    // ---- 2) この draft_id に紐づく「許可ファイル」か検証 ----
+    // 保存先はあなたの実装に合わせて：
+    //   - transient("bbs_tmp_files_$draft_id")
+    //   - get_post_meta($draft_id, 'bbs_tmp_files', true)
+    //   - オプション/カスタムテーブル等
+    $files = get_transient("bbs_tmp_files_$draft_id");
+    if (!is_array($files) || empty($files)) {
+        // フォールバック（保存先が post_meta の場合など）
+        $meta = get_post_meta($draft_id, 'bbs_tmp_files', true);
+        if (is_array($meta)) $files = $meta;
+    }
+    if (!is_array($files) || !in_array($file, $files, true)) {
+        status_header(403);
+        exit('Not allowed');
+    }
+
+    // ---- 3) 実ファイルパスの決定（必ず tmp 直下へ閉じ込める）----
+    $upload_dir = wp_upload_dir();
+    $tmp_dir = trailingslashit($upload_dir['basedir']) . 'tmp/';
+    $base = wp_normalize_path($tmp_dir);
+    $path = wp_normalize_path($tmp_dir . $file);
+
+    // パストラバーサル防止：$path が $base 配下であることを厳密チェック
+    if (strpos($path, $base) !== 0 || !file_exists($path)) {
+        status_header(404);
+        exit('Not found');
+    }
+
+    // ---- 4) MIME 判定＆許可種別チェック ----
+    // まず finfo（なければ wp_check_filetype）
+    $mime = '';
+    if (function_exists('finfo_open')) {
+        $f = finfo_open(FILEINFO_MIME_TYPE);
+        if ($f) {
+            $mime = (string) finfo_file($f, $path);
+            finfo_close($f);
+        }
+    }
+    if ($mime === '') {
+        $ft = wp_check_filetype($path);
+        if (!empty($ft['type'])) $mime = $ft['type'];
+    }
+
+    // 許可リスト（必要に応じて拡張）
+    $allowed_mime = array('image/jpeg', 'image/png', 'video/mp4', 'application/pdf');
+    if (!in_array($mime, $allowed_mime, true)) {
+        status_header(403);
+        exit('Not allowed type');
+    }
+
+    // ---- 5) 配信ヘッダ（直リンク禁止のため PHP から出力）----
+    // ここではキャッシュ短め＋nosniff を推奨
+    @set_time_limit(0);
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: private, max-age=60'); // 必要に応じて調整
+    header('Accept-Ranges: bytes');
+
+    $size = filesize($path);
+    $range = null;
+
+    // ---- 6) 簡易 Range 対応（動画のシークに必要）----
+    if (isset($_SERVER['HTTP_RANGE'])) {
+        // 例: bytes=12345- または bytes=12345-67890
+        if (preg_match('/bytes=(\d+)-(\d*)/i', $_SERVER['HTTP_RANGE'], $m)) {
+            $start = (int)$m[1];
+            $end   = ($m[2] !== '' ? (int)$m[2] : ($size - 1));
+            if ($start <= $end && $end < $size) {
+                $range = array($start, $end);
+            }
+        }
+    }
+
+    if ($range) {
+        list($start, $end) = $range;
+        $length = $end - $start + 1;
+
+        status_header(206); // Partial Content
+        header("Content-Range: bytes $start-$end/$size");
+        header('Content-Length: ' . $length);
+
+        $fp = fopen($path, 'rb');
+        if ($fp === false) {
+            status_header(500);
+            exit('Read error');
+        }
+        fseek($fp, $start);
+        $buf = 8192;
+        while (!feof($fp) && $length > 0) {
+            $read = ($length > $buf) ? $buf : $length;
+            $out = fread($fp, $read);
+            if ($out === false) break;
+            echo $out;
+            $length -= strlen($out);
+            // 出力バッファを適宜フラッシュ
+            if (function_exists('fastcgi_finish_request') === false) {
+                @ob_flush();
+                flush();
+            }
+        }
+        fclose($fp);
+        exit;
+    } else {
+        // Range なし：全体配信
+        header('Content-Length: ' . $size);
+        $fp = fopen($path, 'rb');
+        if ($fp === false) {
+            status_header(500);
+            exit('Read error');
+        }
+        while (!feof($fp)) {
+            $out = fread($fp, 8192);
+            if ($out === false) break;
+            echo $out;
+            if (function_exists('fastcgi_finish_request') === false) {
+                @ob_flush();
+                flush();
+            }
+        }
+        fclose($fp);
+        exit;
+    }
+}
+
+// ====== 一時ファイルの自動掃除（Cron登録） ======
+
+// 1日1回のイベントを登録（重複登録を防ぐ）
+function bbs_register_cleanup_cron()
+{
+    if (!wp_next_scheduled('bbs_tmp_cleanup_event')) {
+        wp_schedule_event(time(), 'daily', 'bbs_tmp_cleanup_event');
+    }
+}
+add_action('wp', 'bbs_register_cleanup_cron');
+
+// 24時間前のファイルを削除
+function bbs_run_tmp_cleanup()
+{
+    $dir = trailingslashit(BBS_TMP_DIR);  // あなたの定義済みディレクトリ
+    if (!is_dir($dir)) return;
+
+    $files = glob($dir . '*');
+    if (!$files) return;
+
+    $now = time();
+    $limit = 24 * 60 * 60; // 24時間
+
+    foreach ($files as $f) {
+        if (!is_file($f)) continue;
+        if ($now - filemtime($f) > $limit) {
+            @unlink($f);
+        }
+    }
+}
+add_action('bbs_tmp_cleanup_event', 'bbs_run_tmp_cleanup');
