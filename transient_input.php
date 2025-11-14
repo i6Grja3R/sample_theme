@@ -885,6 +885,18 @@ $ajax_url      = admin_url('admin-ajax.php');
                 stamp: data.stamp
             };
 
+            // ★★★ ここに安全URLヘルパーを定義 ★★★
+            const tmpGetUrl = (filename) => {
+                if (!filename) return '';
+                const params = new URLSearchParams({
+                    action: 'bbs_tmp_get',
+                    draft: String(lastDraftId),
+                    name: filename,
+                    _nonce: "<?php echo wp_create_nonce('bbs_tmp_get_'); ?>" + String(lastDraftId)
+                });
+                return "<?php echo esc_url(admin_url('admin-ajax.php')); ?>?" + params.toString();
+            };
+
             // === ここから「確認画面」描画 ===
             change2();
             confirm_area.classList.remove('hideItems');
@@ -897,18 +909,12 @@ $ajax_url      = admin_url('admin-ajax.php');
             h3.textContent = 'この内容で投稿しますか？';
             confirm_area.appendChild(h3);
 
-            // files を安全に整形（空文字/null を除去）
-            const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
-            const safeFiles = Array.isArray(data.files) ?
-                data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') : [];
-
             // ===== スロットの実際の選択状況から「メディア」と「ユーザーアイコン」を切り分ける =====
 
             // 1) まず safeFiles を作る（空/null/文字列"null"を排除）
             const getExt = (name) => (String(name || '').split('.').pop() || '').toLowerCase();
             const safeFiles = Array.isArray(data.files) ?
-                data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') :
-                [];
+                data.files.filter(f => f && typeof f === 'string' && f.trim() !== '' && f !== 'null') : [];
 
             // 2) スロットの選択状況を DOM から取得
             //    先頭3つが「動画・画像」、4つ目が「画像アイコン」の前提（あなたのHTMLに合わせています）

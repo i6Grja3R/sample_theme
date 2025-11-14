@@ -523,3 +523,60 @@ function bbs_run_tmp_cleanup()
     }
 }
 add_action('bbs_tmp_cleanup_event', 'bbs_run_tmp_cleanup');
+
+// --------------------------------------------------
+// 一時ファイル安全配信エンドポイント（admin-ajax.php 経由）
+// --------------------------------------------------
+if (!function_exists('bbs_tmp_get')) {
+    function bbs_tmp_get()
+    {
+        // draft_id（= 一時保存中の投稿ID）
+        $draft_id = isset($_GET['draft']) ? (string) $_GET['draft'] : '';
+        $name     = isset($_GET['name'])  ? (string) $_GET['name']  : '';
+
+        // 最低限のバリデーション
+        if ($draft_id === '' || $name === '') {
+            status_header(400);
+            wp_die('Bad Request', '', ['response' => 400]);
+        }
+
+        // ノンスチェック（JS側で作ったものと同じルール）
+        $nonce = isset($_GET['_nonce']) ? (string) $_GET['_nonce'] : '';
+        if (!wp_verify_nonce($nonce, 'bbs_tmp_get_' . $draft_id)) {
+            status_header(403);
+            wp_die('Forbidden', '', ['response' => 403]);
+        }
+
+        // 一時ディレクトリのパス（あなたの既存ヘルパーに合わせてください）
+        $tmp_dir = bbs_tmp_dir(); // 例：/home/xxxx/wp-content/uploads/bbstmp など
+
+        // ディレクトリトラバーサル対策（../ を潰す）
+        $name = wp_basename($name);
+
+        $file = trailingslashit($tmp_dir) . $name;
+
+        if (!file_exists($file) || !is_file($file)) {
+            status_header(404);
+            wp_die('Not Found', '', ['response' => 404]);
+        }
+
+        // MIME を安全に推測
+        $mime = wp_check_filetype($file);
+        $mime_type = $mime['type'] ?: 'application/octet-stream';
+
+        // キャッシュ系ヘッダ（お好みで）
+        nocache_headers();
+        header('Content-Type: ' . $mime_type);
+        header('Content-Length: ' . filesize($file));
+        // inline 表示にしたいので Content-Disposition は付けない or inline に
+        // header('Content-Disposition: inline; filename="' . esc_attr($name) . '"');
+
+        // 出力
+        readfile($file);
+        exit;
+    }
+}
+
+// ログイン・未ログイン両方から呼べるようにする
+add_action('wp_ajax_bbs_tmp_get',        'bbs_tmp_get');
+add_action('wp_ajax_nopriv_bbs_tmp_get', 'bbs_tmp_get');
