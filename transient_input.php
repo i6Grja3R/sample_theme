@@ -68,7 +68,10 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             <div class="image-partial"><!-- 添付ファイル群 -->
                 <h2>
                     動画・画像をアップロード (Upload video / image)
-                    <span class="required">※1ファイル最大5MB・合計最大20MB、JPG/PNG/PDF/MP4</span><!-- サーバ設定に合わせた案内 -->
+                    <span class="required">
+                        動画・画像をアップロード（JPG / PNG / PDF / MP4）<br>
+                        ※画像・PDFは5MBまで、動画は10MBまで、合計20MBまでアップロードできます
+                    </span><!-- サーバ設定に合わせた案内 -->
                 </h2>
 
                 <!-- 1つ目の添付 -->
@@ -624,17 +627,45 @@ $ajax_url      = admin_url('admin-ajax.php');
 
             if (!inp || !viewer || !fileArea) return;
 
-            // サイズ上限
+            // 画像アイコンスロットかどうか
             const isIcon = (slotIndex === Number(usericonIndex));
-            const maxBytes = (isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT) * 1024 * 1024;
+
+            // ★ 拡張子も見て動画かどうか判定
+            const ext = String(file.name || '').split('.').pop().toLowerCase();
+            const isVideo =
+                (file.type && file.type.startsWith('video/')) ||
+                ext === 'mp4';
+
+            // ★ 種類別に「上限MB」を切り替える
+            let maxMB;
+            if (isIcon) {
+                maxMB = MAX_MB_USERICON; // 例: 5MB（アイコン）
+            } else if (isVideo) {
+                maxMB = 10; // ★ 動画だけ 10MB
+            } else {
+                maxMB = MAX_MB_DEFAULT; // 画像・PDFは 5MB のままなら 5
+            }
+
+            const maxBytes = maxMB * 1024 * 1024;
+
+            // デバッグしたいとき用（必要なければ消してOK）
+            console.log('[setFileToSlot] slot', slotIndex, {
+                name: file.name,
+                type: file.type,
+                ext,
+                isVideo,
+                maxMB,
+                sizeMB: (file.size / 1024 / 1024).toFixed(2),
+            });
+
+            // ★ ファイルサイズチェック
             if (file.size > maxBytes) {
-                alert(`ファイルサイズが上限(${isIcon ? MAX_MB_USERICON : MAX_MB_DEFAULT}MB)を超えています。`);
+                alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
                 return;
             }
 
             // タイプチェック（ユーザーアイコン枠だけ jpg/png 限定）
             if (!isAllowedForSlot(slotIndex, file)) {
-                const isIcon = (slotIndex === Number(usericonIndex));
                 if (isIcon) {
                     alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
                 } else {

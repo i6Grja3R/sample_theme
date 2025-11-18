@@ -54,21 +54,33 @@ if (!function_exists('bbs_allowed_upload_map')) {
     function bbs_allowed_upload_map(): array
     {
         return [
-            'image/jpeg'      => ['jpg', 'jpeg'], // [031] JPG
-            'image/png'       => ['png'],         // [032] PNG
+            // 画像
+            'image/jpeg' => ['jpg', 'jpeg'],
+            'image/png'  => ['png'],
             // 'image/gif'    => ['gif'],         // [033] GIFを使う場合はコメント解除
+            // ドキュメント
             'application/pdf' => ['pdf'],         // [034] PDF
+            // 動画（必要なものだけ最小限で）
             'video/mp4'       => ['mp4'],         // [035] MP4
+            'video/quicktime' => ['mov'], // iPhone由来
+            // 'video/webm'    => ['webm'], // 必要なら
         ];
     }
 }
 
 // [040] 上限定数（必要に応じてテーマ/プラグイン側で define しても良い）
 if (!defined('BBS_MAX_FILES'))    define('BBS_MAX_FILES', 4);             // [041] 最大4ファイル
+// 既定（画像・PDFなど）
 if (!defined('BBS_MAX_PER_FILE')) define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // [042] 1ファイル5MB
-if (!defined('BBS_MAX_TOTAL'))    define('BBS_MAX_TOTAL',   20 * 1024 * 1024); // [043] 合計20MB
-if (!defined('BBS_IMG_MAX_W'))    define('BBS_IMG_MAX_W',   6000);        // [044] 最大幅(px)
-if (!defined('BBS_IMG_MAX_H'))    define('BBS_IMG_MAX_H',   6000);        // [045] 最大高(px)
+// 動画（回線や実装に応じて 8〜15MB 推奨）
+if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 10 * 1024 * 1024);  // 10MB
+// PDF 個別調整したい場合
+if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   5  * 1024 * 1024);  // 5MB
+// 合計（3ファイル想定なら 15MB など）
+if (!defined('BBS_MAX_TOTAL'))          define('BBS_MAX_TOTAL',          15 * 1024 * 1024);
+// 画像寸法
+if (!defined('BBS_IMG_MAX_W')) define('BBS_IMG_MAX_W', 4000);
+if (!defined('BBS_IMG_MAX_H')) define('BBS_IMG_MAX_H', 4000);
 
 // [050] 一時保存先 (/wp-content/uploads/tmp/) の絶対パスを返す（無ければ作成）
 if (!function_exists('bbs_tmp_dir')) {
