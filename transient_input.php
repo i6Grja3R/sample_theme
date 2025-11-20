@@ -919,6 +919,7 @@ $ajax_url      = admin_url('admin-ajax.php');
             // ★★★ ここに安全URLヘルパーを定義 ★★★
             const tmpGetUrl = (filename) => {
                 if (!filename) return '';
+
                 const params = new URLSearchParams({
                     action: 'bbs_tmp_get',
                     draft: String(lastDraftId),

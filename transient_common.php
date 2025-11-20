@@ -80,6 +80,10 @@ if (!defined('BBS_MAX_TOTAL'))     define('BBS_MAX_TOTAL',   20 * 1024 * 1024); 
 if (!defined('BBS_IMG_MAX_W'))     define('BBS_IMG_MAX_W',   6000);        // 画像最大幅
 if (!defined('BBS_IMG_MAX_H'))     define('BBS_IMG_MAX_H',   6000);        // 画像最大高
 
+// ★ 動画・PDF 用の個別上限（未定義ならデフォルト値を入れる）
+if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 5 * 1024 * 1024); // 動画も 5MB に揃える
+if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   5 * 1024 * 1024); // PDF も 5MB（お好みで）
+
 /* ===========================================================
  * 4) 保存先ディレクトリ（/uploads/bbs/YYYY/MM/）
  * =========================================================== */
