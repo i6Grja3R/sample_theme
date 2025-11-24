@@ -187,6 +187,19 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 $submit_nonce  = wp_create_nonce('bbs_quest_submit');
 $confirm_nonce = wp_create_nonce('bbs_quest_confirm');
 $ajax_url      = admin_url('admin-ajax.php');
+
+// スタンプ番号 → 画像URL のマップ
+$stamp_files = [
+    1 => get_template_directory_uri() . 'images/stamp/22789936.png',
+    2 => get_template_directory_uri() . 'images/stamp/22789937.png',
+    3 => get_template_directory_uri() . 'images/stamp/22789938.png',
+    4 => get_template_directory_uri() . 'images/stamp/22789939.png',
+    5 => get_template_directory_uri() . 'images/stamp/227899310.png',
+    6 => get_template_directory_uri() . 'images/stamp/227899311.png',
+    7 => get_template_directory_uri() . 'images/stamp/227899312.png',
+    // ……他の番号もCSSと同じファイルに揃えてください……
+    8 => get_template_directory_uri() . '/images/stamp/227899313.png',
+];
 ?>
 <script>
     // 直書きJS用のグローバル設定をPHPで埋め込む
@@ -200,6 +213,9 @@ $ajax_url      = admin_url('admin-ajax.php');
     };
 </script>
 <script>
+    // PHP からスタンプ画像マップを受け取る
+    const STAMP_MAP = <?php echo wp_json_encode($stamp_files, JSON_UNESCAPED_SLASHES); ?>;
+
     // 安全エンドポイントURLを作る
     function tmpGetUrl(fname) {
         const p = new URLSearchParams({
@@ -924,7 +940,7 @@ $ajax_url      = admin_url('admin-ajax.php');
                     action: 'bbs_tmp_get',
                     draft: String(lastDraftId),
                     name: filename,
-                    _nonce: "<?php echo wp_create_nonce('bbs_tmp_get_'); ?>" + String(lastDraftId)
+                    _nonce: "<?php echo wp_create_nonce('bbs_tmp_get'); ?>"
                 });
                 return "<?php echo esc_url(admin_url('admin-ajax.php')); ?>?" + params.toString();
             };
@@ -1089,15 +1105,16 @@ $ajax_url      = admin_url('admin-ajax.php');
             titleBox.appendChild(tBody);
             titleRow.appendChild(titleBox);
 
-            // スタンプ画像（あれば）
-            if (data.stamp) {
+            // ★ここを修正：スタンプ番号→URL をマップから引く
+            if (data.stamp && STAMP_MAP[String(data.stamp)]) {
                 const stampImg = document.createElement('img');
-                stampImg.src = "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp" + String(data.stamp) + ".png";
+                stampImg.src = STAMP_MAP[String(data.stamp)];
                 stampImg.alt = 'stamp ' + data.stamp;
                 stampImg.style.width = '48px';
                 stampImg.style.height = '48px';
                 titleRow.appendChild(stampImg);
             }
+
             confirm_area.appendChild(titleRow);
 
             // ===== 3. 画像アイコン + 名前 =====

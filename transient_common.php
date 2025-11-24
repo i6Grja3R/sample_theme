@@ -81,7 +81,7 @@ if (!defined('BBS_IMG_MAX_W'))     define('BBS_IMG_MAX_W',   6000);        // �
 if (!defined('BBS_IMG_MAX_H'))     define('BBS_IMG_MAX_H',   6000);        // 画像最大高
 
 // ★ 動画・PDF 用の個別上限（未定義ならデフォルト値を入れる）
-if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 5 * 1024 * 1024); // 動画も 5MB に揃える
+if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 10 * 1024 * 1024); // 動画も 5MB に揃える
 if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   5 * 1024 * 1024); // PDF も 5MB（お好みで）
 
 /* ===========================================================
@@ -546,7 +546,8 @@ if (!function_exists('bbs_tmp_get')) {
 
         // ノンスチェック（JS側で作ったものと同じルール）
         $nonce = isset($_GET['_nonce']) ? (string) $_GET['_nonce'] : '';
-        if (!wp_verify_nonce($nonce, 'bbs_tmp_get_' . $draft_id)) {
+        // JS 側の wp_create_nonce('bbs_tmp_get') と揃える
+        if (!wp_verify_nonce($nonce, 'bbs_tmp_get')) {
             status_header(403);
             wp_die('Forbidden', '', ['response' => 403]);
         }
