@@ -188,17 +188,17 @@ $submit_nonce  = wp_create_nonce('bbs_quest_submit');
 $confirm_nonce = wp_create_nonce('bbs_quest_confirm');
 $ajax_url      = admin_url('admin-ajax.php');
 
+$theme_uri = trailingslashit(get_template_directory_uri());
 // スタンプ番号 → 画像URL のマップ
 $stamp_files = [
-    1 => get_template_directory_uri() . 'images/stamp/22789936.png',
-    2 => get_template_directory_uri() . 'images/stamp/22789937.png',
-    3 => get_template_directory_uri() . 'images/stamp/22789938.png',
-    4 => get_template_directory_uri() . 'images/stamp/22789939.png',
-    5 => get_template_directory_uri() . 'images/stamp/227899310.png',
-    6 => get_template_directory_uri() . 'images/stamp/227899311.png',
-    7 => get_template_directory_uri() . 'images/stamp/227899312.png',
-    // ……他の番号もCSSと同じファイルに揃えてください……
-    8 => get_template_directory_uri() . '/images/stamp/227899313.png',
+    1 => $theme_uri . 'images/stamp/1.png',
+    2 => $theme_uri . 'images/stamp/2.png',
+    3 => $theme_uri . 'images/stamp/3.png',
+    4 => $theme_uri . 'images/stamp/4.png',
+    5 => $theme_uri . 'images/stamp/5.png',
+    6 => $theme_uri . 'images/stamp/6.png',
+    7 => $theme_uri . 'images/stamp/7.png',
+    8 => $theme_uri . 'images/stamp/8.png',
 ];
 ?>
 <script>
@@ -213,9 +213,6 @@ $stamp_files = [
     };
 </script>
 <script>
-    // PHP からスタンプ画像マップを受け取る
-    const STAMP_MAP = <?php echo wp_json_encode($stamp_files, JSON_UNESCAPED_SLASHES); ?>;
-
     // 安全エンドポイントURLを作る
     function tmpGetUrl(fname) {
         const p = new URLSearchParams({
@@ -1106,9 +1103,13 @@ $stamp_files = [
             titleRow.appendChild(titleBox);
 
             // ★ここを修正：スタンプ番号→URL をマップから引く
-            if (data.stamp && STAMP_MAP[String(data.stamp)]) {
+            // ★番号.png で直接読む版
+            if (data.stamp) {
                 const stampImg = document.createElement('img');
-                stampImg.src = STAMP_MAP[String(data.stamp)];
+                stampImg.src =
+                    "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp/" +
+                    String(data.stamp) +
+                    ".png"; // 例: .../images/stamp/8.png
                 stampImg.alt = 'stamp ' + data.stamp;
                 stampImg.style.width = '48px';
                 stampImg.style.height = '48px';
