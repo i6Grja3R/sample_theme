@@ -399,143 +399,116 @@ add_action('bbs_tmp_cleanup_event', 'bbs_run_tmp_cleanup');
 
 // --------------------------------------------------
 // 一時ファイル安全配信エンドポイント（admin-ajax.php 経由）
-// JS からは ?action=bbs_tmp_get&draft_id=...&file=...&nonce=... で呼ばれる
 // --------------------------------------------------
 if (!function_exists('bbs_tmp_get')) {
     function bbs_tmp_get()
     {
         // 1) パラメータ取得
-        $draft_id = isset($_GET['draft_id']) ? (string) $_GET['draft_id'] : '';
-        $name     = isset($_GET['file'])     ? (string) $_GET['file']     : '';
-        $nonce    = isset($_GET['nonce'])    ? (string) $_GET['nonce']    : '';
+        $draft_id = isset($_GET['draft_id']) ? sanitize_text_field($_GET['draft_id']) : '';
+        $name     = isset($_GET['file'])     ? sanitize_text_field($_GET['file'])     : '';
+        $nonce    = isset($_GET['nonce'])    ? sanitize_text_field($_GET['nonce'])    : '';
 
-        // 必須チェック
         if ($draft_id === '' || $name === '') {
             status_header(400);
             wp_die('Bad Request', '', ['response' => 400]);
         }
 
-        // nonce は bbs_confirm_vars.nonce と同じ action 名で検証
-        // （上で wp_create_nonce('bbs_quest_confirm') を使っているため）
+        // nonce チェック
         if (!wp_verify_nonce($nonce, 'bbs_quest_confirm')) {
             status_header(403);
-            wp_die('Forbidden', '', ['response' => 403]);
+            wp_die('Invalid nonce', '', ['response' => 403]);
         }
 
-        // 2) パスを決定（/uploads/tmp 配下に閉じ込める）
-        $tmp_dir = bbs_tmp_dir(); // 例: /.../wp-content/uploads/tmp
-        $base    = wp_normalize_path(trailingslashit($tmp_dir));
+        // 2) transient から “許可ファイル” を取得して照合
+        if (!function_exists('get_guest_uuid')) {
+            status_header(500);
+            wp_die('helper missing', '', ['response' => 500]);
+        }
+        $user_id = get_guest_uuid();
 
-        // ディレクトリトラバーサル対策（basename 化）
+        $transient_key = "bbs_quest_{$user_id}_{$draft_id}";
+        $payload = get_transient($transient_key);
+
+        if (!is_array($payload) || !isset($payload['files']) || !is_array($payload['files'])) {
+            status_header(403);
+            wp_die('No files allowed', '', ['response' => 403]);
+        }
+
         $file = wp_basename($name);
-        $path = wp_normalize_path($base . $file);
+        if (!in_array($file, $payload['files'], true)) {
+            status_header(403);
+            wp_die('Not allowed', '', ['response' => 403]);
+        }
+
+        // 3) tmp 直下のパスを決定
+        $tmp_dir = bbs_tmp_dir();
+        $base    = wp_normalize_path(trailingslashit($tmp_dir));
+        $path    = wp_normalize_path($base . $file);
 
         if (strpos($path, $base) !== 0 || !file_exists($path) || !is_file($path)) {
             status_header(404);
-            wp_die('Not Found', '', ['response' => 404]);
+            wp_die('Not found', '', ['response' => 404]);
         }
 
-        // 3) MIME 判定（finfo → wp_check_filetype）
+        // 4) MIME 判定
         $mime = '';
         if (function_exists('finfo_open')) {
             $f = finfo_open(FILEINFO_MIME_TYPE);
             if ($f) {
-                $mime = (string) finfo_file($f, $path);
+                $mime = finfo_file($f, $path);
                 finfo_close($f);
             }
         }
         if ($mime === '') {
             $ft = wp_check_filetype($path);
-            if (!empty($ft['type'])) {
-                $mime = $ft['type'];
-            }
-        }
-        if ($mime === '') {
-            $mime = 'application/octet-stream';
+            $mime = $ft['type'] ?: 'application/octet-stream';
         }
 
-        // 許可 MIME（必要なら追加）
-        $allowed_mime = [
-            'image/jpeg',
-            'image/png',
-            'image/gif',
-            'video/mp4',
-            'application/pdf',
-        ];
-        if (!in_array($mime, $allowed_mime, true)) {
+        $allowed = ['image/jpeg', 'image/png', 'video/mp4', 'application/pdf'];
+        if (!in_array($mime, $allowed, true)) {
             status_header(403);
             wp_die('Not allowed type', '', ['response' => 403]);
         }
 
-        // 4) 共通ヘッダ設定
+        // 5) ヘッダ + Range 対応
         @set_time_limit(0);
         header('X-Content-Type-Options: nosniff');
         header('Content-Type: ' . $mime);
-        header('Cache-Control: private, max-age=60');
         header('Accept-Ranges: bytes');
+        header('Cache-Control: private, max-age=60');
 
-        $size  = filesize($path);
-        $range = null;
+        $size = filesize($path);
 
-        // 5) Range ヘッダ解析（動画シーク用）
-        if (isset($_SERVER['HTTP_RANGE'])) {
-            if (preg_match('/bytes=(\d+)-(\d*)/i', $_SERVER['HTTP_RANGE'], $m)) {
-                $start = (int) $m[1];
-                $end   = ($m[2] !== '' ? (int) $m[2] : ($size - 1));
-                if ($start <= $end && $end < $size) {
-                    $range = [$start, $end];
+        if (
+            isset($_SERVER['HTTP_RANGE']) &&
+            preg_match('/bytes=(\d+)-(\d*)/i', $_SERVER['HTTP_RANGE'], $m)
+        ) {
+
+            $start = (int) $m[1];
+            $end   = ($m[2] !== '' ? (int) $m[2] : ($size - 1));
+
+            if ($start <= $end && $end < $size) {
+                status_header(206);
+                header("Content-Range: bytes $start-$end/$size");
+                header("Content-Length: " . ($end - $start + 1));
+
+                $fp = fopen($path, 'rb');
+                fseek($fp, $start);
+                $remaining = $end - $start + 1;
+                while ($remaining > 0 && !feof($fp)) {
+                    $data = fread($fp, min(8192, $remaining));
+                    echo $data;
+                    $remaining -= strlen($data);
+                    flush();
                 }
+                fclose($fp);
+                exit;
             }
         }
 
-        // 6) 配信本体：Range あり / なし
-        if ($range) {
-            list($start, $end) = $range;
-            $length = $end - $start + 1;
-
-            status_header(206); // Partial Content
-            header("Content-Range: bytes {$start}-{$end}/{$size}");
-            header('Content-Length: ' . $length);
-
-            $fp = fopen($path, 'rb');
-            if ($fp === false) {
-                status_header(500);
-                wp_die('Read error', '', ['response' => 500]);
-            }
-            fseek($fp, $start);
-            $buf = 8192;
-            while (!feof($fp) && $length > 0) {
-                $read = ($length > $buf) ? $buf : $length;
-                $out  = fread($fp, $read);
-                if ($out === false) break;
-                echo $out;
-                $length -= strlen($out);
-                if (function_exists('fastcgi_finish_request') === false) {
-                    @ob_flush();
-                    flush();
-                }
-            }
-            fclose($fp);
-            exit;
-        } else {
-            header('Content-Length: ' . $size);
-            $fp = fopen($path, 'rb');
-            if ($fp === false) {
-                status_header(500);
-                wp_die('Read error', '', ['response' => 500]);
-            }
-            while (!feof($fp)) {
-                $out = fread($fp, 8192);
-                if ($out === false) break;
-                echo $out;
-                if (function_exists('fastcgi_finish_request') === false) {
-                    @ob_flush();
-                    flush();
-                }
-            }
-            fclose($fp);
-            exit;
-        }
+        header('Content-Length: ' . $size);
+        readfile($path);
+        exit;
     }
 }
 

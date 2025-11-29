@@ -929,19 +929,6 @@ $stamp_files = [
                 stamp: data.stamp
             };
 
-            // ★★★ ここに安全URLヘルパーを定義 ★★★
-            const tmpGetUrl = (filename) => {
-                if (!filename) return '';
-
-                const params = new URLSearchParams({
-                    action: 'bbs_tmp_get',
-                    draft: String(lastDraftId),
-                    name: filename,
-                    _nonce: "<?php echo wp_create_nonce('bbs_tmp_get'); ?>"
-                });
-                return "<?php echo esc_url(admin_url('admin-ajax.php')); ?>?" + params.toString();
-            };
-
             // === ここから「確認画面」描画 ===
             change2();
             confirm_area.classList.remove('hideItems');
