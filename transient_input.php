@@ -466,17 +466,23 @@ $stamp_files = [
         let filesCount = 0;
         let clientFileOk = true;
         const MAX_FILES = 4;
-        const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
+        // const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
 
         inputs.forEach(f => {
             if (f.files?.length) {
                 filesCount += f.files.length;
-                for (const file of f.files)
-                    if (file.size > MAX_PER) clientFileOk = false;
+                // ★ サイズチェックは JS ではやらない（PHP で厳格チェックするので）
+                // for (const file of f.files) {
+                //     if (file.size > MAX_PER) clientFileOk = false;
+                // }
             }
         });
-        if (filesCount > MAX_FILES) clientFileOk = false;
+        // 枚数だけ軽くチェック
+        if (filesCount > MAX_FILES) {
+            clientFileOk = false;
+        }
 
+        // enabled 判定は今までどおり
         const enabled = (titleOk && textOk && stampOk && clientFileOk);
         btn.disabled = !enabled;
 

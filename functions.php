@@ -1224,21 +1224,19 @@ if (!function_exists('bbs_quest_submit')) {
                     $per_limit = BBS_MAX_PER_FILE_PDF;   // 例: 5MB など
                 }
 
-                /* 8) サイズ（個別/合計）— ここで per-type の上限を適用 */
+                // 8) サイズ（個別/合計）— ここで per-type の上限を適用
                 if ($size <= 0 || $size > $per_limit) {
                     $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
                     continue;
                 }
-                // 合計サイズと「種類別の合計上限」を更新
-                // $total        += $size;
-                // $dyn_total_cap += $per_limit;
 
-                // 固定総上限と種類別合計上限の小さい方でチェック
-                /* $effective_total_cap = min($hard_total, $dyn_total_cap);
-                if ($total > $effective_total_cap) {
-                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($effective_total_cap / 1024 / 1024) . 'MB）。';
-                    break;
-                } */
+                // ★ 合計サイズ（ざっくりハード上限だけチェック）
+                $total += $size;
+                if ($total > $hard_total) {
+                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($hard_total / 1024 / 1024) . 'MB）。';
+                    break; // これ以上見ても意味がないのでループ終了
+                }
+
 
                 /* 9) 画像は中身チェック（壊れ/偽装/巨大寸法） */
                 if (strpos($mime, 'image/') === 0) {

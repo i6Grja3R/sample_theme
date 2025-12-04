@@ -74,15 +74,40 @@ if (!function_exists('bbs_allowed_upload_map')) {                           // �
 /* ===========================================================
  * 3) 上限定数（必要に応じて調整）
  * =========================================================== */
-if (!defined('BBS_MAX_FILES'))     define('BBS_MAX_FILES', 4);             // 最大4ファイル
-if (!defined('BBS_MAX_PER_FILE'))  define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // 1枚5MB
-if (!defined('BBS_MAX_TOTAL'))     define('BBS_MAX_TOTAL',   20 * 1024 * 1024); // 合計20MB
-if (!defined('BBS_IMG_MAX_W'))     define('BBS_IMG_MAX_W',   6000);        // 画像最大幅
-if (!defined('BBS_IMG_MAX_H'))     define('BBS_IMG_MAX_H',   6000);        // 画像最大高
 
-// ★ 動画・PDF 用の個別上限（未定義ならデフォルト値を入れる）
-if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 10 * 1024 * 1024); // 動画も 5MB に揃える
-if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   5 * 1024 * 1024); // PDF も 5MB（お好みで）
+// 添付ファイル数の上限
+if (!defined('BBS_MAX_FILES')) {
+    define('BBS_MAX_FILES', 4); // 最大4ファイル
+}
+
+// 種類別の1ファイル上限（バイト）
+if (!defined('BBS_MAX_PER_FILE_IMAGE')) {
+    define('BBS_MAX_PER_FILE_IMAGE', 5 * 1024 * 1024); // 画像 5MB
+}
+if (!defined('BBS_MAX_PER_FILE_VIDEO')) {
+    define('BBS_MAX_PER_FILE_VIDEO', 10 * 1024 * 1024); // 動画 10MB
+}
+if (!defined('BBS_MAX_PER_FILE_PDF')) {
+    define('BBS_MAX_PER_FILE_PDF', 5 * 1024 * 1024); // PDF 5MB（好みで 10MB でもOK）
+}
+
+// 総容量（全ファイル合計のハード上限）
+if (!defined('BBS_MAX_TOTAL')) {
+    define('BBS_MAX_TOTAL', 40 * 1024 * 1024); // 例: 40MB（動画4本×10MBを想定）
+}
+
+// 既存の BBS_MAX_PER_FILE が必要な場合（未知MIMEのフォールバック用）
+if (!defined('BBS_MAX_PER_FILE')) {
+    define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // 従来の一律上限（保険）
+}
+
+// 画像の寸法上限
+if (!defined('BBS_IMG_MAX_W')) {
+    define('BBS_IMG_MAX_W', 6000);
+}
+if (!defined('BBS_IMG_MAX_H')) {
+    define('BBS_IMG_MAX_H', 6000);
+}
 
 /* ===========================================================
  * 4) 保存先ディレクトリ（/uploads/bbs/YYYY/MM/）
@@ -251,35 +276,6 @@ if (!function_exists('bbs_first_image_html_or_fallback')) {
         return '<img class="archive-thumbnail" src="' . esc_url($fallback_url) . '" alt="No image" />';
     }
 }
-
-// すでにあれば再定義しない
-if (!function_exists('bbs_rate_guard')) {
-    /**
-     * IP + user_id でレート制限（$window 秒で最大 $limit 回）
-     * 超過時は wp_send_json_error() で即終了。
-     */
-    function bbs_rate_guard(string $user_id, int $limit = 20, int $window = 600): void
-    {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';          // 取得不可時はダミー
-        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);      // 一意キー
-        $cnt = (int) get_transient($key);                    // 現在カウント
-        if ($cnt >= $limit) {                                // 閾値を超えたら拒否
-            wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
-        }
-        set_transient($key, $cnt + 1, $window);              // 10分維持
-    }
-}
-
-// 種類別の1ファイル上限（バイト）
-if (!defined('BBS_MAX_PER_FILE_IMAGE')) define('BBS_MAX_PER_FILE_IMAGE', 5  * 1024 * 1024); // 画像 5MB
-if (!defined('BBS_MAX_PER_FILE_VIDEO')) define('BBS_MAX_PER_FILE_VIDEO', 20 * 1024 * 1024); // 動画 20MB
-if (!defined('BBS_MAX_PER_FILE_PDF'))   define('BBS_MAX_PER_FILE_PDF',   10 * 1024 * 1024); // PDF 10MB
-
-// 合計サイズ（動画を許すならやや大きめ推奨）
-if (!defined('BBS_MAX_TOTAL')) define('BBS_MAX_TOTAL', 50 * 1024 * 1024); // 例: 50MB
-
-// 既存の BBS_MAX_PER_FILE があれば “未知MIMEのフォールバック” に使う
-if (!defined('BBS_MAX_PER_FILE')) define('BBS_MAX_PER_FILE', 5 * 1024 * 1024); // 従来の一律上限（保険）
 
 // --- ① 一時ディレクトリを“非公開”で初期化 ---
 // ===== 1) 一時ディレクトリの“非公開”初期化 =====
