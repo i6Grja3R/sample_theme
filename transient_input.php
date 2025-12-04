@@ -462,23 +462,51 @@ $stamp_files = [
         const textOk = (textMin ? textLen >= textMin : true) && (textMax ? textLen <= textMax : true);
 
         // 添付ざっくりチェック（最終判定はサーバ）
+        // ※ PHP の定数と合わせる：BBS_MAX_FILES=4, 画像5MB, 動画10MB, PDF5MB, 合計40MB
         const inputs = document.querySelectorAll('input.attach[type="file"]');
+
         let filesCount = 0;
         let clientFileOk = true;
-        const MAX_FILES = 4;
+        let clientTotalSize = 0;
+
+        // サーバの定数に合わせる
+        const MAX_FILES = 4; // BBS_MAX_FILES
+        const MAX_TOTAL = 40 * 1024 * 1024; // BBS_MAX_TOTAL
+        const MAX_PER_IMAGE = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_IMAGE
+        const MAX_PER_VIDEO = 10 * 1024 * 1024; // BBS_MAX_PER_FILE_VIDEO
+        const MAX_PER_PDF = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_PDF
         // const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
 
-        inputs.forEach(f => {
-            if (f.files?.length) {
-                filesCount += f.files.length;
-                // ★ サイズチェックは JS ではやらない（PHP で厳格チェックするので）
-                // for (const file of f.files) {
-                //     if (file.size > MAX_PER) clientFileOk = false;
-                // }
+        inputs.forEach(input => {
+            if (!input.files || !input.files.length) return;
+
+            for (const file of input.files) {
+                filesCount++;
+
+                const type = file.type || '';
+                const name = file.name || '';
+                const ext = (name.split('.').pop() || '').toLowerCase();
+
+                // 種類ごとの1ファイル上限（拡張子も見てざっくり判定）
+                let maxPer = MAX_PER_IMAGE; // デフォルトは画像扱い
+                if (type.startsWith('video/') || ext === 'mp4') {
+                    maxPer = MAX_PER_VIDEO;
+                } else if (type === 'application/pdf' || ext === 'pdf') {
+                    maxPer = MAX_PER_PDF;
+                }
+
+                // 1ファイルが 0バイト or 上限超えならNG
+                if (file.size <= 0 || file.size > maxPer) {
+                    clientFileOk = false;
+                }
+
+                // 合計サイズも足しておく（ざっくり）
+                clientTotalSize += file.size;
             }
         });
-        // 枚数だけ軽くチェック
-        if (filesCount > MAX_FILES) {
+
+        // 合計サイズのざっくりチェック（40MB超ならNG）
+        if (clientTotalSize > MAX_TOTAL) {
             clientFileOk = false;
         }
 
@@ -529,8 +557,9 @@ $stamp_files = [
         const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4', 'pdf'];
 
         // スロット別の最大サイズ(MB)
-        const MAX_MB_USERICON = 5;
-        const MAX_MB_DEFAULT = 15;
+        const MAX_MB_USERICON = 5; // アイコン
+        const MAX_MB_IMAGE_PDF = 5; // 画像・PDF
+        const MAX_MB_VIDEO = 10; // 動画
 
         // 各スロットに紐づく一時URLを覚えておいて clear 時に解放する
         const urlBucket = new Map(); // key: input[type=file] element, value: Array<objectURL>
@@ -658,11 +687,11 @@ $stamp_files = [
             // ★ 種類別に「上限MB」を切り替える
             let maxMB;
             if (isIcon) {
-                maxMB = MAX_MB_USERICON; // 例: 5MB（アイコン）
+                maxMB = MAX_MB_USERICON; // アイコン 5MB
             } else if (isVideo) {
-                maxMB = 10; // ★ 動画だけ 10MB
+                maxMB = MAX_MB_VIDEO; // 動画 10MB
             } else {
-                maxMB = MAX_MB_DEFAULT; // 画像・PDFは 5MB のままなら 5
+                maxMB = MAX_MB_IMAGE_PDF; // 画像・PDF 5MB
             }
 
             const maxBytes = maxMB * 1024 * 1024;
