@@ -1122,9 +1122,9 @@ if (!function_exists('bbs_quest_submit')) {
         // $img_w_max     = BBS_IMG_MAX_W;                                          // 画像最大幅
         // $img_h_max     = BBS_IMG_MAX_H;                                          // 画像最大高
 
-        $hard_total     = BBS_MAX_TOTAL; // 既存の固定総上限（保険の天井）
-        $dyn_total_cap  = 0;             // ← 種類別上限の合計（動的に積み上げる）
-        $total          = 0;             // 受け取った実サイズ合計
+        // --- サイズ系の上限（総容量はざっくりハード上限だけにする） ---
+        $hard_total = BBS_MAX_TOTAL;  // 例: 40MB （定数側で 40 * 1024 * 1024 にしておく）
+        $total      = 0;              // 受け取った実サイズ合計
 
         $tmp_dir = bbs_tmp_dir(); // …/uploads/tmp/                              // 最終保存先（存在しなければ作成）
         $base_tmp = realpath($tmp_dir);
@@ -1230,15 +1230,15 @@ if (!function_exists('bbs_quest_submit')) {
                     continue;
                 }
                 // 合計サイズと「種類別の合計上限」を更新
-                $total        += $size;
-                $dyn_total_cap += $per_limit;
+                // $total        += $size;
+                // $dyn_total_cap += $per_limit;
 
                 // 固定総上限と種類別合計上限の小さい方でチェック
-                $effective_total_cap = min($hard_total, $dyn_total_cap);
+                /* $effective_total_cap = min($hard_total, $dyn_total_cap);
                 if ($total > $effective_total_cap) {
                     $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($effective_total_cap / 1024 / 1024) . 'MB）。';
                     break;
-                }
+                } */
 
                 /* 9) 画像は中身チェック（壊れ/偽装/巨大寸法） */
                 if (strpos($mime, 'image/') === 0) {

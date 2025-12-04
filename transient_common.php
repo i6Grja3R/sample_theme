@@ -287,6 +287,9 @@ if (!defined('BBS_TMP_SUBDIR')) {
     define('BBS_TMP_SUBDIR', 'tmp'); // /uploads/tmp
 }
 
+// ========================
+// ① 一時ディレクトリ周り
+// ========================
 if (!function_exists('bbs_tmp_dir')) {
     function bbs_tmp_dir(): string
     {
@@ -334,27 +337,25 @@ HT;
         }
     }
 }
-
 // WordPress 起動ごとに存在を担保（軽い処理）
 add_action('init', 'bbs_tmp_bootstrap');
 
-// ===============================
-// ② 一時ファイルの安全配信エンドポイント（直リンク禁止）
-//    /wp-admin/admin-ajax.php?action=bbs_tmp_get&draft_id=...&file=...&nonce=...
-// ===============================
-add_action('wp_ajax_bbs_tmp_get', 'bbs_tmp_get');          // ログイン時
-add_action('wp_ajax_nopriv_bbs_tmp_get', 'bbs_tmp_get');   // 未ログイン時も許可するなら
 
-// ====== 一時ファイルの自動掃除（Cron登録） ======
+// ========================
+// ② 一時ファイルの自動掃除
+// ========================
 
 // 1日1回のイベントを登録（重複登録を防ぐ）
-function bbs_register_cleanup_cron()
-{
-    if (!wp_next_scheduled('bbs_tmp_cleanup_event')) {
-        wp_schedule_event(time(), 'daily', 'bbs_tmp_cleanup_event');
+if (!function_exists('bbs_register_cleanup_cron')) {
+    function bbs_register_cleanup_cron()
+    {
+        if (!wp_next_scheduled('bbs_tmp_cleanup_event')) {
+            wp_schedule_event(time(), 'daily', 'bbs_tmp_cleanup_event');
+        }
     }
 }
-add_action('wp', 'bbs_register_cleanup_cron');
+// cron は 'wp' より 'init' の方が確実なのでこちらに
+add_action('init', 'bbs_register_cleanup_cron');
 
 // 24時間以上前の一時ファイルを削除（安全版）
 if (!function_exists('bbs_run_tmp_cleanup')) {
@@ -393,13 +394,13 @@ if (!function_exists('bbs_run_tmp_cleanup')) {
         }
     }
 }
-
-// Cron イベントに紐づけ
 add_action('bbs_tmp_cleanup_event', 'bbs_run_tmp_cleanup');
 
-// --------------------------------------------------
-// 一時ファイル安全配信エンドポイント（admin-ajax.php 経由）
-// --------------------------------------------------
+
+// ===============================
+// ③ 一時ファイルの安全配信エンドポイント
+//    /wp-admin/admin-ajax.php?action=bbs_tmp_get&draft_id=...&file=...&nonce=...
+// ===============================
 if (!function_exists('bbs_tmp_get')) {
     function bbs_tmp_get()
     {
@@ -413,7 +414,7 @@ if (!function_exists('bbs_tmp_get')) {
             wp_die('Bad Request', '', ['response' => 400]);
         }
 
-        // nonce チェック
+        // nonce チェック（JS の bbs_confirm_vars.nonce と同じ action）
         if (!wp_verify_nonce($nonce, 'bbs_quest_confirm')) {
             status_header(403);
             wp_die('Invalid nonce', '', ['response' => 403]);
@@ -450,20 +451,21 @@ if (!function_exists('bbs_tmp_get')) {
             wp_die('Not found', '', ['response' => 404]);
         }
 
-        // 4) MIME 判定
+        // 4) MIME 判定（finfo → wp_check_filetype）
         $mime = '';
         if (function_exists('finfo_open')) {
             $f = finfo_open(FILEINFO_MIME_TYPE);
             if ($f) {
-                $mime = finfo_file($f, $path);
+                $mime = (string) finfo_file($f, $path);
                 finfo_close($f);
             }
         }
         if ($mime === '') {
-            $ft = wp_check_filetype($path);
+            $ft   = wp_check_filetype($path);
             $mime = $ft['type'] ?: 'application/octet-stream';
         }
 
+        // 許可 MIME
         $allowed = ['image/jpeg', 'image/png', 'video/mp4', 'application/pdf'];
         if (!in_array($mime, $allowed, true)) {
             status_header(403);
@@ -483,7 +485,6 @@ if (!function_exists('bbs_tmp_get')) {
             isset($_SERVER['HTTP_RANGE']) &&
             preg_match('/bytes=(\d+)-(\d*)/i', $_SERVER['HTTP_RANGE'], $m)
         ) {
-
             $start = (int) $m[1];
             $end   = ($m[2] !== '' ? (int) $m[2] : ($size - 1));
 
@@ -493,10 +494,15 @@ if (!function_exists('bbs_tmp_get')) {
                 header("Content-Length: " . ($end - $start + 1));
 
                 $fp = fopen($path, 'rb');
+                if ($fp === false) {
+                    status_header(500);
+                    wp_die('Read error', '', ['response' => 500]);
+                }
                 fseek($fp, $start);
                 $remaining = $end - $start + 1;
                 while ($remaining > 0 && !feof($fp)) {
                     $data = fread($fp, min(8192, $remaining));
+                    if ($data === false) break;
                     echo $data;
                     $remaining -= strlen($data);
                     flush();
@@ -512,5 +518,6 @@ if (!function_exists('bbs_tmp_get')) {
     }
 }
 
+// Ajax フック（※二重で書かないようにここだけ）
 add_action('wp_ajax_bbs_tmp_get',        'bbs_tmp_get');
 add_action('wp_ajax_nopriv_bbs_tmp_get', 'bbs_tmp_get');
