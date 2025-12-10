@@ -667,9 +667,6 @@ $stamp_files = [
             urlBucket.set(attachInputs[slotIndex], arr);
         };
 
-        // 例：4番目のスロットがアイコン
-        const usericonIndex = 3;
-
         // スロットごとに処理を束ねる
         const setFileToSlot = (slotIndex, file) => {
             const inp = attachInputs[slotIndex];
@@ -697,6 +694,16 @@ $stamp_files = [
             }
             const maxBytes = maxMB * 1024 * 1024;
 
+            // デバッグしたいとき用（必要なければ消してOK）	// ★ ファイルサイズチェック
+            console.log('[setFileToSlot] slot', slotIndex, {
+                name: file.name,
+                type: file.type,
+                ext,
+                isVideo,
+                maxMB,
+                sizeMB: (file.size / 1024 / 1024).toFixed(2),
+            });
+
             // ★ ファイルサイズチェック
             if (file.size > maxBytes) {
                 alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
@@ -710,103 +717,102 @@ $stamp_files = [
                 } else {
                     alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
                 }
-            }
-            return;
-        }
-
-        // カメラエリアを隠し、プレビューを描画
-        fileArea.classList.add('hideItems');
-        renderPreview(slotIndex, file);
-
-        // 送信可否の再評価（あれば）
-        if (typeof validation === 'function') validation();
-    };
-
-    // input[type=file] の change
-    attachInputs.forEach((inp, idx) => {
-        // 初期化
-        urlBucket.set(inp, []);
-
-        inp.addEventListener('change', () => {
-            // 旧URLを解放
-            revokeAllFor(inp);
-
-            const file = inp.files && inp.files[0];
-            const fileArea = fileAreas[idx];
-            const viewer = viewers[idx];
-            if (!file) {
-                // 何も選んでいない ⇒ カメラエリアを戻す
-                if (viewer) {
-                    viewer.innerHTML = '';
-                    viewer.style.display = 'none';
-                }
-                if (fileArea) fileArea.classList.remove('hideItems');
-                if (typeof validation === 'function') validation();
                 return;
             }
-            setFileToSlot(idx, file);
-        });
-    });
 
-    // clear ボタン
-    clearBtns.forEach((btn, idx) => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
+            // カメラエリアを隠し、プレビューを描画
+            // fileArea.classList.add('hideItems');
+            // renderPreview(slotIndex, file);
 
-            const inp = attachInputs[idx];
-            const fileArea = fileAreas[idx];
-            const viewer = viewers[idx];
-            if (!inp || !viewer || !fileArea) return;
-
-            // input クリア
-            inp.value = '';
-
-            // プレビューを消す＆objectURL解放
-            viewer.innerHTML = '';
-            viewer.style.display = 'none';
-            revokeAllFor(inp);
-
-            // カメラエリアを復活
-            fileArea.classList.remove('hideItems');
-
+            // 送信可否の再評価（あれば）
             if (typeof validation === 'function') validation();
+        };
+
+        // input[type=file] の change
+        attachInputs.forEach((inp, idx) => {
+            // 初期化
+            urlBucket.set(inp, []);
+
+            inp.addEventListener('change', () => {
+                // 旧URLを解放
+                revokeAllFor(inp);
+
+                const file = inp.files && inp.files[0];
+                const fileArea = fileAreas[idx];
+                const viewer = viewers[idx];
+                if (!file) {
+                    // 何も選んでいない ⇒ カメラエリアを戻す
+                    if (viewer) {
+                        viewer.innerHTML = '';
+                        viewer.style.display = 'none';
+                    }
+                    if (fileArea) fileArea.classList.remove('hideItems');
+                    if (typeof validation === 'function') validation();
+                    return;
+                }
+                setFileToSlot(idx, file);
+            });
         });
-    });
 
-    // D&D (ファイルエリアへのドラッグ＆ドロップ)
-    fileAreas.forEach((fa, idx) => {
-        if (!fa) return;
+        // clear ボタン
+        clearBtns.forEach((btn, idx) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
 
-        // ドラッグ見た目
-        fa.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fa.classList.add('dragover');
+                const inp = attachInputs[idx];
+                const fileArea = fileAreas[idx];
+                const viewer = viewers[idx];
+                if (!inp || !viewer || !fileArea) return;
+
+                // input クリア
+                inp.value = '';
+
+                // プレビューを消す＆objectURL解放
+                viewer.innerHTML = '';
+                viewer.style.display = 'none';
+                revokeAllFor(inp);
+
+                // カメラエリアを復活
+                fileArea.classList.remove('hideItems');
+
+                if (typeof validation === 'function') validation();
+            });
         });
-        fa.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            fa.classList.remove('dragover');
+
+        // D&D (ファイルエリアへのドラッグ＆ドロップ)
+        fileAreas.forEach((fa, idx) => {
+            if (!fa) return;
+
+            // ドラッグ見た目
+            fa.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fa.classList.add('dragover');
+            });
+            fa.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+            });
+
+            fa.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+
+                const files = e.dataTransfer && e.dataTransfer.files;
+                if (!files || !files.length) return;
+
+                const file = files[0];
+
+                // input.files にも反映（送信のため）
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                const inp = attachInputs[idx];
+                if (inp) inp.files = dt.files;
+
+                // 旧URLを解放の上プレビュー
+                if (inp) revokeAllFor(inp);
+                setFileToSlot(idx, file);
+            });
         });
-
-        fa.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fa.classList.remove('dragover');
-
-            const files = e.dataTransfer && e.dataTransfer.files;
-            if (!files || !files.length) return;
-
-            const file = files[0];
-
-            // input.files にも反映（送信のため）
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            const inp = attachInputs[idx];
-            if (inp) inp.files = dt.files;
-
-            // 旧URLを解放の上プレビュー
-            if (inp) revokeAllFor(inp);
-            setFileToSlot(idx, file);
-        });
-    });
     }
 
     /* ------------------------------
