@@ -971,11 +971,6 @@ $stamp_files = [
             input_area.style.display = 'none';
             confirm_area.innerHTML = ''; // 一旦クリア
 
-            // 見出し
-            const h3 = document.createElement('h3');
-            h3.textContent = 'この内容で投稿しますか？';
-            confirm_area.appendChild(h3);
-
             // ===== スロットの実際の選択状況から「メディア」と「ユーザーアイコン」を切り分ける =====
 
             // 1) まず safeFiles を作る（空/null/文字列"null"を排除）
@@ -1012,63 +1007,53 @@ $stamp_files = [
             // --- ここから先は “並び描画” のロジックは今までのままでOK ---
             // （2件のときは 1段目：media[0] + 質問文、2段目：media[1] + 空白、というあなたの既存処理で固定表示になります）
 
-            // メディア要素を作るヘルパー
+            // メディア要素を作るヘルパー（確認画面用）
             const makeMediaEl = (fname) => {
                 const ext = getExt(fname);
-                // const url = TMP_BASE_URL + encodeURIComponent(fname);
                 const url = tmpGetUrl(fname);
-                let el;
+
+                // 外側のラッパ
+                const wrap = document.createElement('div');
+                wrap.className = 'confirm-media-wrap'; // ←CSSでサイズ指定
+
+                let el = null;
+
                 if (['jpg', 'jpeg', 'png'].includes(ext)) {
                     el = document.createElement('img');
-                    el.src = url;
                     el.alt = fname;
-                    el.style.width = '100%';
-                    el.style.height = '220px';
-                    el.style.objectFit = 'cover';
                 } else if (ext === 'mp4') {
                     el = document.createElement('video');
-                    el.src = url;
                     el.controls = true;
-                    el.style.width = '100%';
-                    el.style.height = '220px';
+                    el.preload = 'metadata';
                 } else if (ext === 'pdf') {
                     el = document.createElement('iframe');
-                    el.src = url;
-                    el.width = '100%';
-                    el.height = '220';
+                    el.title = 'PDF preview';
                 } else {
-                    // 想定外はスキップ
                     return null;
                 }
-                const card = document.createElement('div');
-                card.style.border = '1px solid #ddd';
-                card.style.borderRadius = '8px';
-                card.style.padding = '6px';
-                card.appendChild(el);
-                return card;
+
+                el.src = url;
+                el.className = 'confirm-media-content'; // ←CSSで 530×350 を指定
+                wrap.appendChild(el);
+
+                return wrap;
             };
 
             // ===== 1. 先頭エリア：添付 + 質問文 =====
             // 2カラムのグリッドを作成
             const firstGrid = document.createElement('div');
-            firstGrid.style.display = 'grid';
-            firstGrid.style.gridTemplateColumns = '1fr 1fr';
-            firstGrid.style.gap = '12px';
+            // ↓ この1行を追加
+            firstGrid.classList.add('confirm-first-grid');
 
             // 質問文ボックス
             const makeTextBox = () => {
                 const box = document.createElement('div');
-                box.style.border = '1px solid #ddd';
-                box.style.borderRadius = '8px';
-                box.style.padding = '10px';
-                const ttl = document.createElement('div');
-                ttl.textContent = '質問文';
-                ttl.style.fontWeight = 'bold';
-                ttl.style.marginBottom = '6px';
+                box.className = 'confirm-text-box'; // ★これを追加
+
                 const body = document.createElement('div');
                 body.style.whiteSpace = 'pre-wrap';
                 body.textContent = data.text ?? '';
-                box.appendChild(ttl);
+                // box.appendChild(ttl);
                 box.appendChild(body);
                 return box;
             };
@@ -1115,12 +1100,13 @@ $stamp_files = [
             titleRow.style.marginTop = '14px';
 
             const titleBox = document.createElement('div');
-            const tHdr = document.createElement('div');
-            tHdr.textContent = '質問タイトル';
-            tHdr.style.fontWeight = 'bold';
+            // ラベル「質問タイトル」は出さない
+            // const tHdr = document.createElement('div');
+            // tHdr.textContent = '質問タイトル';
+            // tHdr.style.fontWeight = 'bold';
             const tBody = document.createElement('div');
             tBody.textContent = data.title ?? '';
-            titleBox.appendChild(tHdr);
+            // titleBox.appendChild(tHdr);
             titleBox.appendChild(tBody);
             titleRow.appendChild(titleBox);
 
@@ -1169,12 +1155,13 @@ $stamp_files = [
 
             // 名前
             const nameBox = document.createElement('div');
-            const nHdr = document.createElement('div');
-            nHdr.textContent = '名前';
-            nHdr.style.fontWeight = 'bold';
+            // ラベル「名前」は出さない
+            // const nHdr = document.createElement('div');
+            // nHdr.textContent = '名前';
+            // nHdr.style.fontWeight = 'bold';
             const nBody = document.createElement('div');
             nBody.textContent = data.name || '匿名';
-            nameBox.appendChild(nHdr);
+            // nameBox.appendChild(nHdr);
             nameBox.appendChild(nBody);
             userRow.appendChild(nameBox);
 
