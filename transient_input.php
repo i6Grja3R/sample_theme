@@ -721,8 +721,8 @@ $stamp_files = [
             }
 
             // カメラエリアを隠し、プレビューを描画
-            // fileArea.classList.add('hideItems');
-            // renderPreview(slotIndex, file);
+            fileArea.classList.add('hideItems');
+            renderPreview(slotIndex, file);
 
             // 送信可否の再評価（あれば）
             if (typeof validation === 'function') validation();
