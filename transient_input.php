@@ -707,6 +707,15 @@ $stamp_files = [
             // ★ ファイルサイズチェック
             if (file.size > maxBytes) {
                 alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
+
+                // 👇 ここを追加：NGのときは input をリセット
+                inp.value = '';
+                // プレビューも念のため消す（保険）
+                viewer.innerHTML = '';
+                viewer.style.display = 'none';
+                fileArea.classList.remove('hideItems');
+
+                if (typeof validation === 'function') validation();
                 return;
             }
 
@@ -717,6 +726,14 @@ $stamp_files = [
                 } else {
                     alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
                 }
+
+                // 👇 ここも同様にクリア
+                inp.value = '';
+                viewer.innerHTML = '';
+                viewer.style.display = 'none';
+                fileArea.classList.remove('hideItems');
+
+                if (typeof validation === 'function') validation();
                 return;
             }
 
