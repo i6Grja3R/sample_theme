@@ -1244,7 +1244,7 @@ $stamp_files = [
 
                 if (json.data?.id) {
                     const idp = document.createElement('p');
-                    idp.textContent = `受付番号: ${json.data.id}`;
+                    idp.textContent = '受付番号: ${json.data.id}';
                     confirm_area.appendChild(idp);
                 }
             }
@@ -1317,7 +1317,7 @@ $stamp_files = [
         ['text', 'title', 'name'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                console.log(`[BBS] init display_text_length for ${id}`);
+                console.log('[BBS] init display_text_length for ${id}');
                 display_text_length({
                     target: el
                 });
