@@ -1115,12 +1115,14 @@ $stamp_files = [
             titleRow.style.marginTop = '14px';
 
             const titleBox = document.createElement('div');
+            titleBox.classList.add('confirm-title-box'); // ★ 追加
             // ラベル「質問タイトル」は出さない
             // const tHdr = document.createElement('div');
             // tHdr.textContent = '質問タイトル';
             // tHdr.style.fontWeight = 'bold';
             const tBody = document.createElement('div');
             tBody.textContent = data.title ?? '';
+            tBody.classList.add('confirm-title-text'); // ★ 追加
             // titleBox.appendChild(tHdr);
             titleBox.appendChild(tBody);
             titleRow.appendChild(titleBox);
