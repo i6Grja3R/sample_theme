@@ -862,7 +862,7 @@ $stamp_files = [
         go.type = 'button';
         go.id = 'confirm_button';
         go.className = 'answer-following';
-        go.textContent = 'この内容で投稿を確定する';
+        go.textContent = '結果画面へ進む';
         go.addEventListener('click', confirm_button_click, {
             once: true
         });
@@ -1108,6 +1108,7 @@ $stamp_files = [
 
             // ===== 2. タイトル + スタンプ =====
             const titleRow = document.createElement('div');
+            titleRow.classList.add('confirm-title-row'); // ← ★追加
             titleRow.style.display = 'grid';
             titleRow.style.gridTemplateColumns = '1fr auto';
             titleRow.style.alignItems = 'center';
@@ -1136,8 +1137,8 @@ $stamp_files = [
                     String(data.stamp) +
                     ".png"; // 例: .../images/stamp/8.png
                 stampImg.alt = 'stamp ' + data.stamp;
-                stampImg.style.width = '48px';
-                stampImg.style.height = '48px';
+                stampImg.style.width = '80px';
+                stampImg.style.height = '80px';
                 titleRow.appendChild(stampImg);
             }
 
@@ -1145,17 +1146,20 @@ $stamp_files = [
 
             // ===== 3. 画像アイコン + 名前 =====
             const userRow = document.createElement('div');
-            userRow.style.display = 'grid';
-            userRow.style.gridTemplateColumns = 'auto 1fr';
-            userRow.style.alignItems = 'center';
-            userRow.style.gap = '12px';
-            userRow.style.marginTop = '14px';
+            userRow.classList.add('confirm-user-row'); // ★親にクラスだけ付ける
+            // userRow.style.display = 'grid';
+            // userRow.style.gridTemplateColumns = 'auto 1fr';
+            // userRow.style.alignItems = 'center';
+            // userRow.style.gap = '12px';
+            // userRow.style.marginTop = '14px';
 
             // アイコン
             const iconWrap = document.createElement('div');
+            iconWrap.classList.add('confirm-usericon-wrap'); // ★ここで div にクラス
             const iconImg = document.createElement('img');
-            iconImg.style.width = '90px';
-            iconImg.style.height = '90px';
+            iconImg.classList.add('confirm-usericon-img'); // ★imgにもクラス
+            // iconImg.style.width = '90px';
+            // iconImg.style.height = '90px';
             iconImg.style.objectFit = 'cover';
             <?php if (isset($noimage_url)) : ?>
                 iconImg.src = <?php echo json_encode(esc_url($noimage_url)); ?>;
@@ -1172,11 +1176,13 @@ $stamp_files = [
 
             // 名前
             const nameBox = document.createElement('div');
+            nameBox.classList.add('confirm-name-box'); // ← 外側（必要なら）
             // ラベル「名前」は出さない
             // const nHdr = document.createElement('div');
             // nHdr.textContent = '名前';
             // nHdr.style.fontWeight = 'bold';
             const nBody = document.createElement('div');
+            nBody.classList.add('confirm-name-text'); // ← ★これが「<div>名前テスト</div>」に付くクラス
             nBody.textContent = data.name || '匿名';
             // nameBox.appendChild(nHdr);
             nameBox.appendChild(nBody);
