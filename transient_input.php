@@ -1054,11 +1054,107 @@ $stamp_files = [
                 return wrap;
             };
 
+            // --- confirm用カルーセルDOM生成 ---
+            function buildConfirmCarousel(fileNames) {
+                // fileNames: ['xxx.jpg','yyy.mp4', ...]  ※tmpのファイル名想定
+                const total = Math.max(1, fileNames.length);
+
+                const area = document.createElement('div');
+                area.className = 'confirm-carousel-area';
+
+                const track = document.createElement('div');
+                track.className = 'confirm-carousel-track';
+                track.id = 'confirm_carousel_track';
+                track.style.setProperty('--w', (total * 100) + '%');
+
+                // スライド本体
+                if (fileNames.length === 0) {
+                    // 添付が無い時のプレースホルダー（黒背景＋1）
+                    const ph = document.createElement('div');
+                    ph.className = 'confirm-carousel-slide confirm-carousel-placeholder';
+                    ph.textContent = '1';
+                    track.appendChild(ph);
+                } else {
+                    fileNames.forEach((fname) => {
+                        const slide = document.createElement('div');
+                        slide.className = 'confirm-carousel-slide';
+
+                        const media = makeMediaEl(fname);
+                        if (media) slide.appendChild(media);
+
+                        track.appendChild(slide);
+                    });
+                }
+
+                // prev / next
+                const prev = document.createElement('button');
+                prev.type = 'button';
+                prev.id = 'confirm_prev';
+                prev.className = 'confirm-carousel-prev';
+                prev.setAttribute('aria-label', 'prev');
+
+                const next = document.createElement('button');
+                next.type = 'button';
+                next.id = 'confirm_next';
+                next.className = 'confirm-carousel-next';
+                next.setAttribute('aria-label', 'next');
+
+                // indicator
+                const indicator = document.createElement('ul');
+                indicator.id = 'confirm_indicator';
+                indicator.className = 'confirm-carousel-indicator';
+
+                for (let i = 0; i < total; i++) {
+                    const li = document.createElement('li');
+                    li.className = 'confirm-indicator-dot';
+                    indicator.appendChild(li);
+                }
+
+                area.appendChild(track);
+                area.appendChild(prev);
+                area.appendChild(next);
+                area.appendChild(indicator);
+
+                return area;
+            }
+
+            // --- confirm用カルーセル挙動（single-que_list.php のロジックを移植） ---
+            function initConfirmCarousel() {
+                const track = document.getElementById('confirm_carousel_track');
+                const prev = document.getElementById('confirm_prev');
+                const next = document.getElementById('confirm_next');
+                const indicator = document.getElementById('confirm_indicator');
+                if (!track || !prev || !next || !indicator) return;
+
+                const dots = indicator.querySelectorAll('.confirm-indicator-dot');
+                const totalSlides = Math.max(1, dots.length);
+                const slidePercent = 100 / totalSlides;
+                let current = 0;
+
+                function updateDots() {
+                    dots.forEach((d, i) => d.classList.toggle('is-active', i === current));
+                }
+
+                function goTo(idx) {
+                    current = (idx + totalSlides) % totalSlides;
+                    track.style.transform = `translateX(-${current * slidePercent}%)`;
+                    updateDots();
+                }
+
+                prev.addEventListener('click', () => goTo(current - 1));
+                next.addEventListener('click', () => goTo(current + 1));
+
+                dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+
+                // 初期
+                goTo(0);
+            }
+
             // ===== 1. 先頭エリア：添付 + 質問文 =====
             // 2カラムのグリッドを作成
-            const firstGrid = document.createElement('div');
+            // const firstGrid = document.createElement('div');
             // ↓ この1行を追加
-            firstGrid.classList.add('confirm-first-grid');
+            // firstGrid.classList.add('confirm-first-grid');
 
             // 質問文ボックス
             const makeTextBox = () => {
@@ -1073,38 +1169,16 @@ $stamp_files = [
                 return box;
             };
 
-            if (mediaFiles.length >= 3) {
-                // 1段目: 添付0, 添付1
-                const el0 = makeMediaEl(mediaFiles[0]);
-                if (el0) firstGrid.appendChild(el0);
-                const el1 = makeMediaEl(mediaFiles[1]);
-                if (el1) firstGrid.appendChild(el1);
-                // 2段目: 添付2, 質問文
-                const el2 = makeMediaEl(mediaFiles[2]);
-                if (el2) firstGrid.appendChild(el2);
-                firstGrid.appendChild(makeTextBox());
-            } else if (mediaFiles.length === 2) {
-                // 1段目: 添付0, 質問文
-                const el0 = makeMediaEl(mediaFiles[0]);
-                if (el0) firstGrid.appendChild(el0);
-                firstGrid.appendChild(makeTextBox());
-                // 2段目: 添付1, 空白（バランス用）
-                const el1 = makeMediaEl(mediaFiles[1]);
-                if (el1) firstGrid.appendChild(el1);
-                const spacer = document.createElement('div');
-                firstGrid.appendChild(spacer);
-            } else if (mediaFiles.length === 1) {
-                // 1段目: 添付0, 質問文
-                const el0 = makeMediaEl(mediaFiles[0]);
-                if (el0) firstGrid.appendChild(el0);
-                firstGrid.appendChild(makeTextBox());
-            } else {
-                // 添付なし: 質問文だけを2カラム幅で表示
-                const textOnly = makeTextBox();
-                textOnly.style.gridColumn = '1 / span 2';
-                firstGrid.appendChild(textOnly);
-            }
-            confirm_area.appendChild(firstGrid);
+            // ===== 1. 添付（カルーセル） =====
+            // mediaFiles は既に作ってある想定。もし未定義なら slotFiles から作る：
+            const mediaFiles = (Array.isArray(slotFiles) ? slotFiles : []).filter(Boolean);
+
+            const carouselEl = buildConfirmCarousel(mediaFiles);
+            confirm_area.appendChild(carouselEl);
+            initConfirmCarousel();
+
+            // ===== 2. 質問文（スライダーの下に表示） =====
+            confirm_area.appendChild(makeTextBox());
 
             // ===== 2. タイトル + スタンプ =====
             const titleRow = document.createElement('div');
