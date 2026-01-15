@@ -48,6 +48,130 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             transform: rotate(360deg);
         }
     }
+
+    /* ===== confirm carousel ===== */
+    .confirm-carousel-area {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .confirm-carousel-track {
+        display: flex;
+        width: var(--w, 100%);
+        transition: transform .25s ease;
+    }
+
+    .confirm-carousel-slide {
+        flex: 0 0 100%;
+        display: flex;
+        background: #000;
+        min-height: 360px;
+    }
+
+    /* ここで“左右余白”を作る */
+    .confirm-carousel-inner {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 90px;
+        box-sizing: border-box;
+    }
+
+    .confirm-carousel-placeholder {
+        color: #fff;
+        font-size: 64px;
+        font-weight: 700;
+    }
+
+    /* ② メディアをスライド内に収める（余白を考慮） */
+    .confirm-media-wrap {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .confirm-media-content {
+        width: 100%;
+        height: 100%;
+        max-height: 360px;
+        object-fit: contain;
+    }
+
+    /* prev / next */
+    .confirm-carousel-prev,
+    .confirm-carousel-next {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(255, 255, 255, .85);
+        cursor: pointer;
+    }
+
+    /* ③ ボタンを少し外側へ（余白に合わせて） */
+    /* 12→24など */
+    .confirm-carousel-prev {
+        left: 24px;
+    }
+
+    /* 12→24など */
+    .confirm-carousel-next {
+        right: 24px;
+    }
+
+    .confirm-carousel-prev::before,
+    .confirm-carousel-next::before {
+        content: '';
+        display: block;
+        width: 10px;
+        height: 10px;
+        border-top: 3px solid #111;
+        border-right: 3px solid #111;
+        margin: auto;
+    }
+
+    .confirm-carousel-prev::before {
+        transform: rotate(-135deg);
+    }
+
+    .confirm-carousel-next::before {
+        transform: rotate(45deg);
+    }
+
+    /* indicator */
+    .confirm-carousel-indicator {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 10px;
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+    }
+
+    .confirm-indicator-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .45);
+        cursor: pointer;
+    }
+
+    .confirm-indicator-dot.is-active {
+        background: rgba(255, 255, 255, .95);
+    }
 </style>
 <div class="board_form_partial" id="js_board_form_partial"><!-- 全体ラッパ -->
     <div class="questionHeader-partial"><!-- 画面上部の見出し -->
@@ -1016,7 +1140,7 @@ $stamp_files = [
             // ここで slotFiles[0..2] がメディア側、slotFiles[3] がアイコン側の「実際のファイル名（tmp名）」になる
 
             // 4) media と icon に分解（null を除外）
-            const mediaFiles = slotFiles.slice(0, 3).filter(Boolean);
+            const mediaFiles = (Array.isArray(slotFiles) ? slotFiles.slice(0, 3) : []).filter(Boolean);
             const userIconName = slotFiles[3] || null;
 
             // --- ここから先は “並び描画” のロジックは今までのままでOK ---
@@ -1079,9 +1203,13 @@ $stamp_files = [
                         const slide = document.createElement('div');
                         slide.className = 'confirm-carousel-slide';
 
-                        const media = makeMediaEl(fname);
-                        if (media) slide.appendChild(media);
+                        const inner = document.createElement('div');
+                        inner.className = 'confirm-carousel-inner';
 
+                        const media = makeMediaEl(fname);
+                        if (media) inner.appendChild(media);
+
+                        slide.appendChild(inner);
                         track.appendChild(slide);
                     });
                 }
@@ -1120,10 +1248,19 @@ $stamp_files = [
 
             // --- confirm用カルーセル挙動（single-que_list.php のロジックを移植） ---
             function initConfirmCarousel() {
+                console.log('initConfirmCarousel called'); // ←これ
                 const track = document.getElementById('confirm_carousel_track');
                 const prev = document.getElementById('confirm_prev');
                 const next = document.getElementById('confirm_next');
                 const indicator = document.getElementById('confirm_indicator');
+
+                console.log('carousel els:', {
+                    track,
+                    prev,
+                    next,
+                    indicator
+                }); // ←ここ
+
                 if (!track || !prev || !next || !indicator) return;
 
                 const dots = indicator.querySelectorAll('.confirm-indicator-dot');
@@ -1137,6 +1274,12 @@ $stamp_files = [
 
                 function goTo(idx) {
                     current = (idx + totalSlides) % totalSlides;
+                    console.log('goTo:', {
+                        idx,
+                        current,
+                        totalSlides,
+                        slidePercent
+                    }); // ←ここ
                     track.style.transform = `translateX(-${current * slidePercent}%)`;
                     updateDots();
                 }
@@ -1171,11 +1314,30 @@ $stamp_files = [
 
             // ===== 1. 添付（カルーセル） =====
             // mediaFiles は既に作ってある想定。もし未定義なら slotFiles から作る：
-            const mediaFiles = (Array.isArray(slotFiles) ? slotFiles : []).filter(Boolean);
+            try {
+                console.log('BEFORE build/append', {
+                    mediaFiles,
+                    confirm_area
+                });
 
-            const carouselEl = buildConfirmCarousel(mediaFiles);
-            confirm_area.appendChild(carouselEl);
-            initConfirmCarousel();
+                const carouselEl = buildConfirmCarousel(mediaFiles);
+
+                console.log('AFTER build, BEFORE append', {
+                    carouselEl
+                });
+
+                confirm_area.appendChild(carouselEl);
+
+                console.log('AFTER append, calling init');
+
+                initConfirmCarousel();
+
+                console.log('AFTER initConfirmCarousel() call');
+
+            } catch (e) {
+                console.error('CONFIRM RENDER ERROR', e);
+                throw e;
+            }
 
             // ===== 2. 質問文（スライダーの下に表示） =====
             confirm_area.appendChild(makeTextBox());
