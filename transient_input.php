@@ -1280,7 +1280,13 @@ $stamp_files = [
                         totalSlides,
                         slidePercent
                     }); // ←ここ
-                    track.style.transform = `translateX(-${current * slidePercent}%)`;
+                    let vSlidePercent = 0;
+                    if (totalSlides == 2) {
+                        vSlidePercent = current * 100 + 25;
+                    } else if (totalSlides == 3) {
+                        vSlidePercent = current * 100 + 33;
+                    }
+                    track.style.transform = `translateX(-${vSlidePercent}%)`;
                     updateDots();
                 }
 
