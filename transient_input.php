@@ -52,7 +52,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     /* ===== confirm carousel ===== */
     .confirm-carousel-area {
         position: relative;
-        width: 100%;
+        width: 70%;
         max-width: 100%;
         border-radius: 12px;
         overflow: hidden;
