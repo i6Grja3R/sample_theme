@@ -1269,86 +1269,21 @@ $stamp_files = [
                 const area = document.createElement('div');
                 area.className = 'confirm-carousel-area';
 
-                function buildConfirmCarousel(fileNames) {
-                    const total = Math.max(1, fileNames.length);
+                // ✅ 上帯 PREV / NEXT（実体ボタン：クリックできる）
+                const topPrev = document.createElement('button');
+                topPrev.type = 'button';
+                topPrev.className = 'confirm-topnav confirm-topnav-prev';
+                topPrev.setAttribute('aria-label', 'prev');
+                topPrev.textContent = 'PREV';
 
-                    const area = document.createElement('div');
-                    area.className = 'confirm-carousel-area';
+                const topNext = document.createElement('button');
+                topNext.type = 'button';
+                topNext.className = 'confirm-topnav confirm-topnav-next';
+                topNext.setAttribute('aria-label', 'next');
+                topNext.textContent = 'NEXT';
 
-                    // ✅ 上帯ボタン（実体）
-                    const topPrev = document.createElement('button');
-                    topPrev.type = 'button';
-                    topPrev.className = 'confirm-topnav confirm-topnav-prev';
-                    topPrev.setAttribute('aria-label', 'prev');
-                    topPrev.textContent = 'PREV';
-
-                    const topNext = document.createElement('button');
-                    topNext.type = 'button';
-                    topNext.className = 'confirm-topnav confirm-topnav-next';
-                    topNext.setAttribute('aria-label', 'next');
-                    topNext.textContent = 'NEXT';
-
-                    area.appendChild(topPrev);
-                    area.appendChild(topNext);
-
-                    const track = document.createElement('div');
-                    track.className = 'confirm-carousel-track';
-                    track.id = 'confirm_carousel_track';
-                    track.style.setProperty('--w', (total * 100) + '%');
-
-                    // スライド
-                    if (fileNames.length === 0) {
-                        const ph = document.createElement('div');
-                        ph.className = 'confirm-carousel-slide confirm-carousel-placeholder';
-                        ph.textContent = '1';
-                        track.appendChild(ph);
-                    } else {
-                        fileNames.forEach((fname) => {
-                            const slide = document.createElement('div');
-                            slide.className = 'confirm-carousel-slide';
-
-                            const inner = document.createElement('div');
-                            inner.className = 'confirm-carousel-inner';
-
-                            const media = makeMediaEl(fname);
-                            if (media) inner.appendChild(media);
-
-                            slide.appendChild(inner);
-                            track.appendChild(slide);
-                        });
-                    }
-
-                    // 左右グレーパネルボタン
-                    const prev = document.createElement('button');
-                    prev.type = 'button';
-                    prev.id = 'confirm_prev';
-                    prev.className = 'confirm-carousel-prev';
-                    prev.setAttribute('aria-label', 'prev');
-
-                    const next = document.createElement('button');
-                    next.type = 'button';
-                    next.id = 'confirm_next';
-                    next.className = 'confirm-carousel-next';
-                    next.setAttribute('aria-label', 'next');
-
-                    // indicator
-                    const indicator = document.createElement('ul');
-                    indicator.id = 'confirm_indicator';
-                    indicator.className = 'confirm-carousel-indicator';
-
-                    for (let i = 0; i < total; i++) {
-                        const li = document.createElement('li');
-                        li.className = 'confirm-indicator-dot';
-                        indicator.appendChild(li);
-                    }
-
-                    area.appendChild(track);
-                    area.appendChild(prev);
-                    area.appendChild(next);
-                    area.appendChild(indicator);
-
-                    return area;
-                }
+                area.appendChild(topPrev);
+                area.appendChild(topNext);
 
                 const track = document.createElement('div');
                 track.className = 'confirm-carousel-track';
@@ -1357,7 +1292,6 @@ $stamp_files = [
 
                 // スライド本体
                 if (fileNames.length === 0) {
-                    // 添付が無い時のプレースホルダー（黒背景＋1）
                     const ph = document.createElement('div');
                     ph.className = 'confirm-carousel-slide confirm-carousel-placeholder';
                     ph.textContent = '1';
@@ -1378,7 +1312,7 @@ $stamp_files = [
                     });
                 }
 
-                // prev / next
+                // prev / next（左右グレーパネルのボタン）
                 const prev = document.createElement('button');
                 prev.type = 'button';
                 prev.id = 'confirm_prev';
@@ -1417,9 +1351,10 @@ $stamp_files = [
                 const next = document.getElementById('confirm_next');
                 const indicator = document.getElementById('confirm_indicator');
 
-                // ✅ 上帯ボタンを取る（confirm_area内のカルーセルから取る）
-                const topPrev = document.querySelector('#confirm_area .confirm-topnav-prev');
-                const topNext = document.querySelector('#confirm_area .confirm-topnav-next');
+                // ✅ 上帯ボタン（buildConfirmCarouselで作った実体）
+                const area = document.querySelector('#confirm_area .confirm-carousel-area');
+                const topPrev = area ? area.querySelector('.confirm-topnav-prev') : null;
+                const topNext = area ? area.querySelector('.confirm-topnav-next') : null;
 
                 if (!track || !prev || !next || !indicator) return;
 
@@ -1451,13 +1386,14 @@ $stamp_files = [
                 prev.addEventListener('click', () => goTo(current - 1));
                 next.addEventListener('click', () => goTo(current + 1));
 
-                // ✅ 上帯PREV/NEXTも同じ動作
+                // ✅ 上帯PREV/NEXTも同じ挙動
                 if (topPrev) topPrev.addEventListener('click', () => goTo(current - 1));
                 if (topNext) topNext.addEventListener('click', () => goTo(current + 1));
 
                 // ドット
                 dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
 
+                // 初期
                 goTo(0);
             }
 
