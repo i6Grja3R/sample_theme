@@ -12,167 +12,250 @@ $upload_dir = wp_upload_dir();                                // アップロー
 $camera_url  = esc_url($upload_dir['baseurl'] . '/camera.png');  // camera.png のURL（存在場所に合わせて配置）
 $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png のURL（存在場所に合わせて配置）
 ?>
+
 <style>
-    /* ステップ表示用の簡易スタイル */
-    .step_img {
-        height: 364px;
-        width: 36px;
+    #confirm_area {
+        --panelW: 260px;
+        --navH: 46px;
+        --line: #777;
+        --panel: #666;
     }
 
-    .hideItems {
-        display: none;
+    /* 全体枠（上帯ぶん） */
+    #confirm_area .confirm-carousel-area {
+        position: relative !important;
+        padding-top: var(--navH) !important;
+        background: #fff !important;
+        border: 1px solid var(--line) !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
     }
 
-    .concealItems {
-        display: none;
+    /* 上帯の疑似要素は使わない */
+    #confirm_area .confirm-carousel-area::before,
+    #confirm_area .confirm-carousel-area::after {
+        content: none !important;
+        display: none !important;
     }
 
-    /* ローディング中の簡易スピナー（ボタンに付与） */
-    .wait {
-        height: 40px;
-        width: 40px;
-        border-radius: 40px;
-        border: 3px solid;
-        border-color: #bbbbbb;
-        border-left-color: #1ECD97;
-        font-size: 0;
-        animation: rotating 2s 0.25s linear infinite;
+    /* 上帯ボタン（実体） */
+    #confirm_area .confirm-topnav {
+        position: absolute !important;
+        top: 0 !important;
+        height: var(--navH) !important;
+        width: var(--panelW) !important;
+        background: #fff !important;
+        border: 0 !important;
+        border-bottom: 1px solid var(--line) !important;
+        font-weight: 800 !important;
+        letter-spacing: .18em !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+        z-index: 70 !important;
+        box-sizing: border-box !important;
     }
 
-    @keyframes rotating {
-        from {
-            transform: rotate(0deg);
-        }
-
-        to {
-            transform: rotate(360deg);
-        }
+    #confirm_area .confirm-topnav-prev {
+        left: 0 !important;
+        border-right: 1px solid var(--line) !important;
     }
 
-    /* ===== confirm carousel ===== */
-    .confirm-carousel-area {
-        position: relative;
-        width: 70%;
-        max-width: 100%;
-        border-radius: 12px;
-        overflow: hidden;
+    #confirm_area .confirm-topnav-next {
+        right: 0 !important;
+        border-left: 1px solid var(--line) !important;
     }
 
-    .confirm-carousel-track {
-        display: flex;
-        width: var(--w, 100%);
-        transition: transform .25s ease;
+    /* track */
+    #confirm_area .confirm-carousel-track {
+        display: flex !important;
+        width: var(--w, 100%) !important;
+        transition: transform .25s ease !important;
+        will-change: transform !important;
     }
 
-    .confirm-carousel-slide {
-        flex: 0 0 100%;
-        display: flex;
-        background: #000;
-        min-height: 360px;
+    /* slide（左右パネルぶん） */
+    #confirm_area .confirm-carousel-slide {
+        flex: 0 0 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 520px !important;
+        padding: 24px var(--panelW) 24px var(--panelW) !important;
+        box-sizing: border-box !important;
+        background: transparent !important;
     }
 
-    /* ここで“左右余白”を作る */
-    .confirm-carousel-inner {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 90px;
-        box-sizing: border-box;
+    /* 中の枠消し */
+    #confirm_area .confirm-carousel-inner {
+        border: 0 !important;
+        background: transparent !important;
+        padding: 0 !important;
     }
 
-    .confirm-carousel-placeholder {
-        color: #fff;
-        font-size: 64px;
-        font-weight: 700;
+    /* メディア */
+    #confirm_area .confirm-media-wrap {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* ② メディアをスライド内に収める（余白を考慮） */
-    .confirm-media-wrap {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    #confirm_area .confirm-media-content {
+        width: 100% !important;
+        height: 520px !important;
+        object-fit: contain !important;
+        background: #fff !important;
+        display: block !important;
     }
 
-    .confirm-media-content {
-        width: 100%;
-        height: 100%;
-        max-height: 360px;
-        object-fit: contain;
+    /* 左右パネル（クリック領域） */
+    #confirm_area button#confirm_prev.confirm-carousel-prev,
+    #confirm_area button#confirm_next.confirm-carousel-next {
+        position: absolute !important;
+        top: var(--navH) !important;
+        bottom: 0 !important;
+        width: var(--panelW) !important;
+        background: var(--panel) !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        z-index: 30 !important;
+        transform: none !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+
+        /* ✅ ボタン内HTMLは使わない（疑似要素で出す） */
+        font-size: 0 !important;
+        line-height: 0 !important;
+        color: transparent !important;
     }
 
-    /* prev / next */
-    .confirm-carousel-prev,
-    .confirm-carousel-next {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 44px;
-        height: 44px;
-        border-radius: 999px;
-        border: none;
-        background: rgba(255, 255, 255, .85);
-        cursor: pointer;
+    #confirm_area button#confirm_prev.confirm-carousel-prev {
+        left: 0 !important;
+        border-right: 1px solid var(--line) !important;
     }
 
-    /* ③ ボタンを少し外側へ（余白に合わせて） */
-    /* 12→24など */
-    .confirm-carousel-prev {
-        left: 24px;
+    #confirm_area button#confirm_next.confirm-carousel-next {
+        right: 0 !important;
+        border-left: 1px solid var(--line) !important;
     }
 
-    /* 12→24など */
-    .confirm-carousel-next {
-        right: 24px;
+    /* 丸い矢印（中央固定） */
+    #confirm_area button#confirm_prev.confirm-carousel-prev::after,
+    #confirm_area button#confirm_next.confirm-carousel-next::after {
+        position: absolute !important;
+        left: 50% !important;
+        top: 50% !important;
+        /* ←中央に固定（動画でもズレない） */
+        transform: translate(-50%, -50%) !important;
+
+        width: 64px !important;
+        height: 64px !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, .92) !important;
+        box-shadow: 0 10px 22px rgba(0, 0, 0, .22) !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        color: #111 !important;
+        font-weight: 900 !important;
+        font-size: 34px !important;
+        line-height: 1 !important;
+        z-index: 3 !important;
+        pointer-events: none !important;
     }
 
-    .confirm-carousel-prev::before,
-    .confirm-carousel-next::before {
-        content: '';
-        display: block;
+    #confirm_area button#confirm_prev.confirm-carousel-prev::after {
+        content: "‹" !important;
+    }
+
+    #confirm_area button#confirm_next.confirm-carousel-next::after {
+        content: "›" !important;
+    }
+
+    /* ✅ LEFT/RIGHT（下寄せで“確実に見える”） */
+    #confirm_area button#confirm_prev.confirm-carousel-prev::before,
+    #confirm_area button#confirm_next.confirm-carousel-next::before {
+        content: "" !important;
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 22% !important;
+        /* ←下側に固定（見切れにくい） */
+        transform: none !important;
+
+        text-align: center !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+        font-weight: 800 !important;
+        letter-spacing: .03em !important;
+        color: #fff !important;
+        z-index: 4 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: none !important;
+    }
+
+    #confirm_area button#confirm_prev.confirm-carousel-prev::before {
+        content: "LEFT（戻る）" !important;
+    }
+
+    #confirm_area button#confirm_next.confirm-carousel-next::before {
+        content: "RIGHT（進む）" !important;
+    }
+
+    /* インジケータ */
+    #confirm_area .confirm-carousel-indicator {
+        position: absolute !important;
+        left: var(--panelW) !important;
+        right: var(--panelW) !important;
+        bottom: 10px !important;
+        display: flex !important;
+        gap: 10px !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        list-style: none !important;
+        z-index: 10 !important;
+    }
+
+    #confirm_area .confirm-indicator-dot {
         width: 10px;
         height: 10px;
-        border-top: 3px solid #111;
-        border-right: 3px solid #111;
-        margin: auto;
-    }
-
-    .confirm-carousel-prev::before {
-        transform: rotate(-135deg);
-    }
-
-    .confirm-carousel-next::before {
-        transform: rotate(45deg);
-    }
-
-    /* indicator */
-    .confirm-carousel-indicator {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 10px;
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        padding: 0;
-        margin: 0;
-        list-style: none;
-    }
-
-    .confirm-indicator-dot {
-        width: 10px;
-        height: 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, .45);
-        cursor: pointer;
+        background: rgba(0, 0, 0, .18);
     }
 
-    .confirm-indicator-dot.is-active {
-        background: rgba(255, 255, 255, .95);
+    #confirm_area .confirm-indicator-dot.is-active {
+        background: rgba(0, 0, 0, .65);
+    }
+
+    /* レスポンシブ */
+    @media (max-width:1200px) {
+        #confirm_area {
+            --panelW: 200px;
+        }
+
+        #confirm_area .confirm-media-content {
+            height: 480px !important;
+        }
+    }
+
+    @media (max-width:900px) {
+        #confirm_area {
+            --panelW: 140px;
+        }
+
+        #confirm_area .confirm-media-content {
+            height: 420px !important;
+        }
     }
 </style>
+
 <div class="board_form_partial" id="js_board_form_partial"><!-- 全体ラッパ -->
     <div class="questionHeader-partial"><!-- 画面上部の見出し -->
         <h2>
@@ -1186,6 +1269,87 @@ $stamp_files = [
                 const area = document.createElement('div');
                 area.className = 'confirm-carousel-area';
 
+                function buildConfirmCarousel(fileNames) {
+                    const total = Math.max(1, fileNames.length);
+
+                    const area = document.createElement('div');
+                    area.className = 'confirm-carousel-area';
+
+                    // ✅ 上帯ボタン（実体）
+                    const topPrev = document.createElement('button');
+                    topPrev.type = 'button';
+                    topPrev.className = 'confirm-topnav confirm-topnav-prev';
+                    topPrev.setAttribute('aria-label', 'prev');
+                    topPrev.textContent = 'PREV';
+
+                    const topNext = document.createElement('button');
+                    topNext.type = 'button';
+                    topNext.className = 'confirm-topnav confirm-topnav-next';
+                    topNext.setAttribute('aria-label', 'next');
+                    topNext.textContent = 'NEXT';
+
+                    area.appendChild(topPrev);
+                    area.appendChild(topNext);
+
+                    const track = document.createElement('div');
+                    track.className = 'confirm-carousel-track';
+                    track.id = 'confirm_carousel_track';
+                    track.style.setProperty('--w', (total * 100) + '%');
+
+                    // スライド
+                    if (fileNames.length === 0) {
+                        const ph = document.createElement('div');
+                        ph.className = 'confirm-carousel-slide confirm-carousel-placeholder';
+                        ph.textContent = '1';
+                        track.appendChild(ph);
+                    } else {
+                        fileNames.forEach((fname) => {
+                            const slide = document.createElement('div');
+                            slide.className = 'confirm-carousel-slide';
+
+                            const inner = document.createElement('div');
+                            inner.className = 'confirm-carousel-inner';
+
+                            const media = makeMediaEl(fname);
+                            if (media) inner.appendChild(media);
+
+                            slide.appendChild(inner);
+                            track.appendChild(slide);
+                        });
+                    }
+
+                    // 左右グレーパネルボタン
+                    const prev = document.createElement('button');
+                    prev.type = 'button';
+                    prev.id = 'confirm_prev';
+                    prev.className = 'confirm-carousel-prev';
+                    prev.setAttribute('aria-label', 'prev');
+
+                    const next = document.createElement('button');
+                    next.type = 'button';
+                    next.id = 'confirm_next';
+                    next.className = 'confirm-carousel-next';
+                    next.setAttribute('aria-label', 'next');
+
+                    // indicator
+                    const indicator = document.createElement('ul');
+                    indicator.id = 'confirm_indicator';
+                    indicator.className = 'confirm-carousel-indicator';
+
+                    for (let i = 0; i < total; i++) {
+                        const li = document.createElement('li');
+                        li.className = 'confirm-indicator-dot';
+                        indicator.appendChild(li);
+                    }
+
+                    area.appendChild(track);
+                    area.appendChild(prev);
+                    area.appendChild(next);
+                    area.appendChild(indicator);
+
+                    return area;
+                }
+
                 const track = document.createElement('div');
                 track.className = 'confirm-carousel-track';
                 track.id = 'confirm_carousel_track';
@@ -1248,24 +1412,19 @@ $stamp_files = [
 
             // --- confirm用カルーセル挙動（single-que_list.php のロジックを移植） ---
             function initConfirmCarousel() {
-                console.log('initConfirmCarousel called'); // ←これ
                 const track = document.getElementById('confirm_carousel_track');
                 const prev = document.getElementById('confirm_prev');
                 const next = document.getElementById('confirm_next');
                 const indicator = document.getElementById('confirm_indicator');
 
-                console.log('carousel els:', {
-                    track,
-                    prev,
-                    next,
-                    indicator
-                }); // ←ここ
+                // ✅ 上帯ボタンを取る（confirm_area内のカルーセルから取る）
+                const topPrev = document.querySelector('#confirm_area .confirm-topnav-prev');
+                const topNext = document.querySelector('#confirm_area .confirm-topnav-next');
 
                 if (!track || !prev || !next || !indicator) return;
 
                 const dots = indicator.querySelectorAll('.confirm-indicator-dot');
                 const totalSlides = Math.max(1, dots.length);
-                const slidePercent = 100 / totalSlides;
                 let current = 0;
 
                 function updateDots() {
@@ -1274,28 +1433,31 @@ $stamp_files = [
 
                 function goTo(idx) {
                     current = (idx + totalSlides) % totalSlides;
-                    console.log('goTo:', {
-                        idx,
-                        current,
-                        totalSlides,
-                        slidePercent
-                    }); // ←ここ
+
                     let vSlidePercent = 0;
                     if (totalSlides == 2) {
                         vSlidePercent = current * 100 + 25;
                     } else if (totalSlides == 3) {
                         vSlidePercent = current * 100 + 33;
+                    } else {
+                        vSlidePercent = current * 100;
                     }
+
                     track.style.transform = `translateX(-${vSlidePercent}%)`;
                     updateDots();
                 }
 
+                // 左右グレーパネル
                 prev.addEventListener('click', () => goTo(current - 1));
                 next.addEventListener('click', () => goTo(current + 1));
 
+                // ✅ 上帯PREV/NEXTも同じ動作
+                if (topPrev) topPrev.addEventListener('click', () => goTo(current - 1));
+                if (topNext) topNext.addEventListener('click', () => goTo(current + 1));
+
+                // ドット
                 dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
 
-                // 初期
                 goTo(0);
             }
 
