@@ -15,8 +15,13 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 
 <style>
     #confirm_area {
-        --panelW: 200px;
+        --panelW: clamp(140px, 16vw, 200px);
         --navH: 46px;
+
+        /* ✅これを追加（統一線） */
+        --frame-border: 2px solid #999;
+
+        /* （任意）残すなら line/panel はこのままでOK */
         --line: #777;
         --panel: #666;
     }
@@ -71,21 +76,22 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     /* track */
     #confirm_area .confirm-carousel-track {
         display: flex !important;
-        width: var(--w, 100%) !important;
+        width: calc(var(--n, 1) * 100%) !important;
+        /* ★追加 */
         transition: transform .25s ease !important;
         will-change: transform !important;
     }
 
-    /* slide（左右パネルぶん） */
+    /* slide */
     #confirm_area .confirm-carousel-slide {
-        flex: 0 0 100% !important;
+        flex: 0 0 calc(100% / var(--n, 1)) !important;
+        /* ★ここが最重要 */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         min-height: 520px !important;
         padding: 24px var(--panelW) 24px var(--panelW) !important;
         box-sizing: border-box !important;
-        background: transparent !important;
     }
 
     /* 中の枠消し */
@@ -1288,10 +1294,13 @@ $stamp_files = [
                 area.appendChild(topPrev);
                 area.appendChild(topNext);
 
+                // ★追加：CSSへ枚数を渡す
+                area.style.setProperty('--n', total);
+
                 const track = document.createElement('div');
                 track.className = 'confirm-carousel-track';
                 track.id = 'confirm_carousel_track';
-                track.style.setProperty('--w', (total * 100) + '%');
+                // track.style.setProperty('--w', (total * 100) + '%');
 
                 // スライド本体
                 if (fileNames.length === 0) {
@@ -1300,9 +1309,14 @@ $stamp_files = [
                     ph.textContent = '1';
                     track.appendChild(ph);
                 } else {
+                    const slideW = 100 / total; // ← 追加（totalに応じて1枚の幅を決める）
+
                     fileNames.forEach((fname) => {
                         const slide = document.createElement('div');
                         slide.className = 'confirm-carousel-slide';
+
+                        // ✅ 追加：1枚の幅を 100/total %
+                        slide.style.flex = `0 0 ${slideW}%`;
 
                         const inner = document.createElement('div');
                         inner.className = 'confirm-carousel-inner';
@@ -1372,16 +1386,10 @@ $stamp_files = [
                 function goTo(idx) {
                     current = (idx + totalSlides) % totalSlides;
 
-                    let vSlidePercent = 0;
-                    if (totalSlides == 2) {
-                        vSlidePercent = current * 100 + 25;
-                    } else if (totalSlides == 3) {
-                        vSlidePercent = current * 100 + 33;
-                    } else {
-                        vSlidePercent = current * 100;
-                    }
+                    const step = 100 / totalSlides; // 50, 33.333..., 25...
+                    // const vSlidePercent = current * step; // ← 0, 33.33, 66.66...
 
-                    track.style.transform = `translateX(-${vSlidePercent}%)`;
+                    track.style.transform = `translateX(-${current * step}%)`;
                     updateDots();
                 }
 
