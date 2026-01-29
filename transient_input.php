@@ -15,7 +15,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 
 <style>
     #confirm_area {
-        --panelW: 260px;
+        --panelW: 200px;
         --navH: 46px;
         --line: #777;
         --panel: #666;
@@ -24,6 +24,9 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     /* 全体枠（上帯ぶん） */
     #confirm_area .confirm-carousel-area {
         position: relative !important;
+        /* もし横幅が100%だと右側が空いてしまうので、必要に応じて調整 */
+        width: calc(100% + 16px);
+        margin-left: -16px;
         padding-top: var(--navH) !important;
         background: #fff !important;
         border: 1px solid var(--line) !important;
