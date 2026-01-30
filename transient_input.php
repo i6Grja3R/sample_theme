@@ -20,8 +20,6 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         --navH: 46px;
         --line: #777;
         --panel: #666;
-        --frameW: 2px;
-        --frameC: #999;
     }
 
     /* 全体枠（上帯ぶん） */
@@ -32,11 +30,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         margin-left: -16px;
         padding-top: var(--navH) !important;
         background: #fff !important;
-        border: 0 !important;
-        /* ✅ 上下線だけを “内側に” 描く（外枠と干渉しない） */
-        box-shadow:
-            inset 0 var(--frameW) 0 var(--frameC),
-            inset 0 calc(-1 * var(--frameW)) 0 var(--frameC) !important;
+        border: 1px solid var(--line) !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
     }
@@ -55,10 +49,8 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         height: var(--navH) !important;
         width: var(--panelW) !important;
         background: #fff !important;
-
         border: 0 !important;
-        border-bottom: 2px solid #999 !important;
-
+        border-bottom: 1px solid var(--line) !important;
         font-weight: 800 !important;
         letter-spacing: .18em !important;
         font-size: 13px !important;
@@ -68,34 +60,33 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     }
 
     #confirm_area .confirm-topnav-prev {
-        border-left: 0 !important;
-        border-right: 2px solid #999 !important;
+        left: 0 !important;
+        border-right: 1px solid var(--line) !important;
     }
 
     #confirm_area .confirm-topnav-next {
-        border-right: 0 !important;
-        border-left: 2px solid #999 !important;
+        right: 0 !important;
+        border-left: 1px solid var(--line) !important;
     }
 
     /* track */
     #confirm_area .confirm-carousel-track {
         display: flex !important;
-        width: calc(var(--n, 1) * 100%) !important;
-        /* ★追加 */
+        width: var(--w, 100%) !important;
         transition: transform .25s ease !important;
         will-change: transform !important;
     }
 
-    /* slide */
+    /* slide（左右パネルぶん） */
     #confirm_area .confirm-carousel-slide {
-        flex: 0 0 calc(100% / var(--n, 1)) !important;
-        /* ★ここが最重要 */
+        flex: 0 0 100% !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         min-height: 520px !important;
         padding: 24px var(--panelW) 24px var(--panelW) !important;
         box-sizing: border-box !important;
+        background: transparent !important;
     }
 
     /* 中の枠消し */
@@ -144,14 +135,14 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         color: transparent !important;
     }
 
-    /* LEFT側：右（中央側）だけ 2px */
     #confirm_area button#confirm_prev.confirm-carousel-prev {
-        border-right: 2px solid #999 !important;
+        left: 0 !important;
+        border-right: 1px solid var(--line) !important;
     }
 
-    /* RIGHT側：左（中央側）だけ 2px */
     #confirm_area button#confirm_next.confirm-carousel-next {
-        border-left: 2px solid #999 !important;
+        right: 0 !important;
+        border-left: 1px solid var(--line) !important;
     }
 
     /* 丸い矢印（中央固定） */
@@ -268,144 +259,53 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         }
     }
 
+
     /* ===========================================================
- * 追加パッチ：枠線 2px 統一 + LEFT/RIGHT復活 + 0x0対策
- * 既存CSSの「一番下」に置く（上書き目的）
- * =========================================================== */
+     * 追加：枠線を「常に2px #999」で統一（上/下/左右 + 仕切り）
+     * ここを一番下に置くことで、上の1px指定を確実に上書きします。
+     * =========================================================== */
     #confirm_area {
-        --frame-border: 2px solid #999;
+        --line: #999;
+        --frame: 2px solid #999;
     }
 
-    /* 外枠（上・下）を2pxに */
+    /* 外枠（全体） */
     #confirm_area .confirm-carousel-area {
-        border: 0 !important;
-        /* border:1px ... を潰す */
-        border-top: var(--frame-border) !important;
-        border-bottom: var(--frame-border) !important;
-    }
-
-    /* 上帯 PREV/NEXT：外側の線は出さず、内側だけ2px */
-    #confirm_area .confirm-topnav {
-        border: 0 !important;
-        border-bottom: var(--frame-border) !important;
-        /* 上帯の下線を2px */
+        border: var(--frame) !important;
         box-sizing: border-box !important;
     }
 
+    /* 上帯：下に仕切り線（※上は外枠のborder-topで統一） */
+    #confirm_area .confirm-topnav {
+        border: 0 !important;
+        border-bottom: var(--frame) !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 上帯の左右仕切り */
     #confirm_area .confirm-topnav-prev {
-        border-right: var(--frame-border) !important;
-        /* PREV 右線 */
+        border-right: var(--frame) !important;
+        border-left: 0 !important;
     }
 
     #confirm_area .confirm-topnav-next {
-        border-left: var(--frame-border) !important;
-        /* NEXT 左線 */
+        border-left: var(--frame) !important;
+        border-right: 0 !important;
     }
 
-    /* 左右パネル（大ボタン）が 0x0 にならないように強制 */
-    #confirm_area button#confirm_prev.confirm-carousel-prev,
-    #confirm_area button#confirm_next.confirm-carousel-next {
-        display: block !important;
-        position: absolute !important;
-        top: var(--navH) !important;
-        bottom: 0 !important;
-        height: auto !important;
-        width: var(--panelW) !important;
-        min-height: 200px !important;
-
-        visibility: visible !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-
-        z-index: 60 !important;
-        /* track/slidesより前へ */
-        box-sizing: border-box !important;
-    }
-
-    /* 左：上＋右を2px、右：上＋左を2px（外側線は出さない） */
+    /* 左右パネル：中央との仕切りだけ（外側は外枠で統一） */
     #confirm_area button#confirm_prev.confirm-carousel-prev {
-        left: 0 !important;
-        right: auto !important;
-        border: 0 !important;
-        border-top: var(--frame-border) !important;
-        border-right: var(--frame-border) !important;
+        border-right: var(--frame) !important;
+        border-left: 0 !important;
+        border-top: 0 !important;
+        border-bottom: 0 !important;
     }
 
     #confirm_area button#confirm_next.confirm-carousel-next {
-        right: 0 !important;
-        left: auto !important;
-        border: 0 !important;
-        border-top: var(--frame-border) !important;
-        border-left: var(--frame-border) !important;
-    }
-
-    /* 丸矢印（中央） */
-    #confirm_area button#confirm_prev.confirm-carousel-prev::after,
-    #confirm_area button#confirm_next.confirm-carousel-next::after {
-        content: "" !important;
-        /* 念のため初期化。下で個別に設定 */
-        position: absolute !important;
-        left: 50% !important;
-        top: 50% !important;
-        transform: translate(-50%, -50%) !important;
-
-        width: 64px !important;
-        height: 64px !important;
-        border-radius: 999px !important;
-        background: rgba(255, 255, 255, .92) !important;
-        box-shadow: 0 10px 22px rgba(0, 0, 0, .22) !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-
-        color: #111 !important;
-        font-weight: 900 !important;
-        font-size: 34px !important;
-        line-height: 1 !important;
-
-        z-index: 3 !important;
-        pointer-events: none !important;
-    }
-
-    #confirm_area button#confirm_prev.confirm-carousel-prev::after {
-        content: "‹" !important;
-    }
-
-    #confirm_area button#confirm_next.confirm-carousel-next::after {
-        content: "›" !important;
-    }
-
-    /* LEFT/RIGHTラベル（復活） */
-    #confirm_area button#confirm_prev.confirm-carousel-prev::before,
-    #confirm_area button#confirm_next.confirm-carousel-next::before {
-        position: absolute !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 22% !important;
-
-        text-align: center !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-        font-weight: 800 !important;
-        letter-spacing: .03em !important;
-        color: #fff !important;
-
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-
-        z-index: 4 !important;
-        /* 矢印より上 */
-        pointer-events: none !important;
-    }
-
-    #confirm_area button#confirm_prev.confirm-carousel-prev::before {
-        content: "LEFT（戻る）" !important;
-    }
-
-    #confirm_area button#confirm_next.confirm-carousel-next::before {
-        content: "RIGHT（進む）" !important;
+        border-left: var(--frame) !important;
+        border-right: 0 !important;
+        border-top: 0 !important;
+        border-bottom: 0 !important;
     }
 </style>
 
