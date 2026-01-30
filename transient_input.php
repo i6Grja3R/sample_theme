@@ -14,27 +14,29 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 ?>
 
 <style>
+    /* 線の統一 */
     #confirm_area {
-        --panelW: clamp(140px, 16vw, 200px);
-        --navH: 46px;
-
-        /* ✅これを追加（統一線） */
         --frame-border: 2px solid #999;
-
-        /* （任意）残すなら line/panel はこのままでOK */
-        --line: #777;
-        --panel: #666;
     }
 
-    /* 全体枠（上帯ぶん） */
+    /* ✅ 全体枠：上下だけ 2px（左右は描かない＝外側の枠に任せる） */
     #confirm_area .confirm-carousel-area {
         position: relative !important;
-        /* もし横幅が100%だと右側が空いてしまうので、必要に応じて調整 */
-        width: calc(100% + 16px);
-        margin-left: -16px;
+
+        /* これがないと「右が消える」系が出るので戻す */
+        width: calc(100% + 16px) !important;
+        margin-left: -16px !important;
+
         padding-top: var(--navH) !important;
         background: #fff !important;
-        border: 1px solid var(--line) !important;
+
+        /* ★ border: 1px solid ... は使わない（全部上書きされるため） */
+        border: 0 !important;
+        border-top: var(--frame-border) !important;
+        /* 上の線 2px */
+        border-bottom: var(--frame-border) !important;
+        /* 下の線 2px */
+
         overflow: hidden !important;
         box-sizing: border-box !important;
     }
@@ -46,15 +48,24 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         display: none !important;
     }
 
-    /* 上帯ボタン（実体） */
+    /* =========================
+   上帯（PREV / NEXT）
+   ========================= */
+
+    /* 上帯ボタン共通 */
     #confirm_area .confirm-topnav {
         position: absolute !important;
         top: 0 !important;
         height: var(--navH) !important;
         width: var(--panelW) !important;
         background: #fff !important;
+
+        /* 外周は描かない（外側の枠線に任せる） */
         border: 0 !important;
-        border-bottom: 1px solid var(--line) !important;
+
+        /* 上帯の下の線を 2px にする */
+        border-bottom: var(--frame-border) !important;
+
         font-weight: 800 !important;
         letter-spacing: .18em !important;
         font-size: 13px !important;
@@ -63,14 +74,18 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         box-sizing: border-box !important;
     }
 
+    /* PREV：上＋右（上は外枠があるので「右」だけ付けるのが安全） */
     #confirm_area .confirm-topnav-prev {
         left: 0 !important;
-        border-right: 1px solid var(--line) !important;
+        border-right: var(--frame-border) !important;
+        /* 2px */
     }
 
+    /* NEXT：上＋左（上は外枠があるので「左」だけ付けるのが安全） */
     #confirm_area .confirm-topnav-next {
         right: 0 !important;
-        border-left: 1px solid var(--line) !important;
+        border-left: var(--frame-border) !important;
+        /* 2px */
     }
 
     /* track */
@@ -117,84 +132,103 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         display: block !important;
     }
 
-    /* 左右パネル（クリック領域） */
-    #confirm_area button#confirm_prev.confirm-carousel-prev,
-    #confirm_area button#confirm_next.confirm-carousel-next {
+    /* ====== 0×0潰しを強制解除（id直指定） ====== */
+    #confirm_area button#confirm_prev,
+    #confirm_area button#confirm_next {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
         position: absolute !important;
         top: var(--navH) !important;
         bottom: 0 !important;
+
         width: var(--panelW) !important;
-        background: var(--panel) !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        cursor: pointer !important;
-        z-index: 30 !important;
-        transform: none !important;
+        height: auto !important;
+
+        background: #666 !important;
+        z-index: 999 !important;
+
         padding: 0 !important;
-        box-sizing: border-box !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
 
-        /* ✅ ボタン内HTMLは使わない（疑似要素で出す） */
-        font-size: 0 !important;
-        line-height: 0 !important;
-        color: transparent !important;
+        /* これがどこかで入ってると0になるので潰す */
+        clip: auto !important;
+        clip-path: none !important;
+        transform: none !important;
     }
 
-    #confirm_area button#confirm_prev.confirm-carousel-prev {
+    #confirm_area button#confirm_prev {
         left: 0 !important;
-        border-right: 1px solid var(--line) !important;
+        right: auto !important;
     }
 
-    #confirm_area button#confirm_next.confirm-carousel-next {
+    #confirm_area button#confirm_next {
         right: 0 !important;
-        border-left: 1px solid var(--line) !important;
+        left: auto !important;
     }
 
-    /* 丸い矢印（中央固定） */
-    #confirm_area button#confirm_prev.confirm-carousel-prev::after,
-    #confirm_area button#confirm_next.confirm-carousel-next::after {
-        position: absolute !important;
-        left: 50% !important;
-        top: 50% !important;
-        /* ←中央に固定（動画でもズレない） */
-        transform: translate(-50%, -50%) !important;
-
-        width: 64px !important;
-        height: 64px !important;
-        border-radius: 999px !important;
-        background: rgba(255, 255, 255, .92) !important;
-        box-shadow: 0 10px 22px rgba(0, 0, 0, .22) !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-
-        color: #111 !important;
-        font-weight: 900 !important;
-        font-size: 34px !important;
-        line-height: 1 !important;
-        z-index: 3 !important;
-        pointer-events: none !important;
-    }
-
-    #confirm_area button#confirm_prev.confirm-carousel-prev::after {
-        content: "‹" !important;
-    }
-
-    #confirm_area button#confirm_next.confirm-carousel-next::after {
-        content: "›" !important;
-    }
-
-    /* ✅ LEFT/RIGHT（下寄せで“確実に見える”） */
-    #confirm_area button#confirm_prev.confirm-carousel-prev::before,
-    #confirm_area button#confirm_next.confirm-carousel-next::before {
-        content: "" !important;
+    /* LEFT/RIGHT */
+    #confirm_area button#confirm_prev::before,
+    #confirm_area button#confirm_next::before {
         position: absolute !important;
         left: 0 !important;
         right: 0 !important;
         bottom: 22% !important;
-        /* ←下側に固定（見切れにくい） */
-        transform: none !important;
+        text-align: center !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        color: #fff !important;
+        content: "" !important;
+        z-index: 1000 !important;
+        pointer-events: none !important;
+    }
+
+    #confirm_area button#confirm_prev::before {
+        content: "LEFT（戻る）" !important;
+    }
+
+    #confirm_area button#confirm_next::before {
+        content: "RIGHT（進む）" !important;
+    }
+
+    /* 丸矢印 */
+    #confirm_area button#confirm_prev::after,
+    #confirm_area button#confirm_next::after {
+        position: absolute !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 64px !important;
+        height: 64px !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, .92) !important;
+        display: grid !important;
+        place-items: center !important;
+        font-size: 34px !important;
+        font-weight: 900 !important;
+        color: #111 !important;
+        z-index: 1000 !important;
+        pointer-events: none !important;
+        content: "" !important;
+    }
+
+    #confirm_area button#confirm_prev::after {
+        content: "‹" !important;
+    }
+
+    #confirm_area button#confirm_next::after {
+        content: "›" !important;
+    }
+
+    /* LEFT/RIGHT（下寄せ） */
+    #confirm_area button#confirm_prev.confirm-carousel-prev::before,
+    #confirm_area button#confirm_next.confirm-carousel-next::before {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 22% !important;
 
         text-align: center !important;
         font-size: 14px !important;
@@ -202,11 +236,12 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         font-weight: 800 !important;
         letter-spacing: .03em !important;
         color: #fff !important;
-        z-index: 4 !important;
-        display: block !important;
-        visibility: visible !important;
+
+        z-index: 6 !important;
         opacity: 1 !important;
+        visibility: visible !important;
         pointer-events: none !important;
+        content: "" !important;
     }
 
     #confirm_area button#confirm_prev.confirm-carousel-prev::before {
@@ -417,6 +452,7 @@ $stamp_files = [
     8 => $theme_uri . 'images/stamp/8.png',
 ];
 ?>
+
 <script>
     // 直書きJS用のグローバル設定をPHPで埋め込む
     window.bbs_vars = {
