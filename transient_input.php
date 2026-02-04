@@ -14,23 +14,63 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 ?>
 
 <style>
+    .board_form_partial {
+        color: #555;
+    }
+
+    .other_step {
+        width: 450px;
+        height: 45px;
+        overflow: hidden;
+        margin-right: 3px;
+    }
+
+    .other_step img {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        object-fit: cover;
+        /* 余白を切り捨てて枠いっぱい */
+        object-position: center;
+        /* 位置調整できる */
+        display: block;
+    }
+
+    body.is-confirm #js_board_form_partial {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* confirmのスライダー自体をフル幅に */
+    body.is-confirm #confirm_area .confirm-carousel-area {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
     #confirm_area {
         --panelW: clamp(140px, 16vw, 200px);
         /* ← ここがポイント */
         --navH: 46px;
         --line: #777;
         --panel: #666;
+        --frameW: 2px;
+        --frameC: #999;
     }
 
     /* 全体枠（上帯ぶん） */
     #confirm_area .confirm-carousel-area {
         position: relative !important;
         /* もし横幅が100%だと右側が空いてしまうので、必要に応じて調整 */
-        width: calc(100% + 16px);
-        margin-left: -16px;
+        /* width: calc(100% + 16px); */
+        /* margin-left: -16px; */
         padding-top: var(--navH) !important;
         background: #fff !important;
-        border: 1px solid var(--line) !important;
+        border: 0 !important;
+        /* ✅ 上下線だけを “内側に” 描く（外枠と干渉しない） */
+        box-shadow:
+            inset 0 var(--frameW) 0 var(--frameC),
+            inset 0 calc(-1 * var(--frameW)) 0 var(--frameC) !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
     }
@@ -49,8 +89,10 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         height: var(--navH) !important;
         width: var(--panelW) !important;
         background: #fff !important;
+
         border: 0 !important;
-        border-bottom: 1px solid var(--line) !important;
+        border-bottom: 2px solid #999 !important;
+
         font-weight: 800 !important;
         letter-spacing: .18em !important;
         font-size: 13px !important;
@@ -60,33 +102,34 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     }
 
     #confirm_area .confirm-topnav-prev {
-        left: 0 !important;
-        border-right: 1px solid var(--line) !important;
+        border-left: 0 !important;
+        border-right: 2px solid #999 !important;
     }
 
     #confirm_area .confirm-topnav-next {
-        right: 0 !important;
-        border-left: 1px solid var(--line) !important;
+        border-right: 0 !important;
+        border-left: 2px solid #999 !important;
     }
 
     /* track */
     #confirm_area .confirm-carousel-track {
         display: flex !important;
-        width: var(--w, 100%) !important;
+        width: calc(var(--n, 1) * 100%) !important;
+        /* ★追加 */
         transition: transform .25s ease !important;
         will-change: transform !important;
     }
 
-    /* slide（左右パネルぶん） */
+    /* slide */
     #confirm_area .confirm-carousel-slide {
-        flex: 0 0 100% !important;
+        flex: 0 0 calc(100% / var(--n, 1)) !important;
+        /* ★ここが最重要 */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         min-height: 520px !important;
         padding: 24px var(--panelW) 24px var(--panelW) !important;
         box-sizing: border-box !important;
-        background: transparent !important;
     }
 
     /* 中の枠消し */
@@ -135,14 +178,14 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         color: transparent !important;
     }
 
+    /* LEFT側：右（中央側）だけ 2px */
     #confirm_area button#confirm_prev.confirm-carousel-prev {
-        left: 0 !important;
-        border-right: 1px solid var(--line) !important;
+        border-right: 2px solid #999 !important;
     }
 
+    /* RIGHT側：左（中央側）だけ 2px */
     #confirm_area button#confirm_next.confirm-carousel-next {
-        right: 0 !important;
-        border-left: 1px solid var(--line) !important;
+        border-left: 2px solid #999 !important;
     }
 
     /* 丸い矢印（中央固定） */
@@ -259,53 +302,54 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         }
     }
 
+    /* ===========================
+   崩れ対策：位置と幅を強制固定（CSSのみ）
+   =========================== */
 
-    /* ===========================================================
-     * 追加：枠線を「常に2px #999」で統一（上/下/左右 + 仕切り）
-     * ここを一番下に置くことで、上の1px指定を確実に上書きします。
-     * =========================================================== */
-    #confirm_area {
-        --line: #999;
-        --frame: 2px solid #999;
-    }
-
-    /* 外枠（全体） */
+    /* 全体の幅ズレを止める（まずここ） */
     #confirm_area .confirm-carousel-area {
-        border: var(--frame) !important;
-        box-sizing: border-box !important;
+        /* width: 100% !important; */
     }
 
-    /* 上帯：下に仕切り線（※上は外枠のborder-topで統一） */
-    #confirm_area .confirm-topnav {
-        border: 0 !important;
-        border-bottom: var(--frame) !important;
-        box-sizing: border-box !important;
+    /* ✅ 位置固定は「左右を明示」する（これだけで崩れが止まる） */
+    #confirm_area .confirm-topnav.confirm-topnav-prev {
+        left: 0 !important;
+        right: auto !important;
     }
 
-    /* 上帯の左右仕切り */
-    #confirm_area .confirm-topnav-prev {
-        border-right: var(--frame) !important;
-        border-left: 0 !important;
+    #confirm_area .confirm-topnav.confirm-topnav-next {
+        right: 0 !important;
+        left: auto !important;
     }
 
-    #confirm_area .confirm-topnav-next {
-        border-left: var(--frame) !important;
-        border-right: 0 !important;
-    }
-
-    /* 左右パネル：中央との仕切りだけ（外側は外枠で統一） */
     #confirm_area button#confirm_prev.confirm-carousel-prev {
-        border-right: var(--frame) !important;
-        border-left: 0 !important;
-        border-top: 0 !important;
-        border-bottom: 0 !important;
+        left: 0 !important;
+        right: auto !important;
     }
 
     #confirm_area button#confirm_next.confirm-carousel-next {
-        border-left: var(--frame) !important;
-        border-right: 0 !important;
-        border-top: 0 !important;
-        border-bottom: 0 !important;
+        right: 0 !important;
+        left: auto !important;
+    }
+
+    /* ボタンが埋もれる/消える対策（保険） */
+    #confirm_area .confirm-carousel-area {
+        overflow: hidden !important;
+    }
+
+    #confirm_area .confirm-topnav {
+        z-index: 80 !important;
+    }
+
+    #confirm_area button#confirm_prev.confirm-carousel-prev,
+    #confirm_area button#confirm_next.confirm-carousel-next {
+        z-index: 30 !important;
+    }
+
+    /* ✅ PREV/NEXTの上にも枠線を描く（上線が消える対策） */
+    #confirm_area .confirm-topnav {
+        border-top: 2px solid #999 !important;
+        box-sizing: border-box !important;
     }
 </style>
 
@@ -316,10 +360,10 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 <i class="fa fa-circle fa-stack-2x w-circle"></i>
                 <i class="fa-stack-1x fa-inverse q">Q</i>
             </span>
-            <span class="q-text" id="q_text"></span><!-- ステップ名 -->
+            <span class="q-text" id="q_text">質問する</span><!-- ステップ名 -->
         </h2>
         <div class="other_step">
-            <img id="step_img" alt=""><!-- ステップ画像 -->
+            <img id="step_img" src="<?php echo esc_url(get_template_directory_uri() . '/images/step01.png'); ?>" alt="STEP1 入力"><!-- ステップ画像 -->
         </div>
     </div>
 
@@ -396,7 +440,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             </div>
 
             <div class="stamp-partial">
-                <h2>スタンプを選ぶ(必須)</h2>
+                <h2>スタンプを選ぶ<span class="required">※必須</span></h2>
                 <input type="radio" name="stamp" value="1" id="stamp_1"><label for="stamp_1"></label>
                 <input type="radio" name="stamp" value="2" id="stamp_2"><label for="stamp_2"></label>
                 <input type="radio" name="stamp" value="3" id="stamp_3"><label for="stamp_3"></label>
@@ -502,6 +546,8 @@ $stamp_files = [
 
         if (confirm_area) confirm_area.style.display = "none";
         if (input_area) input_area.style.display = "block";
+
+        document.body.classList.remove('is-confirm'); // ←保険でここも
 
         // プレビュー時に保持した値を復元（file は復元しない）
         if (window.lastPreviewData) {
@@ -1115,6 +1161,8 @@ $stamp_files = [
                 confirm_area.textContent = '';
                 confirm_area.style.display = 'none';
             }
+
+            document.body.classList.remove('is-confirm'); // ←★ここ
         });
         wrap.appendChild(back);
 
@@ -1245,7 +1293,9 @@ $stamp_files = [
             confirm_area.classList.remove('hideItems');
             confirm_area.style.display = 'block';
             input_area.style.display = 'none';
-            confirm_area.innerHTML = ''; // 一旦クリア
+            confirm_area.innerHTML = '';
+
+            document.body.classList.add('is-confirm'); // ←★ここ
 
             // ===== スロットの実際の選択状況から「メディア」と「ユーザーアイコン」を切り分ける =====
 
@@ -1600,7 +1650,12 @@ $stamp_files = [
 
         } catch (err) {
             console.error(err);
-            alert("通信に失敗しました。時間をおいて再度お試しください。");
+            const isNetwork = (err instanceof TypeError) && /fetch|network|failed/i.test(String(err && err.message));
+            if (isNetwork) {
+                alert("通信に失敗しました。時間をおいて再度お試しください。");
+            } else {
+                alert("画面処理中にエラーが発生しました。コンソール(F12)に表示されるエラー内容をご確認ください。");
+            }
 
         } finally {
             toggleLoading(btn, false);
@@ -1671,7 +1726,12 @@ $stamp_files = [
             }
         } catch (err) {
             console.error(err);
-            alert("通信に失敗しました。時間をおいて再度お試しください。");
+            const isNetwork = (err instanceof TypeError) && /fetch|network|failed/i.test(String(err && err.message));
+            if (isNetwork) {
+                alert("通信に失敗しました。時間をおいて再度お試しください。");
+            } else {
+                alert("画面処理中にエラーが発生しました。コンソール(F12)に表示されるエラー内容をご確認ください。");
+            }
         } finally {
             toggleLoading(btn, false);
         }
