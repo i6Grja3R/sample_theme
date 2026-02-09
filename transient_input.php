@@ -64,7 +64,11 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         /* もし横幅が100%だと右側が空いてしまうので、必要に応じて調整 */
         /* width: calc(100% + 16px); */
         /* margin-left: -16px; */
-        padding-top: var(--navH) !important;
+        /* padding-top: var(--navH) !important; */
+        padding-top: 20px !important;
+        padding-bottom: 30px !important;
+        /* 24→56 くらい。被りが消えるまで調整 */
+        /* 46px → 28px など */
         background: #fff !important;
         border: 0 !important;
         /* ✅ 上下線だけを “内側に” 描く（外枠と干渉しない） */
@@ -95,7 +99,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
 
         font-weight: 800 !important;
         letter-spacing: .18em !important;
-        font-size: 13px !important;
+        font-size: 16px !important;
         cursor: pointer !important;
         z-index: 70 !important;
         box-sizing: border-box !important;
@@ -127,7 +131,8 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 520px !important;
+        /* ←ここが重要 */
+        min-height: 450px !important;
         padding: 24px var(--panelW) 24px var(--panelW) !important;
         box-sizing: border-box !important;
     }
@@ -230,12 +235,12 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         position: absolute !important;
         left: 0 !important;
         right: 0 !important;
-        bottom: 22% !important;
+        bottom: 30% !important;
         /* ←下側に固定（見切れにくい） */
         transform: none !important;
 
         text-align: center !important;
-        font-size: 14px !important;
+        font-size: 16px !important;
         line-height: 1.2 !important;
         font-weight: 800 !important;
         letter-spacing: .03em !important;
@@ -260,7 +265,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         position: absolute !important;
         left: var(--panelW) !important;
         right: var(--panelW) !important;
-        bottom: 10px !important;
+        bottom: 25px !important;
         display: flex !important;
         gap: 10px !important;
         justify-content: center !important;
@@ -350,6 +355,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     #confirm_area .confirm-topnav {
         border-top: 2px solid #999 !important;
         box-sizing: border-box !important;
+        text-align: center;
     }
 </style>
 
@@ -1549,10 +1555,7 @@ $stamp_files = [
                 throw e;
             }
 
-            // ===== 2. 質問文（スライダーの下に表示） =====
-            confirm_area.appendChild(makeTextBox());
-
-            // ===== 2. タイトル + スタンプ =====
+            // ===== 2. 質問タイトル（スライダーの下に表示） =====
             const titleRow = document.createElement('div');
             titleRow.classList.add('confirm-title-row'); // ← ★追加
             titleRow.style.display = 'grid';
@@ -1573,20 +1576,6 @@ $stamp_files = [
             // titleBox.appendChild(tHdr);
             titleBox.appendChild(tBody);
             titleRow.appendChild(titleBox);
-
-            // ★ここを修正：スタンプ番号→URL をマップから引く
-            // ★番号.png で直接読む版
-            if (data.stamp) {
-                const stampImg = document.createElement('img');
-                stampImg.src =
-                    "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp/" +
-                    String(data.stamp) +
-                    ".png"; // 例: .../images/stamp/8.png
-                stampImg.alt = 'stamp ' + data.stamp;
-                stampImg.style.width = '80px';
-                stampImg.style.height = '80px';
-                titleRow.appendChild(stampImg);
-            }
 
             confirm_area.appendChild(titleRow);
 
@@ -1636,7 +1625,54 @@ $stamp_files = [
 
             confirm_area.appendChild(userRow);
 
-            // ===== 4. 戻る／確定ボタン =====
+            // ★① dataの中身を確認（ここ）
+            console.log('CONFIRM data:', data);
+            console.log('stamp value:', data.stamp);
+
+            // ===== 4. 質問文 =====
+            const confirmTextBox = makeTextBox();
+            confirm_area.appendChild(confirmTextBox);
+
+            // ===== 5. スタンプ画像 =====
+            // ★ここを修正：スタンプ番号→URL をマップから引く
+            // ★番号.png で直接読む版
+            let stampImg = null;
+            if (data.stamp) {
+                const stampImg = document.createElement('img');
+                stampImg.classList.add('confirm-stamp');
+                stampImg.src =
+                    "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp/" +
+                    String(data.stamp) +
+                    ".png";
+                stampImg.alt = 'stamp ' + data.stamp;
+                stampImg.style.width = '80px';
+                stampImg.style.height = '80px';
+
+                // ★ここで初めて正しく効く
+                confirmTextBox.appendChild(stampImg);
+            }
+
+            // 追加直後：本当に追加されたか
+            console.log('stamp appended?', confirm_area.contains(stampImg));
+            console.log('stamp element:', stampImg.outerHTML);
+            console.log('imgs AFTER stamp:', confirm_area.querySelectorAll('img').length);
+
+            // すぐ後で消されてないか（再描画チェック）
+            setTimeout(() => {
+                console.log('AFTER 0ms .confirm-stamp count:', document.querySelectorAll('.confirm-stamp').length);
+            }, 0);
+
+            setTimeout(() => {
+                console.log('AFTER 300ms .confirm-stamp count:', document.querySelectorAll('.confirm-stamp').length);
+            }, 300);
+
+            // ★③ append後のDOM確認
+            console.log(
+                '③ confirm_area imgs:',
+                confirm_area.querySelectorAll('img').length
+            );
+
+            // ===== 6. 戻る／確定ボタン =====
             confirm_area.appendChild(create_button_parts(1));
 
             // 念のため、確定ボタンに once 付きのハンドラを付与（create_button_parts内で付けているなら不要）
