@@ -1635,21 +1635,32 @@ $stamp_files = [
 
             // ===== 5. スタンプ画像 =====
             // ★ここを修正：スタンプ番号→URL をマップから引く
-            // ★番号.png で直接読む版
-            let stampImg = null;
+            // makeTextBox() が返す要素（confirmTextBox）を作った直後にこれを入れる
+            // ===== 5. スタンプ画像 =====
             if (data.stamp) {
-                const stampImg = document.createElement('img');
-                stampImg.classList.add('confirm-stamp');
-                stampImg.src =
-                    "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp/" +
-                    String(data.stamp) +
-                    ".png";
-                stampImg.alt = 'stamp ' + data.stamp;
-                stampImg.style.width = '80px';
-                stampImg.style.height = '80px';
 
-                // ★ここで初めて正しく効く
-                confirmTextBox.appendChild(stampImg);
+                // ✅ confirmTextBox の「本文div（white-space: pre-wrap）」を取る
+                const textDiv = confirmTextBox.querySelector('div[style*="white-space"]') ||
+                    confirmTextBox.querySelector('div');
+
+                if (textDiv) {
+
+                    // ✅ 既にスタンプがあれば消す（重複防止）
+                    const old = textDiv.querySelector('img.confirm-stamp');
+                    if (old) old.remove();
+
+                    // ✅ スタンプ生成（※ここは const でOK。二重宣言しない）
+                    const stampImg = document.createElement('img');
+                    stampImg.className = 'confirm-stamp';
+                    stampImg.src =
+                        "<?php echo esc_url(get_template_directory_uri()); ?>/images/stamp/" +
+                        String(data.stamp) +
+                        ".png";
+                    stampImg.alt = 'stamp ' + data.stamp;
+
+                    // ✅ 重要：本文divの「先頭」に入れる（float が効きやすい）
+                    textDiv.insertBefore(stampImg, textDiv.firstChild);
+                }
             }
 
             // 追加直後：本当に追加されたか
