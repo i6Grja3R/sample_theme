@@ -1653,9 +1653,9 @@ $stamp_files = [
             }
 
             // 追加直後：本当に追加されたか
-            console.log('stamp appended?', confirm_area.contains(stampImg));
-            console.log('stamp element:', stampImg.outerHTML);
-            console.log('imgs AFTER stamp:', confirm_area.querySelectorAll('img').length);
+            // console.log('stamp appended?', confirm_area.contains(stampImg));
+            // console.log('stamp element:', stampImg.outerHTML);
+            // console.log('imgs AFTER stamp:', confirm_area.querySelectorAll('img').length);
 
             // すぐ後で消されてないか（再描画チェック）
             setTimeout(() => {
