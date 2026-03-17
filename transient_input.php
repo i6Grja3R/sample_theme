@@ -49,7 +49,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     }
 
     #confirm_area {
-        --panelW: clamp(140px, 16vw, 200px);
+        --panelW: clamp(100px, 12vw, 160px);
         /* ← ここがポイント */
         --navH: 46px;
         --line: #777;
@@ -356,6 +356,69 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         border-top: 2px solid #999 !important;
         box-sizing: border-box !important;
         text-align: center;
+    }
+
+    /* ===============================
+   投稿前チェック 全体ボックス
+   =============================== */
+    .confirm-checklist {
+        margin-top: 25px;
+        margin-left: 10px;
+        margin-right: 10px;
+        padding: 15px;
+        background: #fafafa;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+    }
+
+    /* ===============================
+   タイトル（■ 投稿前チェック）
+   =============================== */
+    /* タイトル行 */
+    .confirm-checklist h3 {
+        display: flex;
+        align-items: center;
+        /* ← これが重要（縦中央揃え） */
+        gap: 8px;
+        /* ■と文字の間隔 */
+        font-size: 20px;
+        /* 全体サイズ調整 */
+    }
+
+    /* ■部分を大きく */
+    .confirm-checklist h3::before {
+        content: "";
+        /* ← 文字じゃなく四角を作る */
+        width: 12px;
+        /* ■の横幅 */
+        height: 12px;
+        /* ■の高さ */
+        background: #333;
+        /* 色 */
+        display: inline-block;
+    }
+
+    /* ===============================
+   チェック項目（label）
+   =============================== */
+    .confirm-checklist label {
+        display: flex;
+        align-items: flex-start;
+        /* ← center から変更 */
+        /* 縦中央揃え */
+        gap: 8px;
+        /* checkboxと文字の間隔 */
+        font-size: 18px;
+        /* 全体サイズ調整 */
+        line-height: 1.6;
+        /* 読みやすくなる */
+    }
+
+    /* チェックボックスを拡大 */
+    .confirm-checklist input[type="checkbox"] {
+        transform: scale(1.4);
+        /* ← サイズ調整（1.2〜1.8くらいで調整） */
+        margin-top: 3px;
+        /* ← これで文字の先頭とピッタリ揃う */
     }
 </style>
 
@@ -1683,16 +1746,72 @@ $stamp_files = [
                 confirm_area.querySelectorAll('img').length
             );
 
+            // ===== 投稿前チェック =====
+            const wrap = document.createElement('div');
+            wrap.className = 'confirm-checklist';
+
+            // タイトル
+            const title = document.createElement('h3');
+            title.textContent = '投稿前チェック';
+            wrap.appendChild(title);
+
+            // チェック1
+            const label1 = document.createElement('label');
+            const check1 = document.createElement('input');
+            check1.type = 'checkbox';
+            check1.className = 'precheck';
+            label1.appendChild(check1);
+            label1.appendChild(document.createTextNode(' 他人の作品の無断転載や著作権・肖像権侵害をしていません'));
+            wrap.appendChild(label1);
+
+            // チェック2
+            const label2 = document.createElement('label');
+            const check2 = document.createElement('input');
+            check2.type = 'checkbox';
+            check2.className = 'precheck';
+            label2.appendChild(check2);
+            label2.appendChild(document.createTextNode(' 誹謗中傷・差別・個人情報・生成AI作品を含んでいません'));
+            wrap.appendChild(label2);
+
+            // チェック3
+            const label3 = document.createElement('label');
+            const check3 = document.createElement('input');
+            check3.type = 'checkbox';
+            check3.className = 'precheck';
+            label3.appendChild(check3);
+            label3.appendChild(document.createTextNode(' 利用規約に同意します'));
+            wrap.appendChild(label3);
+
+            // 注意文
+            const note = document.createElement('p');
+            note.textContent = '※ 詳しくは「質問・雑談掲示板 利用規約」をご確認ください';
+            note.style.fontSize = '18px';
+            // note.style.color = '#777';
+            note.style.marginTop = '8px';
+            note.style.paddingLeft = 'calc(1.4em + 8px)';
+            wrap.appendChild(note);
+
+            // 追加
+            confirm_area.appendChild(wrap);
+
             // ===== 6. 戻る／確定ボタン =====
             confirm_area.appendChild(create_button_parts(1));
 
-            // 念のため、確定ボタンに once 付きのハンドラを付与（create_button_parts内で付けているなら不要）
+            // ▼ここ追加
             const confirmBtn = document.getElementById('confirm_button');
-            if (confirmBtn) {
-                confirmBtn.addEventListener('click', confirm_button_click, {
-                    once: true
-                });
+            // 投稿前チェック全部入るまでボタン無効
+            const checks = document.querySelectorAll('.precheck');
+
+            if (confirmBtn) confirmBtn.disabled = true;
+
+            function updateConfirmButton() {
+                const allChecked = Array.from(checks).every(c => c.checked);
+                if (confirmBtn) confirmBtn.disabled = !allChecked;
             }
+
+            checks.forEach(c => {
+                c.addEventListener('change', updateConfirmButton);
+            });
             // === ここまで「確認画面」描画 ===
 
         } catch (err) {
