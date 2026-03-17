@@ -1280,7 +1280,7 @@ $stamp_files = [
                     }
                 });
 
-                // // デバッグするなら（あとで消してください）
+                // デバッグするなら（あとで消してください）
                 // for (const [k, v] of formData.entries()) {
                 //   console.log('FD', k, v instanceof File ? `(file) ${v.name} ${v.size}B` : v);
                 // }
