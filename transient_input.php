@@ -1287,7 +1287,7 @@ $stamp_files = [
             } catch (e) {
                 console.warn('append files fallback failed:', e);
             }
-            // ▲ ここまで追加
+            // ここまで追加
 
             const res = await fetch(AJAX_URL, {
                 method: "POST",
