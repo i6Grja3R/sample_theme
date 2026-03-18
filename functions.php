@@ -684,7 +684,7 @@ function bbs_answer_confirm()
             'parent_id' => $parent_id,                  // 親ID
             'text'      => $answer_data['text'],        // 回答本文
             'name'      => $answer_data['name'],        // 回答者名
-            'ip'        => $_SERVER['REMOTE_ADDR'],     // IPアドレス（任意）
+            'ip'        => bbs_get_client_ip(),         // IPアドレス（任意）
             'user_id'   => $user_id                     // 投稿者識別用
         ],
         ['%d', '%s', '%s', '%s', '%s']                  // プレースホルダ（SQL注入防止）
@@ -991,15 +991,68 @@ if (!function_exists('get_guest_uuid')) {
     }
 }
 
+// IP取得用の関数（二重定義エラーを防ぐため if で囲んでいる）
+if (!function_exists('bbs_get_client_ip')) {
+    function bbs_get_client_ip(): string
+    {
+        $ip = '';
+
+        // プロキシ（ロードバランサー等）経由の場合、元のIPが入るヘッダーを確認
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // カンマ区切りのリストから、一番左（クライアントの元IP）を取り出す
+            $ip_list = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $candidate = trim($ip_list[0]); // 前後の空白を削除
+
+            // 取り出した文字列が正しいIPアドレス形式かチェック
+            if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                $ip = $candidate; // 正しければ採用
+            }
+        }
+
+        // 上記で取得できなかった、または不正な形式だった場合は直接接続IPを参照
+        if ($ip === '') {
+            // REMOTE_ADDR（直接の接続元）を取得。なければ空文字
+            $candidate = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+            // 正しいIP形式かチェック
+            if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                $ip = $candidate; // 正しければ採用
+            }
+        }
+
+        // 全ての方法でIPが取れなかった場合の最終的なフォールバック（予備）
+        if ($ip === '') {
+            $ip = '0.0.0.0';
+        }
+
+        return $ip; // 最終的なIPアドレスを返す
+    }
+}
+
+// 連投制限（レートリミット）を判定する関数
 if (!function_exists('bbs_rate_guard')) {
+    /**
+     * @param string $user_id ユーザー識別子（ログインIDなど）
+     * @param int    $limit   許可する最大回数
+     * @param int    $ttl     制限を保持する秒数（有効期限）
+     */
     function bbs_rate_guard(string $user_id, int $limit, int $ttl): void
     {
-        $ip  = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        // 呼び出し元のIPを取得
+        $ip  = bbs_get_client_ip();
+        // IPとユーザーIDを混ぜて、この人専用の保存用キー（名前）を作る（md5でハッシュ化）
         $key = 'bbs_rate_' . md5($ip . '|' . $user_id);
+
+        // WordPressのDB（一時保存データ）から、現在の実行回数を取得
         $cnt = (int) get_transient($key);
+        // 取得した回数が、設定した上限（$limit）に達しているかチェック
         if ($cnt >= $limit) {
-            wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
+            // 上限超えなら、WordPressのJSON形式でエラーを返して処理を即終了させる
+            wp_send_json_error([
+                'errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']
+            ]);
         }
+
+        // まだ上限以下なら、回数を1増やして、指定の秒数（$ttl）だけ再保存する
         set_transient($key, $cnt + 1, $ttl);
     }
 }
@@ -1081,7 +1134,7 @@ if (!function_exists('bbs_quest_submit')) {
         bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
 
         /* --- 入力取得・サニタイズ ---------------------------------------- */
-        $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');             // 親スレ等のID
+        $unique_id = wp_generate_uuid4();             // 親スレ等のID
         $name      = sanitize_text_field($_POST['name']      ?? '匿名');         // 表示名
         $title     = sanitize_text_field($_POST['title']     ?? '');             // タイトル
         $text      = sanitize_textarea_field($_POST['text']  ?? '');             // 本文（改行を保持）
@@ -1505,15 +1558,12 @@ if (!function_exists('bbs_quest_confirm')) {
             );
 
             if (!$ok) {
-                // 万一失敗したら移動済みファイルを戻す/削除するなどの掃除が望ましい
-                // ここでは削除しておく
-                foreach ($moved_rel as $rel) {
-                    if (!$rel) continue;
-                    $uploads = wp_upload_dir();
-                    $abs = trailingslashit($uploads['basedir']) . $rel;
-                    @unlink($abs);
-                }
-                wp_send_json_error(['errors' => ['DBへの保存に失敗しました。']]);
+                error_log('[BBS INSERT ERROR] ' . $wpdb->last_error);
+                error_log('[BBS INSERT QUERY] ' . $wpdb->last_query);
+
+                wp_send_json_error([
+                    'errors' => ['DBへの保存に失敗しました: ' . $wpdb->last_error]
+                ]);
             }
 
             // 3) 下書きを破棄

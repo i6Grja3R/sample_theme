@@ -1886,7 +1886,7 @@ $stamp_files = [
 
                 if (json.data?.id) {
                     const idp = document.createElement('p');
-                    idp.textContent = '受付番号: ${json.data.id}';
+                    idp.textContent = `受付番号: ${json.data.id}`;
                     confirm_area.appendChild(idp);
                 }
             }
