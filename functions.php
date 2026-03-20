@@ -1028,6 +1028,18 @@ if (!function_exists('bbs_get_client_ip')) {
     }
 }
 
+if (!function_exists('bbs_get_user_agent')) {
+    /**
+     * User-Agent を安全に取得
+     * - 未設定なら空文字
+     * - DB列やキー長を考慮して 255文字に切る
+     */
+    function bbs_get_user_agent(): string
+    {
+        return substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+    }
+}
+
 // 連投制限（レートリミット）を判定する関数
 if (!function_exists('bbs_rate_guard')) {
     /**
@@ -1054,6 +1066,51 @@ if (!function_exists('bbs_rate_guard')) {
 
         // まだ上限以下なら、回数を1増やして、指定の秒数（$ttl）だけ再保存する
         set_transient($key, $cnt + 1, $ttl);
+
+        // ② ★追加：IP + UA
+        $ua = bbs_get_user_agent();
+
+        $key_ip_ua = 'bbs_rate_ipua_' . md5($ip . '|' . $ua);
+        $cnt_ip_ua = (int) get_transient($key_ip_ua);
+
+        if ($cnt_ip_ua >= $limit) {
+            wp_send_json_error([
+                'errors' => ['短時間に送信が多すぎます（環境制限）。時間をおいて再度お試しください。']
+            ]);
+        }
+
+        set_transient($key_ip_ua, $cnt_ip_ua + 1, $ttl);
+    }
+}
+
+if (!function_exists('bbs_duplicate_post_guard')) {
+    /**
+     * 同一内容の連投を一時的にブロック
+     *
+     * @param string $user_id ユーザー識別子
+     * @param string $title   投稿タイトル
+     * @param string $text    投稿本文
+     * @param int    $ttl     ブロック保持秒数（既定: 10分）
+     */
+    function bbs_duplicate_post_guard(string $user_id, string $title, string $text, int $ttl = 600): void
+    {
+        // 空白や大文字小文字の差を少し吸収
+        $normalized_title = preg_replace('/\s+/u', ' ', trim(mb_strtolower($title)));
+        $normalized_text  = preg_replace('/\s+/u', ' ', trim(mb_strtolower($text)));
+
+        // タイトル＋本文をまとめてハッシュ化
+        $fingerprint = md5($normalized_title . '|' . $normalized_text);
+
+        // user_id単位で同内容連投を制御
+        $key = 'bbs_dup_' . md5($user_id . '|' . $fingerprint);
+
+        if (get_transient($key)) {
+            wp_send_json_error([
+                'errors' => ['同じ内容の連続投稿はできません。少し時間をおいてから再度お試しください。']
+            ]);
+        }
+
+        set_transient($key, 1, $ttl);
     }
 }
 
@@ -1143,6 +1200,11 @@ if (!function_exists('bbs_quest_submit')) {
         /* --- 長さ上限＆改行正規化 ---------------------------------------- */
         $title = mb_substr($title, 0, 200);                                      // タイトル上限
         $name  = mb_substr($name,  0, 50);                                       // 名前上限
+
+        // 同一内容の連投をブロック（10分）
+        // mb_substr() の後に置く方が、実際に保存される内容ベースで判定可能
+        bbs_duplicate_post_guard($user_id, $title, $text, 10 * MINUTE_IN_SECONDS);
+
         // $text  = mb_substr($text,  0, 5000);                                     // 本文上限
         $text  = preg_replace("/\r\n?/", "\n", mb_substr($text, 0, 5000));       // 改行正規化（\r\n, \r→\n）
 
@@ -1540,6 +1602,10 @@ if (!function_exists('bbs_quest_confirm')) {
             // JSONにまとめて files カラムへ（スキーマに合わせて）
             $files_json = wp_json_encode(array_values($moved_rel), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
+            $ip = bbs_get_client_ip();
+            // スパム対策（IPの補助、バグ調査、Bot判定
+            $ua = bbs_get_user_agent();
+
             $ok = $wpdb->insert(
                 $table,
                 [
@@ -1553,8 +1619,10 @@ if (!function_exists('bbs_quest_confirm')) {
                     'is_confirmed' => 1,
                     'created_at'   => $now,           // テーブル側がDEFAULTなら省略可
                     'confirmed_at' => $now,
+                    'ip'           => $ip,
+                    'ua'           => $ua,
                 ],
-                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s']
+                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s']
             );
 
             if (!$ok) {
