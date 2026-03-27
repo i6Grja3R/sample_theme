@@ -19,15 +19,15 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
     }
 
     .other_step {
-        width: 450px;
-        height: 45px;
+        /* width: 450px; */
         overflow: hidden;
-        margin-right: 3px;
+        margin-right: 15px;
     }
 
     .other_step img {
-        width: 100%;
-        height: 100%;
+        width: auto;
+        height: 55px;
+        /* ←ここで揃える */
         max-width: none;
         object-fit: cover;
         /* 余白を切り捨てて枠いっぱい */
@@ -420,6 +420,63 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         margin-top: 3px;
         /* ← これで文字の先頭とピッタリ揃う */
     }
+
+    /* ===============================
+   投稿完了トースト
+   =============================== */
+    .bbs-toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 280px;
+        max-width: 420px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: #e52d77;
+        color: #fff;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
+        opacity: 0;
+        transform: translateY(16px);
+        transition: opacity .22s ease, transform .22s ease;
+        pointer-events: none;
+    }
+
+    .bbs-toast.is-show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .bbs-toast_icon {
+        flex: 0 0 28px;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .18);
+        position: relative;
+    }
+
+    .bbs-toast_icon::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 6px;
+        width: 8px;
+        height: 14px;
+        border-right: 4px solid #fff;
+        border-bottom: 4px solid #fff;
+        transform: rotate(45deg);
+        box-sizing: border-box;
+    }
+
+    .bbs-toast_text {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.4;
+    }
 </style>
 
 <div class="board_form_partial" id="js_board_form_partial"><!-- 全体ラッパ -->
@@ -584,6 +641,8 @@ $stamp_files = [
     window.bbs_confirm_vars = {
         ajax_url: "<?php echo esc_js(admin_url('admin-ajax.php')); ?>",
         nonce: "<?php echo esc_js(wp_create_nonce('bbs_quest_confirm')); ?>",
+        // 将来的にバグる可能性ありなので英語スラッグにするのがベスト
+        list_url: "<?php echo esc_js(home_url('/question-list/')); ?>"
     };
 </script>
 <script>
@@ -1828,6 +1887,37 @@ $stamp_files = [
         }
     }
 
+    // トースト生成関数
+    function showPostToast(message) {
+        const old = document.querySelector('.bbs-toast');
+        if (old) old.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'bbs-toast';
+
+        const icon = document.createElement('div');
+        icon.className = 'bbs-toast_icon';
+
+        const text = document.createElement('div');
+        text.className = 'bbs-toast_text';
+        text.textContent = message;
+
+        toast.appendChild(icon);
+        toast.appendChild(text);
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.add('is-show');
+        });
+
+        setTimeout(() => {
+            toast.classList.remove('is-show');
+            setTimeout(() => {
+                toast.remove();
+            }, 250);
+        }, 800);
+    }
+
     /* ------------------------------
      * 確定（confirm → bbs_quest_confirm）
      * ------------------------------ */
@@ -1874,22 +1964,12 @@ $stamp_files = [
                 return;
             }
 
-            // 完了UI
-            change3();
-            document.querySelectorAll('.post-button').forEach(el => el.style.display = "none");
+            // 成功トーストを出してから一覧へ遷移
+            showPostToast("投稿しました");
+            setTimeout(() => {
+                window.location.href = window.bbs_confirm_vars.list_url;
+            }, 900);
 
-            if (confirm_area) {
-                confirm_area.textContent = "";
-                const p = document.createElement('p');
-                p.textContent = json.data?.message || "投稿が確定しました。ありがとうございました。";
-                confirm_area.appendChild(p);
-
-                if (json.data?.id) {
-                    const idp = document.createElement('p');
-                    idp.textContent = `受付番号: ${json.data.id}`;
-                    confirm_area.appendChild(idp);
-                }
-            }
         } catch (err) {
             console.error(err);
             const isNetwork = (err instanceof TypeError) && /fetch|network|failed/i.test(String(err && err.message));
