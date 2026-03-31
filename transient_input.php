@@ -1299,7 +1299,7 @@ $stamp_files = [
         go.type = 'button';
         go.id = 'confirm_button';
         go.className = 'answer-following';
-        go.textContent = '結果画面へ進む';
+        go.textContent = '投稿する';
         go.addEventListener('click', confirm_button_click, {
             once: true
         });
@@ -1658,17 +1658,11 @@ $stamp_files = [
                     confirm_area
                 });
 
-                const carouselEl = buildConfirmCarousel(mediaFiles);
-
-                console.log('AFTER build, BEFORE append', {
-                    carouselEl
-                });
-
-                confirm_area.appendChild(carouselEl);
-
-                console.log('AFTER append, calling init');
-
-                initConfirmCarousel();
+                if (mediaFiles.length > 0) {
+                    const carouselEl = buildConfirmCarousel(mediaFiles);
+                    confirm_area.appendChild(carouselEl);
+                    initConfirmCarousel();
+                }
 
                 console.log('AFTER initConfirmCarousel() call');
 

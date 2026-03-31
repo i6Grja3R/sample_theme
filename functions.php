@@ -1083,30 +1083,45 @@ if (!function_exists('bbs_rate_guard')) {
     }
 }
 
-if (!function_exists('bbs_duplicate_post_guard')) {
+if (!function_exists('bbs_duplicate_commit_guard')) {
     /**
-     * 同一内容の連投を一時的にブロック
-     *
-     * @param string $user_id ユーザー識別子
-     * @param string $title   投稿タイトル
-     * @param string $text    投稿本文
-     * @param int    $ttl     ブロック保持秒数（既定: 10分）
+     * 確定直前の重複投稿をブロック
+     * - user_id 単位
+     * - title / text / stamp / 添付スロット をまとめて判定
      */
-    function bbs_duplicate_post_guard(string $user_id, string $title, string $text, int $ttl = 600): void
-    {
-        // 空白や大文字小文字の差を少し吸収
-        $normalized_title = preg_replace('/\s+/u', ' ', trim(mb_strtolower($title)));
-        $normalized_text  = preg_replace('/\s+/u', ' ', trim(mb_strtolower($text)));
+    function bbs_duplicate_commit_guard(
+        string $user_id,
+        string $title,
+        string $text,
+        int $stamp,
+        string $attach1 = '',
+        string $attach2 = '',
+        string $attach3 = '',
+        string $usericon = '',
+        int $ttl = 600
+    ): void {
+        $normalize = function (string $s): string {
+            $s = mb_strtolower($s);
+            $s = preg_replace('/\s+/u', ' ', trim($s));
+            return $s;
+        };
 
-        // タイトル＋本文をまとめてハッシュ化
-        $fingerprint = md5($normalized_title . '|' . $normalized_text);
+        $fingerprint_source = implode('|', [
+            $normalize($title),
+            $normalize($text),
+            (string) $stamp,
+            trim($attach1),
+            trim($attach2),
+            trim($attach3),
+            trim($usericon),
+        ]);
 
-        // user_id単位で同内容連投を制御
-        $key = 'bbs_dup_' . md5($user_id . '|' . $fingerprint);
+        $fingerprint = md5($fingerprint_source);
+        $key = 'bbs_dup_commit_' . md5($user_id . '|' . $fingerprint);
 
         if (get_transient($key)) {
             wp_send_json_error([
-                'errors' => ['同じ内容の連続投稿はできません。少し時間をおいてから再度お試しください。']
+                'errors' => ['同じ内容の投稿は連続して送信できません。少し時間をおいてから再度お試しください。']
             ]);
         }
 
@@ -1200,10 +1215,6 @@ if (!function_exists('bbs_quest_submit')) {
         /* --- 長さ上限＆改行正規化 ---------------------------------------- */
         $title = mb_substr($title, 0, 200);                                      // タイトル上限
         $name  = mb_substr($name,  0, 50);                                       // 名前上限
-
-        // 同一内容の連投をブロック（10分）
-        // mb_substr() の後に置く方が、実際に保存される内容ベースで判定可能
-        bbs_duplicate_post_guard($user_id, $title, $text, 10 * MINUTE_IN_SECONDS);
 
         // $text  = mb_substr($text,  0, 5000);                                     // 本文上限
         $text  = preg_replace("/\r\n?/", "\n", mb_substr($text, 0, 5000));       // 改行正規化（\r\n, \r→\n）
@@ -1628,6 +1639,19 @@ if (!function_exists('bbs_quest_confirm')) {
             $attach2  = $moved_rel[1] ?? '';
             $attach3  = $moved_rel[2] ?? '';
             $usericon = $moved_rel[3] ?? '';
+
+            // 確定直前にだけ重複判定
+            bbs_duplicate_commit_guard(
+                $user_id,
+                $title,
+                $text,
+                (int)$stamp,
+                $attach1,
+                $attach2,
+                $attach3,
+                $usericon,
+                10 * MINUTE_IN_SECONDS
+            );
 
             // files は使わない方針なので空
             $files_json = '';
