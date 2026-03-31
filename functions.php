@@ -1508,86 +1508,111 @@ if (!function_exists('bbs_quest_confirm')) {
         }
 
         // 2) 匿名UUID
-        $user_id  = get_guest_uuid();
+        $user_id = get_guest_uuid();
 
-        /* --- レート制限（IP + user_id、例：10分で20回まで） --------------- */
+        // 3) レート制限
         bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
 
-        /* --- パラメータ ------------------------------------------------------ */
-        $mode = sanitize_text_field($_POST['mode'] ?? 'show'); // 'show' or 'commit'
+        // 4) パラメータ
+        $mode     = sanitize_text_field($_POST['mode'] ?? 'show'); // 'show' or 'commit'
         $draft_id = sanitize_text_field($_POST['draft_id'] ?? '');
+
         if ($draft_id === '') {
             wp_send_json_error(['errors' => ['ドラフトIDがありません。']]);
         }
 
-        // submit と同じ命名規則で transient キーを復元
+        // 5) 下書き復元
         $transient_key = "bbs_quest_{$user_id}_{$draft_id}";
         $payload = get_transient($transient_key);
+
         if (!is_array($payload)) {
             wp_send_json_error(['errors' => ['下書きが見つからないか、有効期限切れです。']]);
         }
 
-        // 必要項目を抽出
-        $unique_id = (string)($payload['unique_id'] ?? '');
-        $name = (string)($payload['name'] ?? '匿名');
-        $title = (string)($payload['title'] ?? '');
-        $text = (string)($payload['text'] ?? '');
-        $stamp   = (int)($payload['stamp'] ?? 0);
-        $files = is_array($payload['files'] ?? null) ? $payload['files'] : [];
+        // 6) 必要項目
+        $unique_id = (string) ($payload['unique_id'] ?? '');
+        $name      = (string) ($payload['name'] ?? '匿名');
+        $title     = (string) ($payload['title'] ?? '');
+        $text      = (string) ($payload['text'] ?? '');
+        $stamp     = (int) ($payload['stamp'] ?? 0);
+        $files     = is_array($payload['files'] ?? null) ? $payload['files'] : [];
 
+        // -----------------------------------------
+        // show: 確認画面用データを返す
+        // -----------------------------------------
         if ($mode === 'show') {
-            // プレビュー用：submit時点の入力をそのまま返す
-            wp_send_json_success(['data' => [
-                'unique_id' => $unique_id,
-                'name'      => $name,
-                'title'     => $title,
-                'text'      => $text,
-                'stamp'     => $stamp,
-                'files'     => $files, // basename の配列
-            ]]);
+            wp_send_json_success([
+                'data' => [
+                    'unique_id' => $unique_id,
+                    'name'      => $name,
+                    'title'     => $title,
+                    'text'      => $text,
+                    'stamp'     => $stamp,
+                    'files'     => array_values($files), // フロント確認画面で利用
+                ]
+            ]);
         }
 
+        // -----------------------------------------
+        // commit: tmp → attach へ移動して DB保存
+        // -----------------------------------------
         if ($mode === 'commit') {
             $errors = [];
 
             // 1) 添付ファイルを /uploads/tmp/ → /uploads/attach/ に移動
             $tmp_dir    = bbs_tmp_dir();        // …/uploads/tmp/
             $final_dir  = bbs_attach_dir();     // …/uploads/attach/（存在しなければ作成）
-            $base_tmp   = realpath($tmp_dir);
-            $base_final = realpath($final_dir);
 
-            $moved_rel  = []; // DB保存用（uploads相対）
+            if (!$final_dir || !wp_mkdir_p($final_dir)) {
+                wp_send_json_error(['errors' => ['投稿処理中にエラーが発生しました。時間をおいて再度お試しください。']]);
+            }
+
+            $base_final = realpath($final_dir);
+            if ($base_final === false) {
+                wp_send_json_error(['errors' => ['投稿処理中にエラーが発生しました。時間をおいて再度お試しください。']]);
+            }
+
+            // 添付結果をスロット順で保持
+            $moved_rel = ['', '', '', ''];
+
             foreach ($files as $i => $basename) {
                 if (!$basename) {
                     $moved_rel[$i] = '';
                     continue;
                 }
+
                 $src = trailingslashit($tmp_dir) . $basename;
                 if (!file_exists($src)) {
-                    $errors[] = '・一時ファイルが見つかりませんでした（' . esc_html($basename) . '）。';
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
                     continue;
                 }
 
-                // 拡張子はベースネームから
+                // 拡張子は basename から取得
                 $ext = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
+                if ($ext === '') {
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
+                    continue;
+                }
+
                 $uuid = wp_generate_uuid4();
                 $dest_name = "{$uuid}_{$i}.{$ext}";
                 $dest_abs  = trailingslashit($final_dir) . $dest_name;
 
-                // realpathガード：最終保存先が /uploads/attach/ 配下か
+                // 保存先が /uploads/attach/ 配下か確認
                 $real = realpath(dirname($dest_abs));
-                if ($base_final === false || $real === false || strpos($real, $base_final) !== 0) {
-                    $errors[] = '・保存先の検証に失敗しました。';
+                if ($real === false || strpos($real, $base_final) !== 0) {
+                    $errors[] = '・投稿処理中にエラーが発生しました。';
                     continue;
                 }
 
-                if (!@rename($src, $dest_abs)) { // move_uploaded_file ではなく rename
-                    $errors[] = '・最終保存への移動に失敗しました。';
+                if (!@rename($src, $dest_abs)) {
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
                     continue;
                 }
+
                 @chmod($dest_abs, 0644);
 
-                // uploads 相対へ
+                // uploads 相対パスへ
                 $moved_rel[$i] = bbs_to_uploads_relative($dest_abs);
             }
 
@@ -1595,15 +1620,19 @@ if (!function_exists('bbs_quest_confirm')) {
                 wp_send_json_error(['errors' => $errors]);
             }
 
-            // 2) DBへ INSERT（ここが初めての保存）
+            // 2) DBへ INSERT（wp_sortable のみ）
             $table = $wpdb->prefix . 'sortable';
             $now   = current_time('mysql', true);
 
-            // JSONにまとめて files カラムへ（スキーマに合わせて）
-            $files_json = wp_json_encode(array_values($moved_rel), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $attach1  = $moved_rel[0] ?? '';
+            $attach2  = $moved_rel[1] ?? '';
+            $attach3  = $moved_rel[2] ?? '';
+            $usericon = $moved_rel[3] ?? '';
+
+            // files は使わない方針なので空
+            $files_json = '';
 
             $ip = bbs_get_client_ip();
-            // スパム対策（IPの補助、バグ調査、Bot判定
             $ua = bbs_get_user_agent();
 
             $ok = $wpdb->insert(
@@ -1616,13 +1645,17 @@ if (!function_exists('bbs_quest_confirm')) {
                     'text'         => $text,
                     'stamp'        => (int)$stamp,
                     'files'        => $files_json,
+                    'attach1'      => $attach1,
+                    'attach2'      => $attach2,
+                    'attach3'      => $attach3,
+                    'usericon'     => $usericon,
                     'is_confirmed' => 1,
-                    'created_at'   => $now,           // テーブル側がDEFAULTなら省略可
+                    'created_at'   => $now,
                     'confirmed_at' => $now,
                     'ip'           => $ip,
                     'ua'           => $ua,
                 ],
-                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s']
+                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
             );
 
             if (!$ok) {
@@ -1642,7 +1675,6 @@ if (!function_exists('bbs_quest_confirm')) {
                 'id'      => (int)$wpdb->insert_id,
             ]);
         }
-
         wp_send_json_error(['errors' => ['不正なモードです。']]);
     }
 }
