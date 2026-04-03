@@ -4,33 +4,68 @@ Template Name: que_list
 固定ページ: 質問一覧画面
 */
 get_header();
-$sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL AND attach1 LIKE '%.mp4' ORDER BY RAND() LIMIT 5";
-$query = $wpdb->prepare($sql);
-$rows = $wpdb->get_results($query);
+
+global $wpdb;
 $upload_dir = wp_upload_dir();
+
+$sql = "
+SELECT *
+FROM {$wpdb->prefix}sortable
+WHERE (parent_id IS NULL OR parent_id = 0)
+  AND (
+    attach1 LIKE '%.mp4'
+    OR attach2 LIKE '%.mp4'
+    OR attach3 LIKE '%.mp4'
+  )
+ORDER BY RAND()
+LIMIT 5
+";
+$rows = $wpdb->get_results($sql);
+
 $carousel_list = [];
 $indicator_list = [];
+
 if (empty($rows)) {
     $carousel_area_style = 'height:0;';
 } else {
     $carousel_area_style = '';
 }
+
 foreach ($rows as $row) {
+    $video_rel = '';
+
+    // attach1 → attach2 → attach3 の順で最初の mp4 を探す
+    foreach ([$row->attach1 ?? '', $row->attach2 ?? '', $row->attach3 ?? ''] as $att) {
+        if (!empty($att) && preg_match('/\.mp4$/i', $att)) {
+            $video_rel = $att;
+            break;
+        }
+    }
+
+    if ($video_rel === '') {
+        continue;
+    }
+
+    $video_url  = trailingslashit($upload_dir['baseurl']) . ltrim($video_rel, '/');
+    $detail_url = home_url('質問回答画面?' . $row->unique_id);
+    $safe_title = esc_js($row->title);
+
     $carousel_list[] = '
 <div class="carousel-container">
     <div class="carousel-video-area" style="">
-        <a href="' . home_url('質問回答画面?' . $row->unique_id) . '">
+        <a href="' . esc_url($detail_url) . '">
             <div class="carousel-video-wrap">
-                <video class="carousel-video-streaming" src="' . $upload_dir['baseurl'] . '/attach/' . $row->attach1 . '#t=0.1" type="video/mp4" autoplay muted loop></video>
+                <video class="carousel-video-streaming" src="' . esc_url($video_url) . '#t=0.1" type="video/mp4" autoplay muted loop></video>
             </div>
             <div class="carousel-video-title">
             <script>
-            document.currentScript.insertAdjacentHTML("beforebegin", truncate("' . $row->title . '",39));
+            document.currentScript.insertAdjacentHTML("beforebegin", truncate("' . $safe_title . '",39));
             </script>
             </div>
         </a>
     </div>
 </div>';
+
     $indicator_list[] = '<li class="list"></li>';
 }
 ?>

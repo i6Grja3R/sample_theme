@@ -751,40 +751,52 @@ add_action('wp_ajax_nopriv_bbs_answer_confirm', 'bbs_answer_confirm');
 function bbs_que_list_items()
 {
     global $wpdb;
-    $count = $_POST['count'];
-    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL LIMIT %d,10";
+
+    $count = isset($_POST['count']) ? (int) $_POST['count'] : 0;
+    if ($count < 0) {
+        $count = 0;
+    }
+
+    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE (parent_id IS NULL OR parent_id = 0) ORDER BY id DESC LIMIT %d,10";
     $query = $wpdb->prepare($sql, $count);
     $rows = $wpdb->get_results($query);
+
     $result = [];
     $result['items'] = [];
     $upload_dir = wp_upload_dir();
+
     foreach ($rows as $row) {
         if (empty($row->attach1)) {
             $url = '';
             $type = '';
         } else {
             $info = pathinfo($row->attach1);
-            $url = $upload_dir['baseurl'] . '/attach/' . $info['basename'];
-            $ext = $info['extension'];
+            $url = trailingslashit($upload_dir['baseurl']) . ltrim($row->attach1, '/');
+            $ext = strtolower($info['extension'] ?? '');
+
             switch ($ext) {
+                case 'jpg':
                 case 'jpeg':
                 case 'png':
                     $type = 'img';
                     break;
                 case 'mp4':
-                    $type = ''; /* ダミー */
-                    break;
                 case 'pdf':
-                    $type = ''; /* ダミー */
-                    break;
                 default:
+                    $type = '';
                     break;
             }
         }
-        $result['items'][] = ['title' => $row->title, 'img1' => $url, 'type' => $type, 'url' => home_url('質問回答画面?' . $row->unique_id)];
+
+        $result['items'][] = [
+            'title' => $row->title,
+            'img1'  => $url,
+            'type'  => $type,
+            'url'   => home_url('質問回答画面?' . $row->unique_id),
+        ];
     }
-    echo json_encode($result);
-    exit;
+
+    wp_send_json($result);
 }
 add_action('wp_ajax_bbs_que_list_items', 'bbs_que_list_items');
 add_action('wp_ajax_nopriv_bbs_que_list_items', 'bbs_que_list_items');
@@ -1635,9 +1647,19 @@ if (!function_exists('bbs_quest_confirm')) {
             $table = $wpdb->prefix . 'sortable';
             $now   = current_time('mysql', true);
 
-            $attach1  = $moved_rel[0] ?? '';
-            $attach2  = $moved_rel[1] ?? '';
-            $attach3  = $moved_rel[2] ?? '';
+            // media(attach1〜3) だけ前詰め
+            // file1空 / file2あり → attach1へ詰まる、file1空 / file2あり / file3あり → attach1, attach2へ詰まる
+            $media = array_values(array_filter([
+                $moved_rel[0] ?? '',
+                $moved_rel[1] ?? '',
+                $moved_rel[2] ?? '',
+            ], function ($v) {
+                return is_string($v) && $v !== '';
+            }));
+
+            $attach1  = $media[0] ?? '';
+            $attach2  = $media[1] ?? '';
+            $attach3  = $media[2] ?? '';
             $usericon = $moved_rel[3] ?? '';
 
             // 確定直前にだけ重複判定
