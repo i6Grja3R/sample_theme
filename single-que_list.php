@@ -11,7 +11,8 @@ $upload_dir = wp_upload_dir();
 $sql = "
 SELECT *
 FROM {$wpdb->prefix}sortable
-WHERE (parent_id IS NULL OR parent_id = 0)
+WHERE parent_id IS NULL
+  AND is_confirmed = 1
   AND (
     attach1 LIKE '%.mp4'
     OR attach2 LIKE '%.mp4'

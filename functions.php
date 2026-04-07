@@ -757,7 +757,7 @@ function bbs_que_list_items()
         $count = 0;
     }
 
-    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE (parent_id IS NULL OR parent_id = 0) ORDER BY id DESC LIMIT %d,10";
+    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL AND is_confirmed = 1 ORDER BY id DESC LIMIT %d,10";
     $query = $wpdb->prepare($sql, $count);
     $rows = $wpdb->get_results($query);
 
@@ -1684,6 +1684,7 @@ if (!function_exists('bbs_quest_confirm')) {
             $ok = $wpdb->insert(
                 $table,
                 [
+                    'parent_id'    => null,
                     'unique_id'    => $unique_id,
                     'user_id'      => $user_id,
                     'name'         => $name,
@@ -1700,8 +1701,7 @@ if (!function_exists('bbs_quest_confirm')) {
                     'confirmed_at' => $now,
                     'ip'           => $ip,
                     'ua'           => $ua,
-                ],
-                ['%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
+                ]
             );
 
             if (!$ok) {
