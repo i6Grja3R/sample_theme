@@ -48,7 +48,7 @@ foreach ($rows as $row) {
     }
 
     $video_url  = trailingslashit($upload_dir['baseurl']) . ltrim($video_rel, '/');
-    $detail_url = home_url('質問回答画面?' . $row->unique_id);
+    $detail_url = home_url('que-answer?' . $row->unique_id);
     $safe_title = esc_js($row->title);
 
     $carousel_list[] = '

@@ -563,9 +563,10 @@ function bbs_answer_submit()
                 $mime = mime_content_type($tmp_name);
                 $ext = pathinfo($original_name, PATHINFO_EXTENSION);
 
-                // MIMEと拡張子チェック（例：画像、PDF、動画のみ許可）
+                // MIMEと拡張子チェック（例：画像、動画のみ許可）
                 // 許可する MIME タイプ（ホワイトリスト）
-                $allowed_types = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
+                // $allowed_types = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
+                $allowed_types = ['image/jpeg', 'image/png', 'video/mp4'];
                 if (!in_array($mime, $allowed_types)) {
                     $error[] = '・許可されていないファイル形式です';
                     continue;
@@ -781,7 +782,7 @@ function bbs_que_list_items()
                     $type = 'img';
                     break;
                 case 'mp4':
-                case 'pdf':
+                    // case 'pdf':
                 default:
                     $type = '';
                     break;
@@ -792,7 +793,7 @@ function bbs_que_list_items()
             'title' => $row->title,
             'img1'  => $url,
             'type'  => $type,
-            'url'   => home_url('質問回答画面?' . $row->unique_id),
+            'url'   => home_url('que-answer?' . $row->unique_id),
         ];
     }
 
@@ -1358,9 +1359,9 @@ if (!function_exists('bbs_quest_submit')) {
                 $per_limit = BBS_MAX_PER_FILE; // 例: 5MB（画像/PDFなどの既定）
                 if (strpos($mime, 'video/') === 0) {
                     $per_limit = BBS_MAX_PER_FILE_VIDEO; // 例: 10MB など
-                } elseif ($mime === 'application/pdf') {
-                    $per_limit = BBS_MAX_PER_FILE_PDF;   // 例: 5MB など
                 }
+                /* } elseif ($mime === 'application/pdf') {
+                $per_limit = BBS_MAX_PER_FILE_PDF; */
 
                 // 8) サイズ（個別/合計）— ここで per-type の上限を適用
                 if ($size <= 0 || $size > $per_limit) {

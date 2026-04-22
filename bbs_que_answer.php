@@ -7,7 +7,7 @@ header('X-FRAME-OPTIONS: SAMEORIGIN');
 get_header();
 // get_header('menu'); 必要なコードか分からない
 $unique_id = substr($_SERVER['REQUEST_URI'], -36);
-$sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE unique_id = %s";
+$sql = 'SELECT * FROM sortable WHERE unique_id = %s';
 $query = $wpdb->prepare($sql, $unique_id);
 $rows = $wpdb->get_results($query);
 // アップロードディレクトリ（パス名）を取得する
@@ -65,12 +65,6 @@ foreach ($rows as $row) {
     // echo '</div>';
     echo '<div class="quest_usericon_img"><img src="' . $usericon_src . '">'; // アイコン画像
     echo '<div class="quest_username">' . $row->name . '</div>'; // 名前
-
-    // テンプレートにデータを渡してボタン描画（AJAX + SVG込み）
-    get_template_part('template-parts/like/button', null, [
-        'unique_id' => $unique_id,
-    ]);
-
     echo '</div>';  // アイコン画像
 }
 echo '</div>'; //<div class="quest_container"> の閉じタグ
@@ -80,15 +74,47 @@ echo '</div>'; //<div class="quest_container"> の閉じタグ
 $camera_url = $upload_dir['baseurl'] . '/camera.png';
 $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 ?>
+
+<style>
+    .board_respond div#input_area .placeholder-area textarea#text {
+        background-color: #FCF2F4;
+        border: 2px solid #F7859C;
+        margin: 5px 0 20px 5px;
+        padding: 10px 0 10px 10px;
+        width: 98%;
+        height: 315px;
+        font-size: 150%;
+        font-weight: 700;
+        letter-spacing: .1em;
+    }
+
+    .board_respond div#input_area .placeholder-area .msg_partial {
+        text-align: right;
+        color: #333;
+        margin: 0 15px 20px 0;
+    }
+
+    .board_respond div#input_area .answer-name-area .msg_partial {
+        text-align: right;
+        color: #333;
+        margin: 0 0 20px 0;
+    }
+
+    .uploadfile-camera-icon.dragover,
+    .user-icon.dragover {
+        outline: 8px solid rgba(22, 165, 191, 0.6);
+        outline-offset: 6px;
+    }
+</style>
+
 <!-- <button class="comment-remark-button" id="">返信</button> -->
 <div id="js_board_respond" class="board_respond">
     <div id="input_area">
         <form name="answer_Input_form">
-            <input type="hidden" name="unique_id" value="<?php echo esc_attr($unique_id); ?>">
             <div class="placeholder-area">
                 <div class="comments-composer">コメント一覧</div>
                 <textarea id="text" class="rich-label" name="text" placeholder="荒らし行為や誹謗中傷や著作権の侵害はご遠慮ください"></textarea>
-                <div></div>
+                <div class="msg_partial"></div>
             </div>
         </form>
     </div>
@@ -225,35 +251,18 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
             // class属性の値を追加
             divFilesizeRestrictionArea.setAttribute('class', 'filesize-restriction-area');
 
-            /* spanタグ要素作成 */
-            const spanAnnotation = document.createElement("span");
-            // class属性の値を追加
-            spanAnnotation.setAttribute('class', 'annotation');
-            spanAnnotation.textContent = "動画・画像をアップロード(Upload video・image)"; //spanタグにテキスト挿入
-            const spanRequired = document.createElement("span");
-            // class属性の値を追加
-            spanRequired.setAttribute('class', 'required');
-            spanRequired.textContent = "※ファイルサイズ15MB以内、JPG/GIF/PNG/MP4"; //spanタグにテキスト挿入
+            /* h2タグ要素作成 */
+            const h2 = document.createElement("h2");
 
-            /* buttonタグ要素作成 */
-            const buttonCancelButton = document.createElement("button");
-            // button要素のtype属性を操作
-            buttonCancelButton.setAttribute("type", "button");
-            // class属性の値を追加
-            buttonCancelButton.setAttribute('class', 'cancel-button');
-            buttonCancelButton.textContent = "キャンセル"; //divタグにテキスト挿入
+            h2.innerHTML = `
+            動画・画像をアップロード（JPG / PNG / MP4）<br>
+            <span class="required">
+            ※画像は1ファイル5MBまで（合計15MBまで）、動画は1ファイル10MBまで（合計30MBまで）アップロードできます
+            </span>
+            `;
 
-            buttonCancelButton.addEventListener("click", () => {
-                let divBoardRespond = document.querySelector('#divBoardRespond');
-                divBoardRespond.remove(); //remove()で要素を削除する
-                // setResButtonsDisabled(false); // 2度押し禁止
-            });
-
-            function setResButtonsDisabled() {
-                // buttonCancelButton = document.querySelector(".cancel-button");
-                // 2度押し禁止
-                divBoardRespond.disabled = true;
-            }
+            // これを追加
+            divFilesizeRestrictionArea.appendChild(h2);
 
             /* divタグ要素作成 */
             const divPostButton = document.createElement("div");
@@ -335,17 +344,15 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
             /* inputタグ要素配置位置 */
             divParts.appendChild(inputName); // div (玄孫要素) の末尾に input を追加
 
+            /* 名前入力可能文字数を動的に生成 */
+            const divNameMsg = document.createElement("div");
+            divNameMsg.className = "msg_partial";
+
             /* divタグ要素配置位置 */
-            divParts.appendChild(document.createElement("div"));
+            divParts.appendChild(divNameMsg);
 
             /* divタグ要素配置位置 */
             formAnswerInputForm.appendChild(divFilesizeRestrictionArea); // form (孫要素) の末尾に div を追加
-
-            /* divタグ要素配置位置 */
-            divFilesizeRestrictionArea.appendChild(spanAnnotation); // div (ひ孫要素) の末尾に span を追加
-
-            /* divタグ要素配置位置 */
-            divFilesizeRestrictionArea.appendChild(spanRequired); // div (ひ孫要素) の末尾に span を追加
 
             /* img要素を動的に作成して画像を表示する */
             const CAMERA_URL = '<?php echo $camera_url; ?>';
@@ -389,7 +396,7 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
                 // datasetでdata属性（data-*）を設定する
                 inputAttach.dataset.maxsize = '5';
                 // accent属性の値を追加
-                inputAttach.accept = ".png, .jpg, .jpeg, .pdf, .mp4"; // accept 値を設定
+                inputAttach.accept = ".png, .jpg, .jpeg, .mp4"; // accept 値を設定
                 // 要素のスタイルを取得・設定
                 inputAttach.style.display = 'none';
 
@@ -424,9 +431,6 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 
             /* divタグ要素配置位置 */
             formAnswerInputForm.appendChild(divPostButton); // form (孫要素) の末尾に div を追加
-
-            /* buttonタグ要素配置位置 */
-            divPostButton.appendChild(buttonCancelButton); // div (ひ孫要素) の末尾に button を追加
 
             /* buttonタグ要素配置位置 */
             divPostButton.appendChild(buttonSubmitButton); // div (ひ孫要素) の末尾に button を追加
@@ -543,6 +547,217 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
     const blobType = ["", "", "", ""];
     const blobUrl = ["", "", "", ""];
 
+    /* -------------------------------------
+     * 回答画面用：文字数表示（本文/名前）
+     *  - data-length / data-minlength を利用
+     *  - 直後の .msg_partial に「残り/超過」を表示
+     * ------------------------------------- */
+    function display_text_length_answer(e) {
+        if (!e || !e.target || !['text', 'name'].includes(e.target.id)) return;
+
+        const el = e.target;
+        const msg = el.nextElementSibling;
+        if (!msg) return;
+
+        const getMax = (el) => {
+            const a = parseInt(el.getAttribute('maxlength') || '0', 10) || 0;
+            const d = parseInt(el.dataset.length || '0', 10) || 0;
+            return a || d;
+        };
+
+        const getMin = (el) => {
+            const a = parseInt(el.getAttribute('minlength') || '0', 10) || 0;
+            const d = parseInt(el.dataset.minlength || '0', 10) || 0;
+            return a || d;
+        };
+
+        const max = getMax(el);
+        const min = getMin(el);
+        const len = el.value.length;
+
+        const strong = (num) => {
+            const s = document.createElement('strong');
+            s.textContent = String(num);
+            s.style.color = '#e52d77';
+            return s;
+        };
+
+        msg.className = 'msg_partial';
+        msg.style.color = '';
+        msg.replaceChildren();
+
+        if (max && len > max) {
+            const over = len - max;
+            msg.style.color = 'red';
+            msg.append(
+                '超過 ', strong(over), ' 文字です（最大 ', strong(max), ' 文字）。'
+            );
+            el.classList.add('is-over');
+        } else if (min && len < min) {
+            const lack = min - len;
+            msg.style.color = '#d9534f';
+            msg.append(
+                'あと ', strong(lack), ' 文字必要です（最低 ', strong(min), ' 文字）。'
+            );
+            el.classList.remove('is-over');
+        } else if (max) {
+            const remain = max - len;
+            msg.append('残り ', strong(remain), ' 文字入力できます。');
+            el.classList.remove('is-over');
+        } else {
+            msg.textContent = '';
+            el.classList.remove('is-over');
+        }
+    }
+
+    /* 初回表示時に現在値でカウンタを出す */
+    function updateAnswerCountersOnce() {
+        ['text', 'name'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            display_text_length_answer({
+                target: el
+            });
+        });
+    }
+
+    function set_attach_event(fileAreaSelector, usericonIndex) {
+
+        const attachInputs = document.querySelectorAll('input.attach[type="file"]');
+        const viewers = document.querySelectorAll('.viewer');
+        const fileAreas = document.querySelectorAll(fileAreaSelector);
+        const clearBtns = document.querySelectorAll('.attachclear');
+
+        function renderPreview(idx, file) {
+            const viewer = viewers[idx];
+            const fileArea = fileAreas[idx];
+            if (!viewer) return;
+
+            viewer.innerHTML = '';
+
+            let el;
+            if (file.type.startsWith('image/')) {
+                el = document.createElement('img');
+            } else if (file.type.startsWith('video/')) {
+                el = document.createElement('video');
+                el.controls = true;
+            } else {
+                return;
+            }
+
+            const url = URL.createObjectURL(file);
+            el.src = url;
+
+            const isIcon = idx === usericonIndex;
+
+            if (isIcon) {
+                el.style.width = '90px';
+                el.style.height = '90px';
+                el.style.objectFit = 'cover';
+            } else {
+                el.style.width = '535px';
+                el.style.height = '301px';
+                el.style.objectFit = 'fill';
+            }
+
+            viewer.appendChild(el);
+            viewer.style.display = 'block';
+
+            // 元のカメラ/アイコン画像を隠す
+            if (fileArea) {
+                fileArea.style.display = 'none';
+            }
+        }
+
+        function setFile(idx, file) {
+            if (!file) return;
+
+            const isIcon = idx === usericonIndex;
+
+            // ① まず種別チェック（ここを先に）
+            if (isIcon) {
+                if (!file.type.match(/^image\/(jpeg|png)$/)) {
+                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）');
+                    return;
+                }
+            } else {
+                if (!file.type.match(/^image\/|^video\/mp4$/)) {
+                    alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4のみ許可）');
+                    return;
+                }
+            }
+
+            // ② 次にサイズチェック
+            let maxMB = isIcon ? 5 : (file.type.startsWith('video/') ? 10 : 5);
+            if (file.size > maxMB * 1024 * 1024) {
+                alert(`ファイルサイズが上限(${maxMB}MB)を超えています`);
+                return;
+            }
+
+            // ③ 表示
+            renderPreview(idx, file);
+        }
+
+
+
+        attachInputs.forEach((inp, idx) => {
+            inp.addEventListener('change', () => {
+                const file = inp.files[0];
+                setFile(idx, file);
+            });
+        });
+
+        clearBtns.forEach((btn, idx) => {
+            btn.addEventListener('click', () => {
+                const viewer = viewers[idx];
+                const inp = attachInputs[idx];
+                const fileArea = fileAreas[idx];
+                if (!viewer || !inp) return;
+
+                viewer.innerHTML = '';
+                viewer.style.display = 'none';
+                inp.value = '';
+
+                // 元のカメラ/アイコン画像を再表示
+                if (fileArea) {
+                    fileArea.style.display = '';
+                }
+            });
+        });
+
+        fileAreas.forEach((fa, idx) => {
+
+            // ドラッグ中（青）
+            fa.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fa.classList.add('dragover');
+            });
+
+            // 離れたとき
+            fa.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+            });
+
+            // ドロップ
+            fa.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fa.classList.remove('dragover');
+
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+
+                // inputにも反映
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                attachInputs[idx].files = dt.files;
+
+                setFile(idx, file);
+            });
+
+        });
+    }
+
     const init = function() {
         make();
         // set_attach_event('.uploadfile-camera-icon,.user-icon', 0);
@@ -551,12 +766,12 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
         /* inputイベント */
         document.addEventListener('input', e => {
             /* 文字数表示 */
-            display_text_length(e);
+            display_text_length_answer(e);
             /* 毎回判定によるボタン制御 */
-            validation();
+            // validation();
         });
-        /* 初回判定のボタン制御 */
-        // validation();
+        // 初回の残り文字表示
+        updateAnswerCountersOnce();
     } //const init = function () の終了
     //DOM構築、スタイルシート、画像、サブフレームの読み込みが完了した後に発生する
     window.addEventListener("DOMContentLoaded", init);
@@ -741,5 +956,4 @@ $noimage_url = $upload_dir['baseurl'] . '/noimage.png';
 </script>
 
 
-<!-- ここからフッター表示 -->
-<?php get_footer(); ?>
+<!-- ここから回答表示 -->

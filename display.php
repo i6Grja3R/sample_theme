@@ -690,8 +690,8 @@ function display_main_banner()
     //配列にしてまとめる(画像リンクとタイトル)
     //配列にしてまとめる(画像リンクとタイトル)
     $banner_data = [
-        ['wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', '2枚絵比較', 'http://www.irasuto.cfbx.jp/画像2タイトル1/'],
-        ['wp-content/themes/sample_theme//images/banner/freefont_logo_jiyunotsubasa.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_TanukiMagic.png', '3枚絵比較', 'http://www.irasuto.cfbx.jp/画像3タイトル1/'],
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_keifont.png', '2枚絵比較', 'http://www.irasuto.cfbx.jp/image-2/'],
+        ['wp-content/themes/sample_theme//images/banner/freefont_logo_jiyunotsubasa.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_TanukiMagic.png', '3枚絵比較', 'http://www.irasuto.cfbx.jp/image-3/'],
         ['wp-content/themes/sample_theme//images/banner/freefont_logo_cinecaption227.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_nicomoji-plus_v09.png', '掲示板質問1', 'http://www.irasuto.cfbx.jp/informtion/'],
         ['wp-content/themes/sample_theme//images/banner/freefont_logo_nicokaku_v1.png', 'wp-content/themes/sample_theme//images/banner/freefont_logo_chogokubosogothic5.png', '掲示板質問2', '掲示板質問1', 'http://www.irasuto.cfbx.jp/entry/'],
     ];

@@ -497,10 +497,9 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         <form id="input_form" method="post" name="input_form" enctype="multipart/form-data"><!-- ファイル送信用にenctype指定 -->
             <div class="image-partial"><!-- 添付ファイル群 -->
                 <h2>
-                    動画・画像をアップロード (Upload video / image)
+                    動画・画像をアップロード（JPG / PNG / MP4）<br>
                     <span class="required">
-                        動画・画像をアップロード（JPG / PNG / PDF / MP4）<br>
-                        ※画像・PDFは5MBまで、動画は10MBまで、合計20MBまでアップロードできます
+                        ※画像は1ファイル5MBまで（合計15MBまで）、動画は1ファイル10MBまで（合計30MBまで）アップロードできます
                     </span><!-- サーバ設定に合わせた案内 -->
                 </h2>
 
@@ -511,7 +510,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
                         <!-- サーバ許可に合わせて accept を指定（gif は除外） -->
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.pdf,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -523,7 +522,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         <div class="image-camera-icon">
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.pdf,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -535,7 +534,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         <div class="image-camera-icon">
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.pdf,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -909,7 +908,7 @@ $stamp_files = [
         const MAX_TOTAL = 40 * 1024 * 1024; // BBS_MAX_TOTAL
         const MAX_PER_IMAGE = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_IMAGE
         const MAX_PER_VIDEO = 10 * 1024 * 1024; // BBS_MAX_PER_FILE_VIDEO
-        const MAX_PER_PDF = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_PDF
+        // const MAX_PER_PDF = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_PDF
         // const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
 
         inputs.forEach(input => {
@@ -926,9 +925,10 @@ $stamp_files = [
                 let maxPer = MAX_PER_IMAGE; // デフォルトは画像扱い
                 if (type.startsWith('video/') || ext === 'mp4') {
                     maxPer = MAX_PER_VIDEO;
-                } else if (type === 'application/pdf' || ext === 'pdf') {
-                    maxPer = MAX_PER_PDF;
                 }
+
+                /* } else if (type === 'application/pdf' || ext === 'pdf') {
+                maxPer = MAX_PER_PDF; */
 
                 // 1ファイルが 0バイト or 上限超えならNG
                 if (file.size <= 0 || file.size > maxPer) {
@@ -987,13 +987,13 @@ $stamp_files = [
         const ALLOWED = {
             'image': ['image/jpeg', 'image/png'],
             'video': ['video/mp4'],
-            'pdf': ['application/pdf']
+            // 'pdf': ['application/pdf']
         };
-        const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4', 'pdf'];
+        const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4'];
 
         // スロット別の最大サイズ(MB)
         const MAX_MB_USERICON = 5; // アイコン
-        const MAX_MB_IMAGE_PDF = 5; // 画像・PDF
+        const MAX_MB_IMAGE = 5; // 画像・PDF
         const MAX_MB_VIDEO = 10; // 動画
 
         // 各スロットに紐づく一時URLを覚えておいて clear 時に解放する
@@ -1037,7 +1037,7 @@ $stamp_files = [
 
             if (type.startsWith('image/')) return ALLOWED.image.includes(type);
             if (type.startsWith('video/')) return ALLOWED.video.includes(type);
-            if (type === 'application/pdf') return true; // 上で拡張子も見ているのでOK
+            // if (type === 'application/pdf') return true; // 上で拡張子も見ているのでOK
 
             return false;
         };
@@ -1054,7 +1054,7 @@ $stamp_files = [
                 const okMime = type === 'image/jpeg' || type === 'image/png';
                 return okExt && okMime;
             }
-            // それ以外の枠は従来どおり（画像・動画・PDFを許可）
+            // それ以外の枠は従来どおり（画像・動画を許可）
             return isAllowed(file);
         };
 
@@ -1073,9 +1073,6 @@ $stamp_files = [
             if (file.type.startsWith('image/')) {
                 el = document.createElement('img');
                 el.alt = '';
-            } else if (file.type === 'application/pdf') {
-                el = document.createElement('iframe');
-                el.setAttribute('title', 'PDF preview');
             } else if (file.type.startsWith('video/')) {
                 el = document.createElement('video');
                 el.setAttribute('controls', ''); // 再生はユーザー操作のみ
@@ -1083,6 +1080,10 @@ $stamp_files = [
             } else {
                 return; // 想定外
             }
+
+            /* } else if (file.type === 'application/pdf') {
+                el = document.createElement('iframe');
+                el.setAttribute('title', 'PDF preview'); */
 
             // レイアウト（旧コード準拠）
             const isIcon = (slotIndex === Number(usericonIndex));
@@ -1102,7 +1103,6 @@ $stamp_files = [
             urlBucket.set(attachInputs[slotIndex], arr);
         };
 
-        // スロットごとに処理を束ねる
         const setFileToSlot = (slotIndex, file) => {
             const inp = attachInputs[slotIndex];
             const fileArea = fileAreas[slotIndex];
@@ -1112,24 +1112,25 @@ $stamp_files = [
 
             const isIcon = (slotIndex === Number(usericonIndex));
 
-            // ★ 拡張子も見て動画かどうか判定
+            // 拡張子も見て動画かどうか判定
             const ext = String(file.name || '').split('.').pop().toLowerCase();
             const isVideo =
                 (file.type && file.type.startsWith('video/')) ||
                 ext === 'mp4';
 
-            // ★ 種類別に上限MBを決定
+            // 種類別に上限MBを決定
             let maxMB;
             if (isIcon) {
                 maxMB = MAX_MB_USERICON; // 5MB
             } else if (isVideo) {
                 maxMB = MAX_MB_VIDEO; // 10MB
             } else {
-                maxMB = MAX_MB_IMAGE_PDF; // 5MB
+                maxMB = MAX_MB_IMAGE; // 画像は5MB
             }
+
+            // ここは分岐の外で定義する
             const maxBytes = maxMB * 1024 * 1024;
 
-            // デバッグしたいとき用（必要なければ消してOK）	// ★ ファイルサイズチェック
             console.log('[setFileToSlot] slot', slotIndex, {
                 name: file.name,
                 type: file.type,
@@ -1139,13 +1140,15 @@ $stamp_files = [
                 sizeMB: (file.size / 1024 / 1024).toFixed(2),
             });
 
-            // ★ ファイルサイズチェック
-            if (file.size > maxBytes) {
-                alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
+            // 1. 先に種別チェック
+            if (!isAllowedForSlot(slotIndex, file)) {
+                if (isIcon) {
+                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
+                } else {
+                    alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4のみ許可）。');
+                }
 
-                // 👇 ここを追加：NGのときは input をリセット
                 inp.value = '';
-                // プレビューも念のため消す（保険）
                 viewer.innerHTML = '';
                 viewer.style.display = 'none';
                 fileArea.classList.remove('hideItems');
@@ -1154,15 +1157,10 @@ $stamp_files = [
                 return;
             }
 
-            // 種別チェック
-            if (!isAllowedForSlot(slotIndex, file)) {
-                if (isIcon) {
-                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
-                } else {
-                    alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4、PDFのみ許可）。');
-                }
+            // 2. そのあとサイズチェック
+            if (file.size <= 0 || file.size > maxBytes) {
+                alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
 
-                // 👇 ここも同様にクリア
                 inp.value = '';
                 viewer.innerHTML = '';
                 viewer.style.display = 'none';
@@ -1176,7 +1174,6 @@ $stamp_files = [
             fileArea.classList.add('hideItems');
             renderPreview(slotIndex, file);
 
-            // 送信可否の再評価（あれば）
             if (typeof validation === 'function') validation();
         };
 
@@ -1479,12 +1476,13 @@ $stamp_files = [
                     el = document.createElement('video');
                     el.controls = true;
                     el.preload = 'metadata';
-                } else if (ext === 'pdf') {
-                    el = document.createElement('iframe');
-                    el.title = 'PDF preview';
                 } else {
                     return null;
                 }
+
+                /* } else if (ext === 'pdf') {
+                    el = document.createElement('iframe');
+                    el.title = 'PDF preview'; */
 
                 el.src = url;
                 el.className = 'confirm-media-content'; // ←CSSで 530×350 を指定
