@@ -979,6 +979,52 @@ $stamp_files = [
      * ------------------------------ */
     let lastDraftId = null; // ← ここで 1 回だけ定義（以降は上書きのみ）
 
+    async function compressImageFile(file, options = {}) {
+        const maxWidth = options.maxWidth || 1200;
+        const quality = options.quality || 0.72;
+
+        if (!file || !file.type.startsWith('image/')) {
+            return file;
+        }
+
+        const bitmap = await createImageBitmap(file);
+
+        let width = bitmap.width;
+        let height = bitmap.height;
+
+        if (width > maxWidth) {
+            height = Math.round(height * (maxWidth / width));
+            width = maxWidth;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, width, height);
+
+        const blob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/jpeg', quality);
+        });
+
+        if (!blob) {
+            return file;
+        }
+
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        return new File([blob], baseName + '.jpg', {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+        });
+    }
+
+    function setInputFile(input, file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+    }
+
     /* ------------------------------
      * 添付ファイル安全版イベント関数
      * ------------------------------ */
@@ -1103,7 +1149,7 @@ $stamp_files = [
             urlBucket.set(attachInputs[slotIndex], arr);
         };
 
-        const setFileToSlot = (slotIndex, file) => {
+        const setFileToSlot = async (slotIndex, file) => {
             const inp = attachInputs[slotIndex];
             const fileArea = fileAreas[slotIndex];
             const viewer = viewers[slotIndex];
@@ -1171,8 +1217,34 @@ $stamp_files = [
             }
 
             // カメラエリアを隠し、プレビューを描画
+            // 画像だけブラウザ側で圧縮する
+            let uploadFile = file;
+
+            if (file.type.startsWith('image/')) {
+                uploadFile = await compressImageFile(file, {
+                    maxWidth: isIcon ? 512 : 1200,
+                    quality: isIcon ? 0.75 : 0.72
+                });
+
+                // 圧縮後でも上限を超えていたら止める
+                if (uploadFile.size <= 0 || uploadFile.size > maxBytes) {
+                    alert(`圧縮後のファイルサイズが上限(${maxMB}MB)を超えています。`);
+                    inp.value = '';
+                    viewer.innerHTML = '';
+                    viewer.style.display = 'none';
+                    fileArea.classList.remove('hideItems');
+
+                    if (typeof validation === 'function') validation();
+                    return;
+                }
+
+                // input.files を圧縮後ファイルに差し替える
+                setInputFile(inp, uploadFile);
+            }
+
+            // カメラエリアを隠し、プレビューを描画
             fileArea.classList.add('hideItems');
-            renderPreview(slotIndex, file);
+            renderPreview(slotIndex, uploadFile);
 
             if (typeof validation === 'function') validation();
         };
@@ -1182,7 +1254,7 @@ $stamp_files = [
             // 初期化
             urlBucket.set(inp, []);
 
-            inp.addEventListener('change', () => {
+            inp.addEventListener('change', async () => {
                 // 旧URLを解放
                 revokeAllFor(inp);
 
@@ -1199,7 +1271,7 @@ $stamp_files = [
                     if (typeof validation === 'function') validation();
                     return;
                 }
-                setFileToSlot(idx, file);
+                await setFileToSlot(idx, file);
             });
         });
 
@@ -1242,7 +1314,7 @@ $stamp_files = [
                 fa.classList.remove('dragover');
             });
 
-            fa.addEventListener('drop', (e) => {
+            fa.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 fa.classList.remove('dragover');
 
@@ -1259,7 +1331,7 @@ $stamp_files = [
 
                 // 旧URLを解放の上プレビュー
                 if (inp) revokeAllFor(inp);
-                setFileToSlot(idx, file);
+                await setFileToSlot(idx, file);
             });
         });
     }
