@@ -538,10 +538,10 @@ function bbs_answer_submit()
     // ファイル添付がある場合の処理
     if (!empty($_FILES['attach']['tmp_name'])) {
         $upload_dir = wp_upload_dir();                      // WordPress のアップロードディレクトリ情報を取得
-        $basedir = wp_normalize_path($upload['basedir']);        // OS差のあるパス記法を統一
+        $basedir = wp_normalize_path($upload_dir['basedir']);        // OS差のあるパス記法を統一
 
         // ファイルシステムのパス結合は path_join()、末尾は trailingslashit() で正規化
-        $attach_dir = trailingslashit(path_join($basedir, 'attach'));
+        $tmp_dir = trailingslashit(path_join($basedir, 'tmp'));
 
         // ディレクトリが無ければ作成（WordPress推奨のAPI）
         if (! is_dir($tmp_dir)) {
@@ -557,27 +557,49 @@ function bbs_answer_submit()
 
         // 各添付ファイルをループ処理
         foreach ($_FILES['attach']['tmp_name'] as $i => $tmp_name) {
+            $is_icon = ($i === 3);
+
+            $max_size = $is_icon
+                ? 1 * 1024 * 1024   // アイコン1MB
+                : 2 * 1024 * 1024;  // 画像2MB
             // ファイルが正しくアップロードされ、5MB以下であることを確認
-            if (is_uploaded_file($tmp_name) && $_FILES['attach']['size'][$i] <= 5 * 1024 * 1024) {
+            if (is_uploaded_file($tmp_name) && $_FILES['attach']['size'][$i] <= $max_size) {
                 $original_name = sanitize_file_name($_FILES['attach']['name'][$i]);
-                $mime = mime_content_type($tmp_name);
-                $ext = pathinfo($original_name, PATHINFO_EXTENSION);
+                // MIMEチェック強化
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+                if ($finfo === false) {
+                    $error[] = '・ファイル形式の確認に失敗しました';
+                    continue;
+                }
+
+                $mime = finfo_file($finfo, $tmp_name);
+
+                if ($mime === false) {
+                    $error[] = '・ファイル形式の確認に失敗しました';
+                    continue;
+                }
+
+                $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
 
                 // MIMEと拡張子チェック（例：画像、動画のみ許可）
                 // 許可する MIME タイプ（ホワイトリスト）
                 // $allowed_types = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4'];
-                $allowed_types = ['image/jpeg', 'image/png', 'video/mp4'];
+                $allowed_types = ['image/jpeg', 'image/png'];
                 if (!in_array($mime, $allowed_types)) {
                     $error[] = '・許可されていないファイル形式です';
                     continue;
                 }
 
                 // 保存用ファイル名を user_id ベースで生成（衝突防止）
-                $filename = $user_id . "_{$i}." . $ext;
+                $filename = $user_id . "_" . time() . "_{$i}." . $ext;
                 $file_path = $tmp_dir . $filename;
 
                 // ファイルを tmp ディレクトリに移動（move_uploaded_file = 安全な移動）
-                move_uploaded_file($tmp_name, $file_path);
+                if (!move_uploaded_file($tmp_name, $file_path)) {
+                    $error[] = '・ファイル保存に失敗しました';
+                    continue;
+                }
 
                 // 添付情報（トランジェント）に保存するためにファイル名を保存（本体は tmp に保存済みなのでファイル本体は保存しない）
                 $answer_data['attach'][$i] = $filename;
@@ -1262,7 +1284,7 @@ if (!function_exists('bbs_quest_submit')) {
         // $img_h_max     = BBS_IMG_MAX_H;                                          // 画像最大高
 
         // --- サイズ系の上限（総容量はざっくりハード上限だけにする） ---
-        $hard_total = BBS_MAX_TOTAL;  // 例: 40MB （定数側で 40 * 1024 * 1024 にしておく）
+        $hard_total = 6 * 1024 * 1024;  // 例: 40MB （定数側で 40 * 1024 * 1024 にしておく）
         $total      = 0;              // 受け取った実サイズ合計
 
         $tmp_dir = bbs_tmp_dir(); // …/uploads/tmp/                              // 最終保存先（存在しなければ作成）
@@ -1284,50 +1306,75 @@ if (!function_exists('bbs_quest_submit')) {
         } */
 
         /* --- 添付ループ --------------------------------------------------- */
+        // 通常画像3枚 + アイコン1枚を、内部的に 0,1,2,3 の4スロットへ正規化する
+        $files = [
+            'name'     => array_fill(0, 4, ''),
+            'type'     => array_fill(0, 4, ''),
+            'tmp_name' => array_fill(0, 4, ''),
+            'error'    => array_fill(0, 4, UPLOAD_ERR_NO_FILE),
+            'size'     => array_fill(0, 4, 0),
+        ];
+
+        // 通常画像 attach[] は 0〜2 に入れる
         if (isset($_FILES['attach']) && is_array($_FILES['attach']['tmp_name'])) {
+            $attach_count = min(3, count($_FILES['attach']['tmp_name']));
 
-            $files = $_FILES['attach'];
-            $count = count($files['tmp_name']);
-            // ファイル数上限チェック
-            if ($count > $max_files) {
-                $errors[] = '・添付できるファイル数は最大 ' . $max_files . ' 件です。';
+            for ($j = 0; $j < $attach_count; $j++) {
+                $files['name'][$j]     = $_FILES['attach']['name'][$j]     ?? '';
+                $files['type'][$j]     = $_FILES['attach']['type'][$j]     ?? '';
+                $files['tmp_name'][$j] = $_FILES['attach']['tmp_name'][$j] ?? '';
+                $files['error'][$j]    = $_FILES['attach']['error'][$j]    ?? UPLOAD_ERR_NO_FILE;
+                $files['size'][$j]     = $_FILES['attach']['size'][$j]     ?? 0;
             }
-            for ($i = 0; $i < $count; $i++) {
+        }
 
-                $saved[$i] = ''; // スロット整合のため先に空文字
+        // usericon は 3番目に入れる
+        if (isset($_FILES['usericon']) && is_array($_FILES['usericon'])) {
+            $files['name'][3]     = $_FILES['usericon']['name']     ?? '';
+            $files['type'][3]     = $_FILES['usericon']['type']     ?? '';
+            $files['tmp_name'][3] = $_FILES['usericon']['tmp_name'] ?? '';
+            $files['error'][3]    = $_FILES['usericon']['error']    ?? UPLOAD_ERR_NO_FILE;
+            $files['size'][3]     = $_FILES['usericon']['size']     ?? 0;
+        }
 
-                $tmp = $files['tmp_name'][$i] ?? '';
+        $count = 4;
 
-                /* 0) PHP標準エラーコードの確認 ------------------------- */
-                $err  = $files['error'][$i]    ?? UPLOAD_ERR_NO_FILE;
+        for ($i = 0; $i < $count; $i++) {
 
-                /* 1) 未選択スロットはスキップ ------------------------- */
-                if ($err === UPLOAD_ERR_NO_FILE || $tmp === '') continue;
+            $saved[$i] = ''; // スロット整合のため先に空文字
 
-                /* 2) エラー種別ごとのメッセージ ----------------------- */
-                if ($err !== UPLOAD_ERR_OK) {
-                    $map = [
-                        UPLOAD_ERR_INI_SIZE   => '・サーバーの上限を超えました（upload_max_filesize）。',
-                        UPLOAD_ERR_FORM_SIZE  => '・フォームの上限を超えました（MAX_FILE_SIZE）。',
-                        UPLOAD_ERR_PARTIAL    => '・アップロードが途中で中断されました。',
-                        UPLOAD_ERR_NO_TMP_DIR => '・一時フォルダが見つかりません（サーバー設定）。',
-                        UPLOAD_ERR_CANT_WRITE => '・ディスク書き込みに失敗しました。',
-                        UPLOAD_ERR_EXTENSION  => '・拡張によりブロックされました。',
-                    ];
-                    $errors[] = $map[$err] ?? '・アップロードに失敗しました。';
-                    continue;
-                }
+            $tmp = $files['tmp_name'][$i] ?? '';
 
-                /* 3) 本当にHTTP経由の一時ファイルか ------------------- */
-                if (!is_uploaded_file($tmp)) {
-                    $errors[] = '・不正なアップロードが検出されました。';
-                    continue;
-                }
+            /* 0) PHP標準エラーコードの確認 ------------------------- */
+            $err  = $files['error'][$i]    ?? UPLOAD_ERR_NO_FILE;
 
-                /* 4) サイズ（個別/合計） ------------------------------- */
-                $size = (int)($files['size'][$i] ?? 0);
-                // 個別上限チェック（ここで continue してOK ※必ず for の内側）
-                /* if ($size <= 0 || $size > $per_limit) {
+            /* 1) 未選択スロットはスキップ ------------------------- */
+            if ($err === UPLOAD_ERR_NO_FILE || $tmp === '') continue;
+
+            /* 2) エラー種別ごとのメッセージ ----------------------- */
+            if ($err !== UPLOAD_ERR_OK) {
+                $map = [
+                    UPLOAD_ERR_INI_SIZE   => '・サーバーの上限を超えました（upload_max_filesize）。',
+                    UPLOAD_ERR_FORM_SIZE  => '・フォームの上限を超えました（MAX_FILE_SIZE）。',
+                    UPLOAD_ERR_PARTIAL    => '・アップロードが途中で中断されました。',
+                    UPLOAD_ERR_NO_TMP_DIR => '・一時フォルダが見つかりません（サーバー設定）。',
+                    UPLOAD_ERR_CANT_WRITE => '・ディスク書き込みに失敗しました。',
+                    UPLOAD_ERR_EXTENSION  => '・拡張によりブロックされました。',
+                ];
+                $errors[] = $map[$err] ?? '・アップロードに失敗しました。';
+                continue;
+            }
+
+            /* 3) 本当にHTTP経由の一時ファイルか ------------------- */
+            if (!is_uploaded_file($tmp)) {
+                $errors[] = '・不正なアップロードが検出されました。';
+                continue;
+            }
+
+            /* 4) サイズ（個別/合計） ------------------------------- */
+            $size = (int)($files['size'][$i] ?? 0);
+            // 個別上限チェック（ここで continue してOK ※必ず for の内側）
+            /* if ($size <= 0 || $size > $per_limit) {
                     $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
                     continue;
                 }
@@ -1342,87 +1389,85 @@ if (!function_exists('bbs_quest_submit')) {
                     break;                                                   // 以降を止める
                 } */
 
-                /* 5) 拡張子の正規化 ----------------------------------- */
-                $orig = sanitize_file_name($files['name'][$i] ?? '');
-                // $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
-                $ext = preg_replace('/[^a-z0-9]/', '', strtolower(pathinfo($orig, PATHINFO_EXTENSION)));          // 多重拡張子対策（英数字のみ）
+            /* 5) 拡張子の正規化 ----------------------------------- */
+            $orig = sanitize_file_name($files['name'][$i] ?? '');
+            // $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+            $ext = preg_replace('/[^a-z0-9]/', '', strtolower(pathinfo($orig, PATHINFO_EXTENSION)));          // 多重拡張子対策（英数字のみ）
 
-                /* 6) 実MIMEの検出と照合 -------------------------------- */
-                // $detected = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';'))); // "type; charset=..." → "type"
-                $mime = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';')));
-                if (!isset($allowed[$mime]) || !in_array($ext, $allowed[$mime], true)) {
-                    $errors[] = '・許可されていないファイル形式です（拡張子と内容の不一致）。';
-                    continue;
-                }
+            /* 6) 実MIMEの検出と照合 -------------------------------- */
+            // $detected = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';'))); // "type; charset=..." → "type"
+            $mime = strtolower(trim(strtok($finfo->file($tmp) ?: '', ';')));
+            if (!isset($allowed[$mime]) || !in_array($ext, $allowed[$mime], true)) {
+                $errors[] = '・許可されていないファイル形式です（拡張子と内容の不一致）。';
+                continue;
+            }
 
-                /* 7) 種別ごとの上限を決める（デフォルトは画像等と同じ） */
-                $per_limit = BBS_MAX_PER_FILE; // 例: 5MB（画像/PDFなどの既定）
-                if (strpos($mime, 'video/') === 0) {
-                    $per_limit = BBS_MAX_PER_FILE_VIDEO; // 例: 10MB など
-                }
-                /* } elseif ($mime === 'application/pdf') {
+            /* 7) 種別ごとの上限を決める（デフォルトは画像等と同じ） */
+            $per_limit = ($i === 3)
+                ? 1 * 1024 * 1024   // アイコン 1MB
+                : 2 * 1024 * 1024;  // 通常画像 2MB
+            /* } elseif ($mime === 'application/pdf') {
                 $per_limit = BBS_MAX_PER_FILE_PDF; */
 
-                // 8) サイズ（個別/合計）— ここで per-type の上限を適用
-                if ($size <= 0 || $size > $per_limit) {
-                    $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
-                    continue;
-                }
-
-                // ★ 合計サイズ（ざっくりハード上限だけチェック）
-                $total += $size;
-                if ($total > $hard_total) {
-                    $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($hard_total / 1024 / 1024) . 'MB）。';
-                    break; // これ以上見ても意味がないのでループ終了
-                }
-
-
-                /* 9) 画像は中身チェック（壊れ/偽装/巨大寸法） */
-                if (strpos($mime, 'image/') === 0) {
-                    $img = @getimagesize($tmp);
-                    if ($img === false || ($img[0] ?? 0) > BBS_IMG_MAX_W || ($img[1] ?? 0) > BBS_IMG_MAX_H) {
-                        $errors[] = '・画像ファイルが壊れているか、サイズが大きすぎます。';
-                        continue;
-                    }
-                }
-
-                /* 8) 予測困難なファイル名（UUID） ---------------------- */
-                $uuid      = wp_generate_uuid4();                           // 例: 550e8400-e29b-41d4-a716-446655440000
-                $save_name = "{$uuid}_{$i}.{$ext}";                         // 例: 550e...-000_0.jpg
-
-                /* 9) 最終保存パスの組み立て ----------------------------- */
-                $dst = trailingslashit($tmp_dir) . $save_name;             // .../uploads/bbs/YYYY/MM/550e...jpg
-                // realpathガード（/uploads/tmp/配下強制）
-                if ($base_tmp === false) {
-                    $errors[] = '・一時ディレクトリの検証に失敗しました。';
-                    continue;
-                }
-
-                /* 10) 保存先ディレクトリのガード ------------------------ */
-                // $base = realpath($final_dir);
-                $real = realpath(dirname($dst));
-                if ($real === false || strpos($real, $base_tmp) !== 0) {
-                    $errors[] = '・保存先の検証に失敗しました。';
-                    continue;
-                }
-
-                /* 11) PHP一時→最終保存へ移動 --------------------------- */
-                if (!@move_uploaded_file($tmp, $dst)) {               // 失敗時は以降に進まない
-                    $errors[] = '・サーバーにファイルを保存できませんでした。';
-                    continue;
-                }
-
-                /* 12) パーミッション調整 ------------------------------- */
-                @chmod($dst, 0644);                                        // 実行権不要
-
-
-                // ★ここが重要：成功した実ファイルをロールバック用に積む
-                $saved_abs[] = $dst;
-
-                /* 13) DB保存用に相対パスへ ------------------------------ */
-                $saved[$i] = basename($dst); // confirmへ渡すのはbasenameのみ                                       // 失敗時掃除のため絶対パスも保持
-                // $to_db[]     = bbs_to_uploads_relative($dest);              // uploads基準の相対パスとして保存
+            // 8) サイズ（個別/合計）— ここで per-type の上限を適用
+            if ($size <= 0 || $size > $per_limit) {
+                $errors[] = '・ファイルサイズが大きすぎます（1ファイル最大 ' . ($per_limit / 1024 / 1024) . 'MB）。';
+                continue;
             }
+
+            // ★ 合計サイズ（ざっくりハード上限だけチェック）
+            $total += $size;
+            if ($total > $hard_total) {
+                $errors[] = '・添付の合計サイズが大きすぎます（最大 ' . ($hard_total / 1024 / 1024) . 'MB）。';
+                break; // これ以上見ても意味がないのでループ終了
+            }
+
+
+            /* 9) 画像は中身チェック（壊れ/偽装/巨大寸法） */
+            if (strpos($mime, 'image/') === 0) {
+                $img = @getimagesize($tmp);
+                if ($img === false || ($img[0] ?? 0) > BBS_IMG_MAX_W || ($img[1] ?? 0) > BBS_IMG_MAX_H) {
+                    $errors[] = '・画像ファイルが壊れているか、サイズが大きすぎます。';
+                    continue;
+                }
+            }
+
+            /* 8) 予測困難なファイル名（UUID） ---------------------- */
+            $uuid      = wp_generate_uuid4();                           // 例: 550e8400-e29b-41d4-a716-446655440000
+            $save_name = "{$uuid}_{$i}.{$ext}";                         // 例: 550e...-000_0.jpg
+
+            /* 9) 最終保存パスの組み立て ----------------------------- */
+            $dst = trailingslashit($tmp_dir) . $save_name;             // .../uploads/bbs/YYYY/MM/550e...jpg
+            // realpathガード（/uploads/tmp/配下強制）
+            if ($base_tmp === false) {
+                $errors[] = '・一時ディレクトリの検証に失敗しました。';
+                continue;
+            }
+
+            /* 10) 保存先ディレクトリのガード ------------------------ */
+            // $base = realpath($final_dir);
+            $real = realpath(dirname($dst));
+            if ($real === false || strpos($real, $base_tmp) !== 0) {
+                $errors[] = '・保存先の検証に失敗しました。';
+                continue;
+            }
+
+            /* 11) PHP一時→最終保存へ移動 --------------------------- */
+            if (!@move_uploaded_file($tmp, $dst)) {               // 失敗時は以降に進まない
+                $errors[] = '・サーバーにファイルを保存できませんでした。';
+                continue;
+            }
+
+            /* 12) パーミッション調整 ------------------------------- */
+            @chmod($dst, 0644);                                        // 実行権不要
+
+
+            // ★ここが重要：成功した実ファイルをロールバック用に積む
+            $saved_abs[] = $dst;
+
+            /* 13) DB保存用に相対パスへ ------------------------------ */
+            $saved[$i] = basename($dst); // confirmへ渡すのはbasenameのみ                                       // 失敗時掃除のため絶対パスも保持
+            // $to_db[]     = bbs_to_uploads_relative($dest);              // uploads基準の相対パスとして保存
         }
 
         /* --- エラーがあれば保存済みファイルを掃除して終了 ------------------ */

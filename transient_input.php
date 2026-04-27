@@ -497,9 +497,9 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
         <form id="input_form" method="post" name="input_form" enctype="multipart/form-data"><!-- ファイル送信用にenctype指定 -->
             <div class="image-partial"><!-- 添付ファイル群 -->
                 <h2>
-                    動画・画像をアップロード（JPG / PNG / MP4）<br>
+                    画像をアップロード (JPG / PNG)
                     <span class="required">
-                        ※画像は1ファイル5MBまで（合計15MBまで）、動画は1ファイル10MBまで（合計30MBまで）アップロードできます
+                        ※画像は1ファイル2MBまで（合計6MBまで）アップロードできます
                     </span><!-- サーバ設定に合わせた案内 -->
                 </h2>
 
@@ -510,7 +510,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
                         <!-- サーバ許可に合わせて accept を指定（gif は除外） -->
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -522,7 +522,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         <div class="image-camera-icon">
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -534,7 +534,7 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                         <div class="image-camera-icon">
                             <img src="<?php echo $camera_url; ?>" class="changeImg" style="height:150px;width:150px" alt="select file">
                         </div>
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
+                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -544,12 +544,13 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             <div class="body-partial-parts"><!-- 本文 -->
                 <h2>質問文 (question)<span class="required">※必須</span></h2>
                 <div class="parts">
-                    <!-- サーバ上限に合わせ、data-* は任意で利用 -->
                     <textarea class="input" name="text" id="text"
-                        data-length="<?php echo defined('MAX_LENGTH::TEXT') ? MAX_LENGTH::TEXT : 5000; ?>"
-                        data-minlength="<?php echo defined('MIN_LENGTH::TEXT') ? MIN_LENGTH::TEXT : 1; ?>"
+                        maxlength="<?php echo MAX_LENGTH::TEXT; ?>"
+                        minlength="<?php echo MIN_LENGTH::TEXT; ?>"
+                        data-length="<?php echo MAX_LENGTH::TEXT; ?>"
+                        data-minlength="<?php echo MIN_LENGTH::TEXT; ?>"
                         placeholder="荒らし行為や誹謗中傷や著作権の侵害はご遠慮ください"></textarea>
-                    <div class="msg_partial"></div> <!-- ←★ここに class を追加 -->
+                    <div class="msg_partial"></div>
                 </div>
             </div>
 
@@ -557,10 +558,12 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 <h2>質問タイトル (title)<span class="required">※必須</span></h2>
                 <div class="parts">
                     <input class="input" type="text" name="title" id="title"
-                        data-length="<?php echo defined('MAX_LENGTH::TITLE') ? MAX_LENGTH::TITLE : 200; ?>"
-                        data-minlength="<?php echo defined('MIN_LENGTH::TITLE') ? MIN_LENGTH::TITLE : 1; ?>"
-                        placeholder="<?php echo defined('MIN_LENGTH::TITLE') ? MIN_LENGTH::TITLE : 1; ?>文字以上で入力してください">
-                    <div class="msg_partial"></div> <!-- ←★ここも同様 -->
+                        maxlength="<?php echo MAX_LENGTH::TITLE; ?>"
+                        minlength="<?php echo MIN_LENGTH::TITLE; ?>"
+                        data-length="<?php echo MAX_LENGTH::TITLE; ?>"
+                        data-minlength="<?php echo MIN_LENGTH::TITLE; ?>"
+                        placeholder="<?php echo MIN_LENGTH::TITLE; ?>文字以上で入力してください">
+                    <div class="msg_partial"></div>
                 </div>
             </div>
 
@@ -577,13 +580,18 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
             </div>
 
             <div class="usericon-partial"><!-- 任意のアイコン（4つ目スロット扱い） -->
-                <h2>画像アイコン (image icon)<span class="required">※任意</span></h2>
+                <h2>
+                    アイコン画像をアップロード (JPG / PNG)
+                    <span class="required">
+                        ※画像は1ファイル1MBまでアップロードできます
+                    </span><!-- サーバ設定に合わせた案内 -->
+                </h2>
                 <div class="usericon-thumbnail-button">
                     <label>
                         <div class="usericon-uploads">
                             <img src="<?php echo $noimage_url; ?>" class="changeImg" style="height:90px;width:90px" alt="user icon">
                         </div>
-                        <input type="file" class="attach" name="attach[]" accept=".jpg,.jpeg,.png" style="display:none;">
+                        <input type="file" class="attach-icon" name="usericon" accept=".jpg,.jpeg,.png" style="display:none;">
                     </label>
                     <div class="viewer" style="display:none;"></div>
                     <button type="button" class="attachclear">clear</button>
@@ -594,8 +602,8 @@ $noimage_url = esc_url($upload_dir['baseurl'] . '/noimage.png'); // noimage.png 
                 <h2>名前 (name)<span class="required">※任意</span></h2>
                 <div class="parts">
                     <input class="input" type="text" name="name" id="name"
-                        data-length="<?php echo defined('MAX_LENGTH::NAME') ? MAX_LENGTH::NAME : 50; ?>"
-                        data-minlength="<?php echo defined('MIN_LENGTH::NAME') ? MIN_LENGTH::NAME : 0; ?>"
+                        data-length="<?php echo MAX_LENGTH::NAME; ?>"
+                        data-minlength="<?php echo MIN_LENGTH::NAME; ?>"
                         placeholder="未入力の場合は匿名で表示されます">
                     <div class="msg_partial"></div> <!-- ←★ここも追加 -->
                 </div>
@@ -647,10 +655,15 @@ $stamp_files = [
 <script>
     // 安全エンドポイントURLを作る
     function tmpGetUrl(fname) {
+        // URLのパラメータを追加する
         const p = new URLSearchParams({
+            // どの処理を呼び出すかを指定する識別子
             action: "bbs_tmp_get",
+            // 現在編集中の下書き（ドラフト）IDを文字列として送る
             draft_id: String(lastDraftId),
+            // 取得したい具体的なファイル名を指定
             file: fname,
+            // セキュリティ（不正操作防止）のための合言葉、ノンスという一時的なトークンを照合
             nonce: (window.bbs_confirm_vars?.nonce || "")
         });
         return (AJAX_URL + "?" + p.toString());
@@ -702,10 +715,15 @@ $stamp_files = [
      *  - 連打防止のため disabled/aria-busy を制御
      * ------------------------------------- */
     function toggleLoading(btn, isLoading) {
+        // ボタン要素が存在しない場合にエラーにならないよう、処理を中断する安全装置です。
         if (!btn) return;
+        // 読み込み中の時
         if (isLoading) {
+            // ボタンをクリックできないようにします。連打による「二重投稿」を物理的に防ぎます。
             btn.disabled = true;
+            // CSSで用意した「wait」というクラスを追加します。
             btn.classList.add('wait');
+            // スクリーンリーダー（音声読み上げ）を使うユーザーに対して、「現在この要素は処理中です」と伝えるためのアクセシビリティ設定です。
             btn.setAttribute('aria-busy', 'true');
         } else {
             btn.disabled = false;
@@ -736,13 +754,19 @@ $stamp_files = [
         const textEl = document.getElementById('text');
         const nameEl = document.getElementById('name');
 
+        // タイトルの入力欄（titleEl）が画面内に存在するかを確認
+        // もし data.title が null または undefined だった場合、代わりに ''（空の文字列） を入れます。
         if (titleEl) titleEl.value = data.title ?? '';
+        // タイトル欄があれば、データ内のタイトル（無ければ空っぽ）を表示する。本文欄があれば、本文を表示する。名前欄があれば、名前を表示する
         if (textEl) textEl.value = data.text ?? '';
         if (nameEl) nameEl.value = data.name ?? '';
 
         // スタンプ（1..8想定）
+        // 「データの中に『スタンプ情報』がちゃんと存在するか」を確認
         if (typeof data.stamp !== 'undefined') {
+            // String(data.stamp)：スタンプの番号が「1」という数字でも「"1"」という文字でも、確実に文字として扱って検索に失敗しないように工夫
             const s = document.querySelector(`input[name="stamp"][value="${String(data.stamp)}"]`);
+            // 「もし該当するスタンプのボタンが見つかったら、それを『選択状態（チェックあり）』にする」という命令です。
             if (s) s.checked = true;
         }
 
@@ -752,12 +776,23 @@ $stamp_files = [
 
     // すべての添付をクリア（本当に input の値を空にするのが重要）
     function clearAllAttachments() {
-        document.querySelectorAll('input.attach[type="file"]').forEach(inp => {
+        // class="attach" がついたファイル選択ボタン、class="attach-icon" がついたファイル選択ボタン
+        // リセット対象となるターゲットを2種類指定
+        // 取得した複数の入力欄に対して、一つずつ順番に { } の中の処理を実行
+        document.querySelectorAll('input.attach[type="file"], input.attach-icon[type="file"]').forEach(inp => {
+            // 「現在選択されているファイル名」が消去され、未選択の状態に戻る
             inp.value = '';
         });
         // プレビューUIを消す（あれば）
-        document.querySelectorAll('.upload-slot .preview, .preview-thumbs').forEach(p => {
-            p.innerHTML = '';
+        // 見つかったすべてのプレビュー枠に対して、一つずつ順番に { } の中の処理を実行
+        document.querySelectorAll('.viewer').forEach(v => {
+            // プレビュー枠の中に入っている文字（ファイル名など）を消去
+            v.textContent = '';
+            v.style.display = 'none';
+        });
+
+        document.querySelectorAll('.image-camera-icon, .usericon-uploads').forEach(area => {
+            area.classList.remove('hideItems');
         });
         // 送信可否の再評価
         if (typeof validation === 'function') validation();
@@ -770,9 +805,10 @@ $stamp_files = [
      * ------------------------------------- */
     // 文字数カウンタ（最小・最大の両方に対応）
     function display_text_length(e) {
-        // id が text / title / name のときだけ処理
+        // id が text / title / name を入力した ➡️ 門番を通過して、保存処理へ進む。
         if (!e || !e.target || !['text', 'title', 'name'].includes(e.target.id)) return;
 
+        // 実際にイベントが発生した要素を取得
         const el = e.target;
         const msg = el.nextElementSibling; // 各 input/textarea の直後の <div class="msg_partial">
         if (!msg) return;
@@ -780,13 +816,15 @@ $stamp_files = [
         // maxlength / minlength は data-* と HTML 属性のどちらでもOKにする
         // ← ココが重要：data-length / data-minlength も確実に拾う
         const getMax = (el) => {
-            const a = parseInt(el.getAttribute('maxlength') || '0', 10) || 0;
-            const d = parseInt(el.dataset.length || '0', 10) || 0; // data-length
-            return a || d; // どちらか入っていればOK
+            // getAttributeがnullの場合は0になり、数字以外の文字列ならNaN(判定で0)になる
+            const a = Number(el.getAttribute('maxlength')) || 0;
+            const d = Number(el.dataset.length) || 0;
+            return a || d;
         };
+
         const getMin = (el) => {
-            const a = parseInt(el.getAttribute('minlength') || '0', 10) || 0;
-            const d = parseInt(el.dataset.minlength || '0', 10) || 0; // data-minlength
+            const a = Number(el.getAttribute('minlength')) || 0;
+            const d = Number(el.dataset.minlength) || 0;
             return a || d;
         };
 
@@ -805,6 +843,7 @@ $stamp_files = [
 
         msg.className = 'msg_partial';
         msg.style.color = ''; // ベース文字色
+        // ノードからすべての子ノードを取り除く
         msg.replaceChildren();
 
         // 判定順：超過 → 不足 → 残り（上限設定がある時） → 何もしない
@@ -841,6 +880,7 @@ $stamp_files = [
             const el = document.getElementById(id);
             if (!el) return;
             // “入力イベント” を発火して同じ処理系に乗せる
+            // 文字列の長さを取得し、それを画面に表示（表示）する
             display_text_length({
                 target: el
             });
@@ -861,7 +901,7 @@ $stamp_files = [
      * 送信ボタン活性/非活性制御
      *  - タイトル/本文の最小・最大
      *  - スタンプ必須（1..8 のどれか）
-     *  - 添付の軽いクライアントチェック（最大4件・5MB/件）
+     *  - 添付の軽いクライアントチェック（画像2MB / アイコン1MB）
      *  ※最終判定はサーバー側で必ず再検証
      * ------------------------------------- */
     function validation() {
@@ -872,14 +912,27 @@ $stamp_files = [
         const textEl = document.getElementById('text');
 
         // ★ dataset だけでなく HTML 属性の maxlength/minlength も見る
-        const getLimit = (el, name, fallback = '0') =>
-            parseInt(el?.getAttribute(name) || el?.dataset?.[name] || fallback, 10) || 0;
+        const getLimit = (el, name, fallback = 0) => {
+            // HTML属性を取る
+            const attr = Number(el?.getAttribute(name)) || 0;
+            // data属性のキーを決める
+            // data-length="" data-minlength=""に対応
+            const dataKey = name === 'maxlength' ? 'length' : 'minlength';
+            // data属性を取る
+            // ?? fallback → undefinedのときだけfallback
+            const data = Number(el?.dataset?.[dataKey] ?? fallback) || 0;
 
+            // 最終結果
+            return attr || data;
+        };
+
+        // 制限の最大値を返す
         const titleMax = getLimit(titleEl, 'maxlength'); // maxlength or data-length
         const titleMin = getLimit(titleEl, 'minlength'); // minlength or data-minlength
         const textMax = getLimit(textEl, 'maxlength');
         const textMin = getLimit(textEl, 'minlength');
 
+        // titleElが存在するなら value を取る、nullだとエラー
         const titleLen = (titleEl?.value || '').length;
         const textLen = (textEl?.value || '').length;
 
@@ -892,50 +945,47 @@ $stamp_files = [
                 break;
             }
 
+        // 最小文字数チェック、最大文字数チェック
         const titleOk = (titleMin ? titleLen >= titleMin : true) && (titleMax ? titleLen <= titleMax : true);
         const textOk = (textMin ? textLen >= textMin : true) && (textMax ? textLen <= textMax : true);
 
         // 添付ざっくりチェック（最終判定はサーバ）
-        // ※ PHP の定数と合わせる：BBS_MAX_FILES=4, 画像5MB, 動画10MB, PDF5MB, 合計40MB
-        const inputs = document.querySelectorAll('input.attach[type="file"]');
+        const inputs = document.querySelectorAll(
+            'input.attach[type="file"], input.attach-icon[type="file"]'
+        );
 
         let filesCount = 0;
         let clientFileOk = true;
         let clientTotalSize = 0;
 
         // サーバの定数に合わせる
-        const MAX_FILES = 4; // BBS_MAX_FILES
-        const MAX_TOTAL = 40 * 1024 * 1024; // BBS_MAX_TOTAL
-        const MAX_PER_IMAGE = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_IMAGE
-        const MAX_PER_VIDEO = 10 * 1024 * 1024; // BBS_MAX_PER_FILE_VIDEO
-        // const MAX_PER_PDF = 5 * 1024 * 1024; // BBS_MAX_PER_FILE_PDF
-        // const MAX_PER = 5 * 1024 * 1024; // 5MB/ファイル（必要なら調整）
+        // const MAX_FILES = 4; // BBS_MAX_FILES
+        const MAX_TOTAL = 6 * 1024 * 1024; // BBS_MAX_TOTAL
+        const MAX_PER_IMAGE = 2 * 1024 * 1024; // BBS_MAX_PER_FILE_IMAGE
+        const MAX_PER_ICON = 1 * 1024 * 1024; // 追加
 
-        inputs.forEach(input => {
+        // inputごとにループ
+        inputs.forEach((input, index) => {
+            // ファイルが無ければスキップ
             if (!input.files || !input.files.length) return;
 
+            // ファイルごとにループ
             for (const file of input.files) {
                 filesCount++;
 
-                const type = file.type || '';
-                const name = file.name || '';
-                const ext = (name.split('.').pop() || '').toLowerCase();
+                // アイコンかどうか判定
+                const isIcon = (index === 3); // ←4つ目がアイコン
 
-                // 種類ごとの1ファイル上限（拡張子も見てざっくり判定）
-                let maxPer = MAX_PER_IMAGE; // デフォルトは画像扱い
-                if (type.startsWith('video/') || ext === 'mp4') {
-                    maxPer = MAX_PER_VIDEO;
-                }
+                // サイズ上限を決定
+                // アイコン → 1MB 通常画像 → 2MB
+                let maxPer = isIcon ? MAX_PER_ICON : MAX_PER_IMAGE;
 
-                /* } else if (type === 'application/pdf' || ext === 'pdf') {
-                maxPer = MAX_PER_PDF; */
-
-                // 1ファイルが 0バイト or 上限超えならNG
+                // サイズチェック
                 if (file.size <= 0 || file.size > maxPer) {
                     clientFileOk = false;
                 }
 
-                // 合計サイズも足しておく（ざっくり）
+                // 合計サイズ加算
                 clientTotalSize += file.size;
             }
         });
@@ -969,6 +1019,7 @@ $stamp_files = [
     /* ------------------------------
      * 共通: AJAX URL（ローカライズ優先）
      * ------------------------------ */
+    // 使えるajax_urlがあればそれを使う、それもなければPHPで直接生成したURLを使う
     const AJAX_URL =
         (window.bbs_vars?.ajax_url) ||
         (window.bbs_confirm_vars?.ajax_url) ||
@@ -979,21 +1030,34 @@ $stamp_files = [
      * ------------------------------ */
     let lastDraftId = null; // ← ここで 1 回だけ定義（以降は上書きのみ）
 
+    // JavaScriptで非同期処理を扱う際、従来はPromiseを使って記述していました。
+    // しかし、処理が複雑になるとコードが読みにくくなることがあります。そこで登場したのがasync/awaitです。
     async function compressImageFile(file, options = {}) {
         const maxWidth = options.maxWidth || 1200;
         const quality = options.quality || 0.72;
 
+        // 画像じゃないならスキップ
         if (!file || !file.type.startsWith('image/')) {
             return file;
         }
 
+        // ① PNGはそのままにする
+        // 透過PNGをJPEG/WebPにすると見た目が変わる可能性があるため
+        if (file.type === 'image/png') {
+            return file;
+        }
+
+        // 画像をbitmapに変換
+        // createImageBitmapで変換してcanvasに描画して圧縮
         const bitmap = await createImageBitmap(file);
 
         let width = bitmap.width;
         let height = bitmap.height;
 
         if (width > maxWidth) {
+            // 「元の幅に対して、最大幅がどれくらいの割合か（縮小率）」を計算
             height = Math.round(height * (maxWidth / width));
+            // 横幅を強制的に最大値（maxWidth）に書き換え
             width = maxWidth;
         }
 
@@ -1001,18 +1065,35 @@ $stamp_files = [
         canvas.width = width;
         canvas.height = height;
 
+        // canvasに「描くためのペン」を取得
         const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return file;
+        }
+
+        // bitmap画像を左上(0,0)に指定サイズ(width × height)で描画
         ctx.drawImage(bitmap, 0, 0, width, height);
 
         const blob = await new Promise(resolve => {
+            // canvas → ファイルデータに変換、quality 圧縮率（0〜1）
+            // 1.0	高画質（重い）、0.7	バランス、0.3 低画質
             canvas.toBlob(resolve, 'image/jpeg', quality);
         });
 
+        // 変換失敗時は元ファイルを返す
         if (!blob) {
             return file;
         }
 
+        // 圧縮後の方が大きいなら元ファイルを使う
+        if (blob.size >= file.size) {
+            return file;
+        }
+
+        // 拡張子を削除
         const baseName = file.name.replace(/\.[^.]+$/, '');
+        // 新しいFileを作る [blob] 中身（圧縮後データ）
+        // メタ情報
         return new File([blob], baseName + '.jpg', {
             type: 'image/jpeg',
             lastModified: Date.now()
@@ -1020,8 +1101,11 @@ $stamp_files = [
     }
 
     function setInputFile(input, file) {
+        // ドラッグ＆ドロップ操作やクリップボード操作などで使われる「データの入れ物」のようなものです。
         const dt = new DataTransfer();
+        // 入れ物の中に、引数で受け取った file（画像データなど）を追加します。
         dt.items.add(file);
+        // 入れ物の中にある「ファイルリスト」を取り出し、HTMLのファイル選択欄（input）にセットします。
         input.files = dt.files;
     }
 
@@ -1030,24 +1114,24 @@ $stamp_files = [
      * ------------------------------ */
     function set_attach_event(fileAreaSelector, usericonIndex) {
         // 許可する拡張子とMIME（最低限のクライアント側バリデーション。最終判定はサーバ）
+        // jpg と jpeg は同じMIMEになる
         const ALLOWED = {
-            'image': ['image/jpeg', 'image/png'],
-            'video': ['video/mp4'],
-            // 'pdf': ['application/pdf']
+            'image': ['image/jpeg', 'image/png']
         };
-        const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'mp4'];
+        const ALLOWED_EXT = ['jpg', 'jpeg', 'png'];
 
         // スロット別の最大サイズ(MB)
-        const MAX_MB_USERICON = 5; // アイコン
-        const MAX_MB_IMAGE = 5; // 画像・PDF
-        const MAX_MB_VIDEO = 10; // 動画
+        const MAX_MB_USERICON = 1; // アイコン 1MB
+        const MAX_MB_IMAGE = 2; // 通常画像 2MB
 
         // 各スロットに紐づく一時URLを覚えておいて clear 時に解放する
         const urlBucket = new Map(); // key: input[type=file] element, value: Array<objectURL>
 
         // 要素の収集
         // 各スロットの並び順は input.attach[type="file"] / .viewer / .image-camera-icon or .usericon-uploads が同じインデックスで並んでいる前提です。ズレていると表示がおかしくなるので、HTML側の順番をそろえてください。
-        const attachInputs = document.querySelectorAll('input.attach[type="file"]');
+        const attachInputs = document.querySelectorAll(
+            'input.attach[type="file"], input.attach-icon[type="file"]'
+        );
         const viewers = document.querySelectorAll('.viewer');
 
         // 「カメラ画像エリア」（=ファイル未選択時に見えているエリア）
@@ -1059,30 +1143,37 @@ $stamp_files = [
 
         // objectURL を安全に解放
         const revokeAllFor = (inp) => {
+            // 保存してあるURL一覧を取得、urlBucket は Map
             const list = urlBucket.get(inp);
+            // 配列かチェック
             if (Array.isArray(list)) {
                 for (const u of list) {
                     try {
-                        URL.revokeObjectURL(u);
+                        URL.revokeObjectURL(u); // 画像を選び直すたびにメモリが増え続けるからURLを1個ずつ削除
                     } catch {}
                 }
             }
-            urlBucket.set(inp, []);
+            urlBucket.set(inp, []); // 配列リセット
         };
 
         // シンプルな拡張子取得
+        // split('.') "name.jpg" → ["name", "jpg"]
         const getExt = (name) => (name.split('.').pop() || '').toLowerCase();
 
         // クイックな MIME/拡張子チェック
         const isAllowed = (file) => {
+            // ファイル名から拡張子（jpgやpngなど）を取り出す
             const ext = getExt(file.name);
+            // 拡張子が、あらかじめ決めた「許可リスト（ALLOWED_EXT）」に入っていなければ、その時点で拒否
             if (!ALLOWED_EXT.includes(ext)) return false;
 
+            // ブラウザが判定したファイルの「MIMEタイプ（ファイルの種類情報）」を取得
             const type = String(file.type || '');
             if (!type) return false;
 
+            // ファイルの種類が「画像」であれば、さらに詳細な種類（jpegなのかpngなのか等）をチェック
             if (type.startsWith('image/')) return ALLOWED.image.includes(type);
-            if (type.startsWith('video/')) return ALLOWED.video.includes(type);
+            // return ALLOWED.video.includes(type);
             // if (type === 'application/pdf') return true; // 上で拡張子も見ているのでOK
 
             return false;
@@ -1090,7 +1181,10 @@ $stamp_files = [
 
         // スロット別の許可判定（usericonIndex は jpg/png のみ）
         const isAllowedForSlot = (slotIndex, file) => {
-            const isIcon = (slotIndex === Number(usericonIndex));
+            const inp = attachInputs[slotIndex];
+            // HTMLの順番変えたら即バグ index判定からclass判定に変更
+            const isIcon = inp.classList.contains('attach-icon');
+            // ファイル名（file.name）を安全に取得し、すべて小文字に変換する処理
             const name = String(file.name || '').toLowerCase();
             const type = String(file.type || '');
 
@@ -1100,7 +1194,7 @@ $stamp_files = [
                 const okMime = type === 'image/jpeg' || type === 'image/png';
                 return okExt && okMime;
             }
-            // それ以外の枠は従来どおり（画像・動画を許可）
+            // それ以外の枠は従来どおり（画像を許可）
             return isAllowed(file);
         };
 
@@ -1110,42 +1204,40 @@ $stamp_files = [
             if (!v) return;
 
             // 既存プレビューはクリア（URLも解放）
-            v.innerHTML = '';
+            v.textContent = '';
 
             const url = URL.createObjectURL(file);
 
-            // タイプごとに安全な要素を作成（autoplay なし、controls は video のみ）
+            // タイプごとに安全な要素を作成（autoplay なし）
             let el = null;
             if (file.type.startsWith('image/')) {
                 el = document.createElement('img');
                 el.alt = '';
-            } else if (file.type.startsWith('video/')) {
-                el = document.createElement('video');
-                el.setAttribute('controls', ''); // 再生はユーザー操作のみ
-                el.preload = 'metadata';
             } else {
                 return; // 想定外
             }
 
             /* } else if (file.type === 'application/pdf') {
-                el = document.createElement('iframe');
-                el.setAttribute('title', 'PDF preview'); */
+                el = document.createElement('iframe'); */
 
             // レイアウト（旧コード準拠）
-            const isIcon = (slotIndex === Number(usericonIndex));
+            const inp = attachInputs[slotIndex];
+            // HTMLの順番変えたら即バグ index判定からclass判定に変更
+            const isIcon = inp.classList.contains('attach-icon');
             el.style.height = isIcon ? '90px' : '301px';
             el.style.width = isIcon ? '90px' : '535px';
-            if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
-                el.style.objectFit = isIcon ? 'contain' : 'fill';
-            }
+            el.style.objectFit = isIcon ? 'contain' : 'fill';
 
             el.src = url;
             v.appendChild(el);
             v.style.display = 'block';
 
             // 生成URLを記憶
+            // 既存の配列を取得（なければ新規）
             const arr = urlBucket.get(attachInputs[slotIndex]) || [];
+            // URLを追加、今作った URL.createObjectURL(file) を保存
             arr.push(url);
+            // 「このinputにはこのURL配列が紐づいてるよ」と登録
             urlBucket.set(attachInputs[slotIndex], arr);
         };
 
@@ -1154,25 +1246,16 @@ $stamp_files = [
             const fileArea = fileAreas[slotIndex];
             const viewer = viewers[slotIndex];
 
+            // 要素がなければ処理中断（クラッシュ防止）
             if (!inp || !viewer || !fileArea) return;
 
-            const isIcon = (slotIndex === Number(usericonIndex));
+            // HTMLの順番変えたら即バグ index判定からclass判定に変更
+            const isIcon = inp.classList.contains('attach-icon');
 
             // 拡張子も見て動画かどうか判定
             const ext = String(file.name || '').split('.').pop().toLowerCase();
-            const isVideo =
-                (file.type && file.type.startsWith('video/')) ||
-                ext === 'mp4';
-
-            // 種類別に上限MBを決定
-            let maxMB;
-            if (isIcon) {
-                maxMB = MAX_MB_USERICON; // 5MB
-            } else if (isVideo) {
-                maxMB = MAX_MB_VIDEO; // 10MB
-            } else {
-                maxMB = MAX_MB_IMAGE; // 画像は5MB
-            }
+            // サイズ上限決定
+            let maxMB = isIcon ? MAX_MB_USERICON : MAX_MB_IMAGE;
 
             // ここは分岐の外で定義する
             const maxBytes = maxMB * 1024 * 1024;
@@ -1181,22 +1264,25 @@ $stamp_files = [
                 name: file.name,
                 type: file.type,
                 ext,
-                isVideo,
                 maxMB,
                 sizeMB: (file.size / 1024 / 1024).toFixed(2),
             });
 
             // 1. 先に種別チェック
+            // jpg/png以外は弾く
             if (!isAllowedForSlot(slotIndex, file)) {
                 if (isIcon) {
                     alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
                 } else {
-                    alert('サポートしていないファイル種別です（画像：jpg/png、動画：mp4のみ許可）。');
+                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
                 }
 
+                // inputリセット
                 inp.value = '';
-                viewer.innerHTML = '';
+                // プレビュー削除
+                viewer.textContent = '';
                 viewer.style.display = 'none';
+                // カメラアイコン戻す
                 fileArea.classList.remove('hideItems');
 
                 if (typeof validation === 'function') validation();
@@ -1220,10 +1306,12 @@ $stamp_files = [
             // 画像だけブラウザ側で圧縮する
             let uploadFile = file;
 
+            // 圧縮処理
             if (file.type.startsWith('image/')) {
+                // 圧縮実行
                 uploadFile = await compressImageFile(file, {
-                    maxWidth: isIcon ? 512 : 1200,
-                    quality: isIcon ? 0.75 : 0.72
+                    maxWidth: isIcon ? 1000 : 1500, // アイコン画像は1000×1500を縮小させて表示（512に縛ると描くのは難しそう）
+                    quality: isIcon ? 0.7 : 0.75
                 });
 
                 // 圧縮後でも上限を超えていたら止める
@@ -1246,6 +1334,7 @@ $stamp_files = [
             fileArea.classList.add('hideItems');
             renderPreview(slotIndex, uploadFile);
 
+            // 送信ボタンの有効/無効更新
             if (typeof validation === 'function') validation();
         };
 
@@ -1264,7 +1353,7 @@ $stamp_files = [
                 if (!file) {
                     // 何も選んでいない ⇒ カメラエリアを戻す
                     if (viewer) {
-                        viewer.innerHTML = '';
+                        viewer.textContent = '';
                         viewer.style.display = 'none';
                     }
                     if (fileArea) fileArea.classList.remove('hideItems');
@@ -1289,7 +1378,7 @@ $stamp_files = [
                 inp.value = '';
 
                 // プレビューを消す＆objectURL解放
-                viewer.innerHTML = '';
+                viewer.textContent = '';
                 viewer.style.display = 'none';
                 revokeAllFor(inp);
 
@@ -1390,30 +1479,54 @@ $stamp_files = [
             formData.append("action", "bbs_quest_submit");
             if (window.bbs_vars?.nonce) formData.append("nonce", bbs_vars.nonce);
 
+            // ---- 送信: submit → bbs_quest_submit ----
+            const imageInputs = document.querySelectorAll('input.attach[type="file"]');
+            const iconInput = document.querySelector('input.attach-icon[type="file"]');
+
+            let total = 0;
+
+            // 通常画像3枚だけ合計
+            imageInputs.forEach(input => {
+                if (input.files && input.files.length > 0) {
+                    total += input.files[0].size;
+                }
+            });
+
+            // アイコンは別チェック
+            if (iconInput && iconInput.files && iconInput.files.length > 0) {
+                if (iconInput.files[0].size > 1 * 1024 * 1024) {
+                    alert("アイコンは1MBまでです");
+                    toggleLoading(btn, false);
+                    return;
+                }
+            }
+
+            if (total > 6 * 1024 * 1024) {
+                alert("画像は合計6MBまでです");
+                toggleLoading(btn, false);
+                return;
+            }
+
             // ← この位置に入れる
             console.log('files in form:',
                 Array.from(document.querySelectorAll('input.attach[type="file"]'))
                 .map(i => Array.from(i.files).map(f => f.name))
             );
 
-            // ▼ ここから追加：file入力を確実に積む
-            // ※ フォームに入っている場合でもブラウザ依存で漏れることがあるため保険で積み直し
-            try {
-                formData.delete('attach[]'); // 同名が既に入っていたら一旦クリア（無ければ無視される）
+            formData.delete('attach[]');
 
-                document.querySelectorAll('input.attach[type="file"]').forEach(inp => {
-                    if (inp.files && inp.files.length > 0) {
-                        for (const f of inp.files)
-                            formData.append('attach[]', f, f.name); // PHP側は $_FILES['attach'] を参照
+            imageInputs.forEach(inp => {
+                if (inp.files && inp.files.length > 0) {
+                    for (const f of inp.files) {
+                        formData.append('attach[]', f, f.name);
                     }
-                });
+                }
+            });
 
-                // デバッグするなら（後で消してください）
-                // for (const [k, v] of formData.entries()) {
-                //   console.log('FD', k, v instanceof File ? `(file) ${v.name} ${v.size}B` : v);
-                // }
-            } catch (e) {
-                console.warn('append files fallback failed:', e);
+            formData.delete('usericon');
+
+            if (iconInput && iconInput.files && iconInput.files.length > 0) {
+                formData.append('usericon', iconInput.files[0], iconInput.files[0].name);
             }
             // ここまで追加
 
@@ -1490,7 +1603,7 @@ $stamp_files = [
             confirm_area.classList.remove('hideItems');
             confirm_area.style.display = 'block';
             input_area.style.display = 'none';
-            confirm_area.innerHTML = '';
+            confirm_area.textContent = '';
 
             document.body.classList.add('is-confirm'); // ←★ここ
 
@@ -1503,7 +1616,9 @@ $stamp_files = [
 
             // 2) スロットの選択状況を DOM から取得
             //    先頭3つが「動画・画像」、4つ目が「画像アイコン」の前提（あなたのHTMLに合わせています）
-            const attachInputs = document.querySelectorAll('input.attach[type="file"]');
+            const attachInputs = document.querySelectorAll(
+                'input.attach[type="file"], input.attach-icon[type="file"]'
+            );
             // 4スロット想定：0..2 = media, 3 = icon（3番目が存在しない場合もあるのでガード）
             const slotSelected = [false, false, false, false];
             for (let i = 0; i < 4; i++) {
@@ -1544,10 +1659,6 @@ $stamp_files = [
                 if (['jpg', 'jpeg', 'png'].includes(ext)) {
                     el = document.createElement('img');
                     el.alt = fname;
-                } else if (ext === 'mp4') {
-                    el = document.createElement('video');
-                    el.controls = true;
-                    el.preload = 'metadata';
                 } else {
                     return null;
                 }
@@ -1565,7 +1676,6 @@ $stamp_files = [
 
             // --- confirm用カルーセルDOM生成 ---
             function buildConfirmCarousel(fileNames) {
-                // fileNames: ['xxx.jpg','yyy.mp4', ...]  ※tmpのファイル名想定
                 const total = Math.max(1, fileNames.length);
 
                 const area = document.createElement('div');
@@ -2084,6 +2194,8 @@ $stamp_files = [
             submitBtn.addEventListener('click', validation); // 任意（押下時に再判定したいなら）
             submitBtn.addEventListener('click', submit_button_click); // ★これが必須！
         }
+
+
 
         document.addEventListener('input', (e) => {
             console.log('[BBS] input EVENT on', e.target?.id || e.target?.name || e.target?.tagName);
