@@ -974,7 +974,8 @@ $stamp_files = [
                 filesCount++;
 
                 // アイコンかどうか判定
-                const isIcon = (index === 3); // ←4つ目がアイコン
+                // const isIcon = (index === 3); // ←4つ目がアイコン
+                const isIcon = input.classList.contains('attach-icon');
 
                 // サイズ上限を決定
                 // アイコン → 1MB 通常画像 → 2MB
@@ -1271,12 +1272,7 @@ $stamp_files = [
             // 1. 先に種別チェック
             // jpg/png以外は弾く
             if (!isAllowedForSlot(slotIndex, file)) {
-                if (isIcon) {
-                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
-                } else {
-                    alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
-                }
-
+                alert('サポートしていないファイル種別です（画像：jpg/pngのみ許可）。');
                 // inputリセット
                 inp.value = '';
                 // プレビュー削除
@@ -1294,7 +1290,7 @@ $stamp_files = [
                 alert(`ファイルサイズが上限(${maxMB}MB)を超えています。`);
 
                 inp.value = '';
-                viewer.innerHTML = '';
+                viewer.textContent = '';
                 viewer.style.display = 'none';
                 fileArea.classList.remove('hideItems');
 
@@ -1309,20 +1305,31 @@ $stamp_files = [
             // 圧縮処理
             if (file.type.startsWith('image/')) {
                 // 圧縮実行
-                uploadFile = await compressImageFile(file, {
-                    maxWidth: isIcon ? 1000 : 1500, // アイコン画像は1000×1500を縮小させて表示（512に縛ると描くのは難しそう）
-                    quality: isIcon ? 0.7 : 0.75
-                });
+                try {
+                    uploadFile = await compressImageFile(file, {
+                        maxWidth: isIcon ? 1000 : 1500,
+                        quality: isIcon ? 0.7 : 0.75
+                    });
+                } catch (error) {
+                    console.error('圧縮失敗:', error);
+                    alert('画像の処理に失敗しました。別の画像で試してください。');
+                    inp.value = '';
+                    viewer.textContent = '';
+                    viewer.style.display = 'none';
+                    fileArea.classList.remove('hideItems');
+                    validation?.();
+                    return;
+                }
 
                 // 圧縮後でも上限を超えていたら止める
                 if (uploadFile.size <= 0 || uploadFile.size > maxBytes) {
                     alert(`圧縮後のファイルサイズが上限(${maxMB}MB)を超えています。`);
                     inp.value = '';
-                    viewer.innerHTML = '';
+                    viewer.textContent = '';
                     viewer.style.display = 'none';
                     fileArea.classList.remove('hideItems');
 
-                    if (typeof validation === 'function') validation();
+                    validation?.();
                     return;
                 }
 
@@ -1537,13 +1544,19 @@ $stamp_files = [
             });
 
             if (!res.ok) {
+                // txtをエラーメッセージに含めず、ログにだけ残す
                 const txt = await res.text().catch(() => "");
-                throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt}`);
+                // console.error("Server Error Details:", txt); // 開発者だけが見れる
+                throw new Error(`サーバーエラーが発生しました (${res.status})`);
             }
 
-            const json = await res.json().catch(() => {
-                throw new Error("submit応答(JSON)の解析に失敗しました。");
-            });
+            // JSON解析の失敗も、より具体的にハンドリング
+            let json;
+            try {
+                json = await res.json();
+            } catch (e) {
+                throw new Error("応答データが正しくありません。");
+            }
 
             if (!json || json.success !== true) {
                 const msg = json?.data?.errors?.[0] || json?.data?.message || "送信に失敗しました。";
@@ -1573,7 +1586,10 @@ $stamp_files = [
 
             if (!showRes.ok) {
                 const txt = await showRes.text().catch(() => "");
-                alert(`プレビュー取得に失敗しました (HTTP ${showRes.status}).\n${txt}`);
+
+                // console.error("Preview Error Details:", txt);
+
+                alert(`プレビュー取得に失敗しました。時間をおいて再度お試しください。`);
                 return;
             }
 
@@ -2121,7 +2137,11 @@ $stamp_files = [
 
             if (!res.ok) {
                 const txt = await res.text().catch(() => "");
-                throw new Error(`HTTP ${res.status} ${res.statusText}\n${txt}`);
+
+                // 開発確認用。本番では消す or DEBUG時だけ出す
+                // console.error("Server Error Details:", txt);
+
+                throw new Error(`サーバーエラーが発生しました (${res.status})`);
             }
 
             let json;
