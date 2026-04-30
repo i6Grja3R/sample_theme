@@ -354,7 +354,7 @@ function display_week_ranking()
                                 <div class="week-ranking mosaic-backdrop">
                                     <div class="index_commentbox">
                                         <?php if (function_exists("the_ratings")) the_ratings(); ?></div>
-                                    <?php // 352行目がこの if の開始タグの場合
+                                    <?php
                                     if (has_post_thumbnail()) {
                                         echo '<div class="week-ranking list-thumbnail">';
                                         the_post_thumbnail(array(200, 200), array('class' => 'week-ranking mosaic-backdrop'));

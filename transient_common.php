@@ -432,7 +432,7 @@ if (!function_exists('bbs_tmp_get')) {
             wp_die('Invalid nonce', '', ['response' => 403]);
         }
 
-        // 2) transient から “許可ファイル” を取得して照合
+        // 2) transient から "許可ファイル" を取得して照合
         if (!function_exists('get_guest_uuid')) {
             status_header(500);
             wp_die('helper missing', '', ['response' => 500]);

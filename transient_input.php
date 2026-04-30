@@ -1937,7 +1937,7 @@ $stamp_files = [
 
             confirm_area.appendChild(userRow);
 
-            // ★① dataの中身を確認（ここ）
+            // ★① dataの中身を確認
             console.log('CONFIRM data:', data);
             console.log('stamp value:', data.stamp);
 

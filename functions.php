@@ -1264,7 +1264,7 @@ if (!function_exists('bbs_duplicate_commit_guard')) {
 /** ここで “最終的に使えるようになったか” を確認 */
 if (function_exists('bbs_tmp_dir'))   error_log('[BBS] bbs_tmp_dir READY');
 if (function_exists('bbs_attach_dir')) error_log('[BBS] bbs_attach_dir READY');
-// …必要なら他も
+// 必要なら他も
 
 // ここから bbs_quest_submit()/bbs_quest_confirm() の定義
 

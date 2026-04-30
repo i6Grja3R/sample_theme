@@ -182,7 +182,7 @@ foreach ($rows as $row) {
         resetAutoPlayInterval();
     });
     // インジケーターをクリックすることで「対応スライドを表示させる」
-    // ↓クリックイベントのリスナーを登録
+    // クリックイベントのリスナーを登録
     indicator.addEventListener('click', (event) => {
         // クリックされた要素が .list クラスを持つかどうかを判定しています
         // event.target はクリックされた要素を指し、classList.contains('list') はその要素のクラスリストに 'list' クラスが含まれているかどうかをチェックする
