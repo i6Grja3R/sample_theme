@@ -732,18 +732,60 @@ function bbs_answer_confirm()
 
         $filenames = []; // DB更新用のファイル名を記録
 
+        $src_base = realpath($src_dir);
+        $dst_base = realpath($dst_dir);
+
+        if ($src_base === false || $dst_base === false) {
+            wp_send_json_error(['message' => '添付ファイルの処理に失敗しました。']);
+        }
+
         // 添付ファイルごとに処理
         foreach ($answer_data['attach'] as $i => $filename) {
-            $src_path = $src_dir . $filename;
-            $ext = pathinfo($filename, PATHINFO_EXTENSION);
+            $i = (int) $i;
 
-            // ファイル名をユニークにリネーム（例：abcde_1.png, abcde_usericon.jpg）
-            $target_name = "{$new_unique_id}_" . ($i == 3 ? 'usericon' : ($i + 1)) . ".$ext";
-            $dst_path = $dst_dir . $target_name;
+            if ($i < 0 || $i > 3) {
+                continue;
+            }
 
-            // 一時ファイルが存在すれば移動（rename = move）
-            if (file_exists($src_path)) {
-                rename($src_path, $dst_path); // move and rename
+            if (!$filename) {
+                $filenames[$i] = '';
+                continue;
+            }
+
+            // パス成分を除去
+            $filename = basename((string) $filename);
+
+            // ファイル名の文字を制限
+            if (!preg_match('/\A[a-zA-Z0-9._-]+\z/', $filename)) {
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+            // 許可拡張子
+            if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+                continue;
+            }
+
+            $src_path = realpath(trailingslashit($src_dir) . $filename);
+
+            // tmpディレクトリ配下の実ファイルか確認
+            if ($src_path === false || strpos($src_path, $src_base . DIRECTORY_SEPARATOR) !== 0 || !is_file($src_path)) {
+                continue;
+            }
+
+            $target_name = "{$new_unique_id}_" . ($i === 3 ? 'usericon' : ($i + 1)) . ".{$ext}";
+            $dst_path = trailingslashit($dst_dir) . $target_name;
+
+            $dst_parent = realpath(dirname($dst_path));
+
+            // 保存先がattachディレクトリ配下か確認
+            if ($dst_parent === false || strpos($dst_parent, $dst_base) !== 0) {
+                continue;
+            }
+
+            if (@rename($src_path, $dst_path)) {
+                @chmod($dst_path, 0644);
                 $filenames[$i] = $target_name;
             }
         }
@@ -859,12 +901,22 @@ add_action('init', function () {
 // ゲスト識別用 UUID をCookieに保存
 // cookie が正しく保存されない → user_id が欠損 → いいね機能が動かない という致命的な問題になるため、WordPress が HTTP ヘッダーを送る「直前」にフックする
 // init で setcookie() を使うのはタイミング的に遅すぎるため setcookie() の効果が失われ、ブラウザに Cookie が保存されない
-// add_action('init', function () {
+// 将来JSでuser_idかdocument.cookieを使う必要が出たら、その時に httponly => false にするのではなく、まずは nonceやAJAX経由でサーバ側に処理させる設計 にした方が安全
 add_action('send_headers', function () {
-    if (!isset($_COOKIE['user_id'])) {
+    if (empty($_COOKIE['user_id'])) {
         $guest_user_id = wp_generate_uuid4();
-        setcookie('user_id', $guest_user_id, time() + (10 * YEAR_IN_SECONDS), COOKIEPATH, COOKIE_DOMAIN);
-        $_COOKIE['user_id'] = $guest_user_id; // 即時使用できるように
+
+        setcookie('user_id', $guest_user_id, [
+            'expires'  => time() + (10 * YEAR_IN_SECONDS),
+            'path'     => COOKIEPATH ?: '/',
+            'domain'   => COOKIE_DOMAIN ?: '',
+            'secure'   => is_ssl(),
+            'httponly' => true, // JavaScriptから user_id を読めなくなる ので、XSSで盗まれるリスクを下げられる
+            'samesite' => 'Lax',
+        ]);
+
+        // PHP内ですぐ使えるようにする
+        $_COOKIE['user_id'] = $guest_user_id;
     }
 });
 
@@ -998,8 +1050,38 @@ if (!function_exists('bbs_attach_dir')) {
         $up = wp_upload_dir();
         $y  = gmdate('Y');
         $m  = gmdate('m');
-        $dir = trailingslashit($up['basedir']) . "attach/{$y}/{$m}";
-        if (!is_dir($dir)) wp_mkdir_p($dir);
+
+        $attach_base = trailingslashit($up['basedir']) . 'attach';
+        $dir = trailingslashit($attach_base) . "{$y}/{$m}";
+
+        if (!is_dir($dir)) {
+            wp_mkdir_p($dir);
+        }
+
+        // attach親ディレクトリに .htaccess を置く
+        $ht = trailingslashit($attach_base) . '.htaccess';
+
+        if (!file_exists($ht)) {
+            $rules = <<<HT
+# BBS attach: disable script execution
+Options -Indexes
+
+<FilesMatch "\.(php|php5|php7|phtml|phar|pl|py|jsp|asp|aspx|sh|cgi)$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>
+HT;
+
+            @file_put_contents($ht, $rules);
+        }
+
         return $dir;
     }
 }
@@ -1086,9 +1168,12 @@ if (!function_exists('bbs_rate_guard')) {
     {
         // 呼び出し元のIPを取得
         $ip  = bbs_get_client_ip();
-        // IPとユーザーIDを混ぜて、この人専用の保存用キー（名前）を作る（md5でハッシュ化）
-        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);
-
+        // IPとユーザーIDを混ぜて、この人専用の保存用キーを作る md5() が弱いハッシュだから変更
+        $key = 'bbs_rate_' . hash_hmac(
+            'sha256',
+            $ip . '|' . $user_id,
+            wp_salt('auth')
+        );
         // WordPressのDB（一時保存データ）から、現在の実行回数を取得
         $cnt = (int) get_transient($key);
         // 取得した回数が、設定した上限（$limit）に達しているかチェック
@@ -1105,7 +1190,11 @@ if (!function_exists('bbs_rate_guard')) {
         // ② ★追加：IP + UA
         $ua = bbs_get_user_agent();
 
-        $key_ip_ua = 'bbs_rate_ipua_' . md5($ip . '|' . $ua);
+        $key_ip_ua = 'bbs_rate_ipua_' . hash_hmac(
+            'sha256',
+            $ip . '|' . $ua,
+            wp_salt('auth')
+        );
         $cnt_ip_ua = (int) get_transient($key_ip_ua);
 
         if ($cnt_ip_ua >= $limit) {
@@ -1151,8 +1240,16 @@ if (!function_exists('bbs_duplicate_commit_guard')) {
             trim($usericon),
         ]);
 
-        $fingerprint = md5($fingerprint_source);
-        $key = 'bbs_dup_commit_' . md5($user_id . '|' . $fingerprint);
+        $fingerprint = hash_hmac(
+            'sha256',
+            $fingerprint_source,
+            wp_salt('auth')
+        );
+        $key = 'bbs_dup_commit_' . hash_hmac(
+            'sha256',
+            $user_id . '|' . $fingerprint,
+            wp_salt('auth')
+        );
 
         if (get_transient($key)) {
             wp_send_json_error([
@@ -1650,15 +1747,42 @@ if (!function_exists('bbs_quest_confirm')) {
                     continue;
                 }
 
-                $src = trailingslashit($tmp_dir) . $basename;
-                if (!file_exists($src)) {
+                // スロット番号は 0〜3 のみ許可
+                $i = (int) $i;
+                if ($i < 0 || $i > 3) {
                     $errors[] = '・添付ファイルの処理に失敗しました。';
                     continue;
                 }
 
+                // ① パス成分を除去
+                $basename = basename((string) $basename);
+
+                // ② ファイル名の文字を制限
+                if (!preg_match('/\A[a-zA-Z0-9._-]+\z/', $basename)) {
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
+                    continue;
+                }
+
+                // ③ 拡張子チェック
                 // 拡張子は basename から取得
                 $ext = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
-                if ($ext === '') {
+                $allowed_ext = ['jpg', 'jpeg', 'png'];
+
+                if (!in_array($ext, $allowed_ext, true)) {
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
+                    continue;
+                }
+
+                $tmp_base = realpath($tmp_dir);
+                if ($tmp_base === false) {
+                    $errors[] = '・添付ファイルの処理に失敗しました。';
+                    continue;
+                }
+
+                $src = realpath(trailingslashit($tmp_dir) . $basename);
+
+                // tmp配下の実ファイルだけ許可
+                if ($src === false || strpos($src, $tmp_base . DIRECTORY_SEPARATOR) !== 0 || !is_file($src)) {
                     $errors[] = '・添付ファイルの処理に失敗しました。';
                     continue;
                 }

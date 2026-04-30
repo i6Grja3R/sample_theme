@@ -135,33 +135,36 @@ LIMIT
     $query = $wpdb->prepare($sql, 'category_count_week', 20);
     $terms = $wpdb->get_results($query);
     if ($terms) {
-        $out = '<ul class="category-ranking clearfix">';
-        $tag_link_count = 0;
-        foreach ($terms as $term) {
-            $url = get_term_link($term) . "?tn={$tn}";
-            $tag_link_count++;
-            $out .= "
+    $out = '<ul class="category-ranking clearfix">';
+    $tag_link_count = 0;
+
+    foreach ($terms as $term) {
+        $url = esc_url(get_term_link($term) . "?tn=" . urlencode($tn));
+        $name = esc_html($term->name);
+        $count = (int)$term->count;
+
+        $tag_link_count++;
+
+        $out .= '
 <li>
-<!--<span class=\"material-icons\">sell
-</span>-->
-<a href=\"{$url}\" class=\"tag-link-{$tag_link_count}\" style=\"font-size:9pt;\" aria-lavel=\"{$term->name}（{$term->count}項目）\" >
-{$term->name}
+<a href="' . $url . '" 
+   class="tag-link-' . (int)$tag_link_count . '" 
+   style="font-size:9pt;" 
+   aria-label="' . $name . '（' . $count . '項目）">
+   ' . $name . '
 </a>
-<div class=\"Information\">
-</div>
-</li>
-";
-        }
-        $out .= '</ul>';
-    } else {
-        $out = '<p>アクセスランキングはまだ集計されていません。</p>';
+<div class="Information"></div>
+</li>';
     }
-    echo "
-<section class=\"category-box\">
-{$out}
-</section>
-";
+
+    $out .= '</ul>';
+} else {
+    $out = '<p>アクセスランキングはまだ集計されていません。</p>';
 }
+
+echo '<section class="category-box">';
+echo wp_kses_post($out);
+echo '</section>';
 
 function display_archive()
 {
