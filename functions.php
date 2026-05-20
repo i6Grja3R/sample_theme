@@ -103,18 +103,31 @@ function add_google_icons()
 }
 add_action('wp_enqueue_scripts', 'add_google_icons');
 
-//PHPをウィジェット追加
-function widget_text_exec_php($widget_text)
-{
-    if (strpos($widget_text, '<' . '?') !== false) {
-        ob_start();
-        eval('?>' . $widget_text);
-        $widget_text = ob_get_contents();
-        ob_end_clean();
+// WordPress でプラグイン使わずにウィジェットで PHP コード動かす
+add_filter('widget_text', function ($ret) {
+
+    // ホワイトリスト化。
+    $allowed = [
+        'ahoaho',
+    ];
+
+    foreach ($allowed as $file) {
+
+        if (strpos($ret, '[' . $file . ']') !== false) {
+
+            ob_start();
+
+            // template-parts に固定
+            get_template_part('template-parts/widget/' . $file);
+
+            $ret = ob_get_clean();
+
+            break;
+        }
     }
-    return $widget_text;
-}
-add_filter('widget_text', 'widget_text_exec_php', 99);
+
+    return $ret;
+}, 99);
 
 // カスタマイズコメントフォーム
 if (!function_exists('custom_comment_form')) {
@@ -157,6 +170,52 @@ function default_author_name($author, $comment_ID, $comment)
     return $author;
 }
 add_filter('get_comment_author', 'default_author_name', 10, 3);
+
+// コメント投稿レート制限
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
+    $key = 'comment_rate_' . md5($ip);
+
+    if (get_transient($key)) {
+
+        wp_die('短時間での連続投稿はできません。');
+    }
+
+    set_transient($key, 1, 60);
+
+    return $commentdata;
+});
+
+// URL混入禁止
+add_filter('preprocess_comment', function ($commentdata) {
+
+    if (preg_match('/https?:\/\/|www\./i', $commentdata['comment_content'])) {
+
+        wp_die('URLを含むコメントは禁止されています。');
+    }
+
+    return $commentdata;
+});
+
+// 承認待ち化
+add_filter('pre_comment_approved', function ($approved, $commentdata) {
+
+    $text = $commentdata['comment_content'];
+
+    // 英数字URLが多い
+    if (preg_match_all('/https?:\/\//i', $text) >= 1) {
+        return 0;
+    }
+
+    // 長すぎる
+    if (mb_strlen($text) > 300) {
+        return 0;
+    }
+
+    return $approved;
+}, 10, 2);
 
 // 検索ワードファイルパス
 define('SEARCH_WORDS_FILE_PATH', __DIR__ . '/test.csv');
@@ -388,8 +447,14 @@ function getPostViews3day($postID)
 //クリック数をカウントする
 function category_views_week()
 {
-    global $cat;
-    $categoryID = $cat;
+    // WordPress公式の取得方法、int化できる、categoryページ専用変数に依存しない
+    $categoryID = get_queried_object_id();
+    $categoryID = max(0, (int) $categoryID);
+
+    if ($categoryID <= 0) {
+        return;
+    }
+
     $key = 'category_count_week';
     category_views($categoryID, $key);
 }
@@ -416,12 +481,12 @@ add_action("phpmailer_init", "send_smtp_email");
 function send_smtp_email($phpmailer)
 {
     $phpmailer->isSMTP();
-    $phpmailer->Host       = "mail.last.cfbx.jp";
+    $phpmailer->Host       = SMTP_HOST;
     $phpmailer->SMTPAuth   = true;
-    $phpmailer->Port       = 587;
-    $phpmailer->SMTPSecure = "tls";
-    $phpmailer->Username   = "test@last.cfbx.jp";
-    $phpmailer->Password   = "takuya7530";
+    $phpmailer->Port       = SMTP_PORT;
+    $phpmailer->SMTPSecure = SMTP_SECURE;
+    $phpmailer->Username   = SMTP_USER;
+    $phpmailer->Password   = SMTP_PASS;
     $phpmailer->From       = "test@last.cfbx.jp";
     $phpmailer->FromName   = "test";
 }
@@ -1896,3 +1961,10 @@ if (!function_exists('bbs_quest_confirm')) {
 }
 add_action('wp_ajax_bbs_quest_confirm',        'bbs_quest_confirm');
 add_action('wp_ajax_nopriv_bbs_quest_confirm', 'bbs_quest_confirm');
+
+// 検索エンジンインデックス汚染（新規追加なので消さないで）
+add_action('wp_head', function () {
+    if (is_search()) {
+        echo '<meta name="robots" content="noindex,follow">' . "\n";
+    }
+});

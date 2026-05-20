@@ -15,11 +15,22 @@ function set_template_info()
 function get_template_url($template_number, $check_search)
 {
     if ($check_search && is_category()) {
-        $category = single_cat_title('', false);
-        $sub = "category/{$category}";
+        $term = get_queried_object();
+
+        if ($term instanceof WP_Term) {
+            return get_term_link($term);
+        }
+
+        return home_url('/');
     } elseif ($check_search && is_archive()) {
-        $y = get_query_var('year');
-        $m = get_query_var('monthnum');
+        $y = (int) get_query_var('year');
+        $m = (int) get_query_var('monthnum');
+
+        // URL崩れ防止、変な文字混入防止、想定外URL防止
+        if ($y <= 0 || $m <= 0 || $m > 12) {
+            return home_url('/');
+        }
+
         $sub = "{$y}/{$m}";
     } elseif (1 === $template_number || $check_search && is_search()) {
         $sub = '';
@@ -33,11 +44,14 @@ function get_template_number()
 {
     global $template;
     // 修正前: $template_number = $_GET['tn'];
-    $template_number = isset($_GET['tn']) ? $_GET['tn'] : ''; // 35行目
+    // tn は数値だけという前提をコード側で強制
+    $template_number = isset($_GET['tn'])
+        ? (int)$_GET['tn']
+        : 1; // 35行目
     switch ($template_number) {
-        case '2':
+        case 2:
             break;
-        case '3':
+        case 3:
             break;
         default:
             switch (pathinfo($template, PATHINFO_FILENAME)) {
@@ -57,35 +71,41 @@ function get_template_number()
 function get_template_key($template_number)
 {
     if (1 == $template_number) {
-        $template_key = 'single_rss_feed1';
+        return 'single_rss_feed1';
     } elseif (2 == $template_number) {
-        $template_key = 'double_rss_feed2';
+        return 'double_rss_feed2';
     } elseif (3 == $template_number) {
-        $template_key = 'triple_rss_feed3';
+        return 'triple_rss_feed3';
     }
 
-    return $template_key;
+    return 'single_rss_feed1';
 }
 function get_rss_table_name($template_number)
 {
     if (1 == $template_number) {
-        $rss_table_name = 'single_rss_feed';
+        return 'single_rss_feed';
     } elseif (2 == $template_number) {
-        $rss_table_name = 'double_rss_feed';
+        return 'double_rss_feed';
     } elseif (3 == $template_number) {
-        $rss_table_name = 'triple_rss_feed';
+        return 'triple_rss_feed';
     } elseif (4 == $template_number) {
-        $rss_table_name = 'trisect_rss_feed';
+        return 'trisect_rss_feed';
     }
 
-    return $rss_table_name;
+    return 'single_rss_feed';
 }
 function get_current_page()
 {
     // 修正前: $cp = $_GET['cp'];
     $cp = isset($_GET['cp']) ? $_GET['cp'] : ''; // 84行目
     if (ctype_digit($cp)) {
+        // 数字なら int化
         $cp = (int) $cp; // ここを $_GET['cp'] ではなく $cp に変更
+
+        // 1未満防止
+        if ($cp < 1) {
+            $cp = 1;
+        }
     } else {
         $cp = 1;
     }
@@ -98,7 +118,7 @@ function display_other_template()
     for ($i = 1; $i <= 3; ++$i) {
         if ($i != $tn) {
             $url = get_template_url($i, false);
-            echo "<div><a href=\"{$url}\">画像{$i}の一覧へ</a></div>";
+            echo '<div><a href="' . esc_url($url) . '">画像' . (int)$i . 'の一覧へ</a></div>';
         }
     }
 }
@@ -135,17 +155,25 @@ LIMIT
     $query = $wpdb->prepare($sql, 'category_count_week', 20);
     $terms = $wpdb->get_results($query);
     if ($terms) {
-    $out = '<ul class="category-ranking clearfix">';
-    $tag_link_count = 0;
+        $out = '<ul class="category-ranking clearfix">';
+        $tag_link_count = 0;
 
-    foreach ($terms as $term) {
-        $url = esc_url(get_term_link($term) . "?tn=" . urlencode($tn));
-        $name = esc_html($term->name);
-        $count = (int)$term->count;
+        foreach ($terms as $term) {
+            // rawurlencode()でURLの構成要素を安全にエンコード
+            $term_link = get_term_link($term);
 
-        $tag_link_count++;
+            // カテゴリ1個壊れてもランキング全体は表示される
+            if (is_wp_error($term_link)) {
+                continue;
+            }
 
-        $out .= '
+            $url = esc_url(add_query_arg('tn', (int) $tn, $term_link));
+            $name = esc_html($term->name);
+            $count = (int)$term->count;
+
+            $tag_link_count++;
+
+            $out .= '
 <li>
 <a href="' . $url . '" 
    class="tag-link-' . (int)$tag_link_count . '" 
@@ -155,16 +183,17 @@ LIMIT
 </a>
 <div class="Information"></div>
 </li>';
+        }
+
+        $out .= '</ul>';
+    } else {
+        $out = '<p>アクセスランキングはまだ集計されていません。</p>';
     }
 
-    $out .= '</ul>';
-} else {
-    $out = '<p>アクセスランキングはまだ集計されていません。</p>';
+    echo '<section class="category-box">';
+    echo wp_kses_post($out);
+    echo '</section>';
 }
-
-echo '<section class="category-box">';
-echo wp_kses_post($out);
-echo '</section>';
 
 function display_archive()
 {
@@ -201,11 +230,24 @@ m DESC
     }
     $out = '<ul class="archive-list">';
     foreach ($ym_array as $y => $y_items) {
-        $out .= '<li class="year">' . $y;
+        $out .= '<li class="year">' . (int)$y;
         $out .= '<ul class="month-archive-list">';
         foreach ($y_items as $m => $c) {
-            $url = home_url("{$y}/{$m}?tn={$tn}");
-            $out .= "<li><a href=\"{$url}\">{$y}年{$m}月</a>({$c})</li>";
+            // rawurlencode() → URLパラメータ安全化
+            // esc_url() → href用URL安全化、esc_html() → 表示文字列のXSS対策
+            // (int)$c → 数値固定
+            $year  = (int)$y;
+            $month = (int)$m;
+
+            // URLを安全化
+            $url = esc_url(
+                home_url($year . '/' . $month . '?tn=' . rawurlencode((string)$tn))
+            );
+
+            // 表示文字列をエスケープ
+            $out .= '<li><a href="' . $url . '">' .
+                esc_html($year . '年' . $month . '月') .
+                '</a>(' . (int)$c . ')</li>';
         }
         $out .= '</ul>';
     }
@@ -217,104 +259,207 @@ m DESC
 <div class=\"side-title\">月別アーカイブ(monthly archive)</div>
 {$out}
 </div>
-</div>
 ";
 }
 
 function display_pagenavi()
 {
     echo '<div>ページナビ</div>';
+
     global $tn;
     global $current_page;
     global $posts_per_page;
     global $post_count;
-    $pages = ceil($post_count / $posts_per_page);
+
+    // 数値を安全化
+    $tn             = (int) $tn;
+    $posts_per_page = max(1, (int) $posts_per_page);
+    $post_count     = max(0, (int) $post_count);
+    $pages          = max(1, (int) ceil($post_count / $posts_per_page));
+    $current_page   = max(1, min((int) $current_page, $pages));
+
     $display_pages = 5;
     $display_page_count = 0;
+
+    // ベースURLを安全化
     $url = get_template_url($tn, true);
-    $a = filter_input(INPUT_GET, 's');
-    var_dump($a);
-    $s = '';
-    if (is_search()) {
-        $s = filter_input(INPUT_GET, 's');
-        if (!empty($s)) {
-            $s = "&s={$s}";
+
+    // 検索ページなら検索語を引き継ぐ
+    $search_query = is_search() ? get_search_query(false) : null;
+
+    // ページURL生成用
+    $make_page_url = function ($page) use ($url, $tn, $search_query) {
+        $args = [
+            'cp' => max(1, (int) $page),
+            'tn' => $tn,
+        ];
+
+        if ($search_query !== null && $search_query !== '') {
+            $args['s'] = $search_query;
         }
-    }
+
+        return add_query_arg($args, $url);
+    };
+
     for ($i = 1; $i <= $pages; ++$i) {
-        if (1 == $i) {
-            $page_text = '＜＜';
-            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
-            if ($current_page > 1) {
-                $j = $current_page - 1;
-            } else {
-                $j = 1;
-            }
-            $page_text = '＜';
-            echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
+
+        if (1 === $i) {
+            echo '<a href="' . esc_url($make_page_url(1)) . '">' . esc_html('＜＜') . '</a> ';
+
+            $prev_page = max(1, $current_page - 1);
+
+            echo '<a href="' . esc_url($make_page_url($prev_page)) . '">' . esc_html('＜') . '</a> ';
         }
+
         if ($i >= $current_page && ++$display_page_count <= $display_pages) {
-            $page_text = $i;
-            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
+            echo '<a href="' . esc_url($make_page_url($i)) . '">' . esc_html((string) $i) . '</a> ';
         }
-        if ($i == $pages) {
-            if ($current_page < $pages) {
-                $j = $current_page + 1;
-            } else {
-                $j = $pages;
-            }
-            $page_text = '＞';
-            echo "<a href=\"{$url}?cp={$j}&tn={$tn}{$s}\">{$page_text}</a> ";
-            $page_text = '＞＞';
-            echo "<a href=\"{$url}?cp={$i}&tn={$tn}{$s}\">{$page_text}</a> ";
+
+        if ($i === $pages) {
+            $next_page = min($pages, $current_page + 1);
+
+            echo '<a href="' . esc_url($make_page_url($next_page)) . '">' . esc_html('＞') . '</a> ';
+
+            echo '<a href="' . esc_url($make_page_url($pages)) . '">' . esc_html('＞＞') . '</a> ';
         }
     }
 }
 
-// 3日間ランキング
+// 3日間ランキングを表示
 function display_3day_ranking()
 {
-    global $post;
+    // ランキング取得
+    // posts_per_page      : 表示件数
+    // post_status         : 公開済み記事のみ取得（下書き・非公開除外）
+    // ignore_sticky_posts : 固定記事をランキングに混ぜない
+    // meta_key            : PV保存用カスタムフィールド
+    // orderby             : 数値として並び替え
+    // no_found_rows       : 総件数取得SQLを省略して軽量化
+    $ranking_posts = get_posts([
+        'posts_per_page'      => 12,
+        'post_status'         => 'publish',
+        'ignore_sticky_posts' => true,
+        'meta_key'            => 'pv_count_3day',
+        'orderby'             => 'meta_value_num',
+        'order'               => 'DESC',
+        'no_found_rows'       => true,
+    ]);
 ?>
-    <div class="3day-ranking">
+
+    <div class="three-day-ranking">
+
         <div class="side-title">3days ranking</div>
+
         <div class="AMvertical black" style="width: 300px;">
+
             <section class="popular-box">
-                <?php
-                $args = array(
-                    'numberposts'   => 12,       //表示数
-                    'meta_key'      => 'pv_count_3day',
-                    'orderby'       => 'meta_value_num',
-                    'order'         => 'DESC',
-                );
-                $posts = get_posts($args);
-                if ($posts) : ?>
+
+                <?php if (!empty($ranking_posts)) : ?>
+
                     <ul>
-                        <?php foreach ($posts as $post) : setup_postdata($post); ?>
+
+                        <?php
+                        // ランキング番号用
+                        // 未定義防止のため初期化
+                        // $count = 1;
+
+                        // ランキング記事ループ
+                        foreach ($ranking_posts as $ranking_post) :
+
+                            // WordPress の投稿データをセット
+                            setup_postdata($ranking_post);
+
+                            // 投稿IDを整数化
+                            // 念のため型を固定
+                            $post_id = (int) $ranking_post->ID;
+                        ?>
+
                             <li>
-                                <a href="<?php echo get_permalink(); ?>" style="width: 97px;height: 130px">
-                                    <?php if (has_post_thumbnail()) {
-                                        the_post_thumbnail(array(100, 100));
-                                    } ?>
-                                    <div class="modelName"> <span class="name"><?php the_title(); ?><span id="likeCount3"></span></span>
+
+                                <!-- 記事URL -->
+                                <!-- esc_url() でURLを安全に出力 -->
+                                <a href="<?php echo esc_url(get_permalink($post_id)); ?>" class="ranking-link">
+
+                                    <?php
+                                    // サムネイルが存在する場合のみ表示
+                                    if (has_post_thumbnail($post_id)) {
+
+                                        // サムネイルを出力
+                                        // alt属性は esc_attr() で属性用エスケープ
+                                        // loading="lazy" で画像遅延読み込み
+                                        echo get_the_post_thumbnail(
+                                            $post_id,
+                                            [100, 100],
+                                            [
+                                                'alt'    => esc_attr(get_the_title($post_id)),
+                                                'loading' => 'lazy',
+                                            ]
+                                        );
+                                    }
+                                    ?>
+
+                                    <div class="modelName">
+
+                                        <span class="name">
+
+                                            <!-- タイトル出力 -->
+                                            <!-- esc_html() でXSS対策 -->
+                                            <?php echo esc_html(get_the_title($post_id)); ?>
+
+                                            <!-- class化 -->
+                                            <!-- idはループ内重複禁止のため使用しない -->
+                                            <span class="likeCount3"></span>
+
+                                        </span>
+
                                     </div>
+
                                 </a>
-                                <div class="info topinfo">
-                                    <p>
-                                        <?php //　連番表示 $count = sprintf("%02d",$count); // 一桁を二桁に echo $count + 1; // 01を出力 $count++; 
-                                        ?> </p>
-                                </div>
-                                <?/*php echo getPostViews3days(get_the_ID()); // 記事閲覧回数表示 */ ?>
-                            <?php endforeach;
-                        wp_reset_postdata(); ?>
+
+                                <?php
+                                // 閲覧回数表示用
+                                // 出力時は esc_html() 推奨
+                                /*
+                                echo esc_html(
+                                    getPostViews3days($post_id)
+                                );
+                                */
+                                ?>
+
                             </li>
+
+                        <?php
+                        // ランキング番号を加算
+                        // $count++;
+
+                        endforeach;
+
+                        // setup_postdata() を元に戻す
+                        // 忘れると他テンプレートへ影響する
+                        wp_reset_postdata();
+                        ?>
+
                     </ul>
+
                 <?php else : ?>
-                    <p>アクセスランキングはまだ集計されていません。</p>
+
+                    <!-- ランキングが空の場合 -->
+                    <p>
+                        <?php
+                        echo esc_html(
+                            'アクセスランキングはまだ集計されていません。'
+                        );
+                        ?>
+                    </p>
+
                 <?php endif; ?>
+
             </section>
+
         </div>
+
     </div>
+
 <?php
 }
 
@@ -344,7 +489,7 @@ function display_week_ranking()
                                             <span class="week-ranking-date"><?php the_time('Y/m/d'); ?></span>
                                             <span class="week-ranking-time"><?php the_time('H:i'); ?></span>
                                         </time> </div>
-                                    <a href="<?php echo get_permalink(); ?>" width: 100px;height: 130px;>
+                                    <a href="<?php echo esc_url(get_permalink()); ?>" style="width:100px;height:130px;">
                                         <!--div class="week-ranking masking"-->
                                         <!--<h3 class="week-ranking masktext">-->
                                         <?php  //the_title(); 
@@ -385,9 +530,33 @@ function display_search_form()
 {
     global $tn;
 ?>
-    <form method="get" id="searchform" class="searchform" action="<?php echo home_url('/'); ?>">
-        <div class="text-form"> <input type="text" placeholder="ブログ内を検索" name="s" id="s" value="" /> <input type="hidden" name="tn" value="<?php echo $tn; ?>"> </div>
-        <div class="form-bottom"> <input type="submit" id="searchsubmit" value="Q" /> </div>
+    <form
+        method="get"
+        id="searchform"
+        class="searchform"
+        action="<?php echo esc_url(home_url('/')); ?>">
+        <div class="text-form">
+
+            <!-- 検索キーワード -->
+            <input
+                type="text"
+                placeholder="ブログ内を検索"
+                name="s"
+                id="s"
+                value="<?php echo esc_attr(get_search_query()); ?>"
+                maxlength="100" />
+
+            <!-- テンプレート番号 -->
+            <input
+                type="hidden"
+                name="tn"
+                value="<?php echo esc_attr((string)$tn); ?>">
+
+        </div>
+
+        <div class="form-bottom">
+            <input type="submit" id="searchsubmit" value="Q">
+        </div>
     </form>
     <?php
 }
@@ -396,12 +565,14 @@ function display_search_form()
 function display_comment()
 {
     $args = array(
-        'author__not_in' => '1',
-        'number' => '5',
+        'author__not_in' => [1],
+        'number' => 5,
         'status' => 'approve',
-        'type' => 'comment'
+        'type' => 'comment',
+        // ページ送りしないので、軽量化
+        'no_found_rows'  => true,
     );
-    $comments_query = new WP_Comment_Query;
+    $comments_query = new WP_Comment_Query();
     $comments = $comments_query->query($args);
     // Comment Loop
     if ($comments) {
@@ -412,38 +583,58 @@ function display_comment()
             <?php
             foreach ($comments as $comment) {
                 // 記述が長いので $pid に入れておく
-                $pid = $comment->comment_post_ID;
+                // 投稿IDなので整数に固定した方が安全
+                $pid = (int) $comment->comment_post_ID;
+                // 親記事が公開中かどうか
+                if (get_post_status($pid) !== 'publish') {
+                    continue;
+                }
                 // 必要な文字列データの取得
                 $url = get_permalink($pid);
-                $img = get_the_post_thumbnail($pid, array('class' => 'myClass'));
-                $date = get_comment_date('(Y/n/d)', $comment->comment_ID);
-                $title = get_the_title($pid);
-                $text = get_comment_text($comment->comment_ID);
-                $user_id = $comment->comment_author;
-                // デフォルト値で初期化して
-                $user_id = '名無しさん(anonymous)';
 
-                if (!empty($comment->comment_author)) {
+                if (!$url) {
+                    continue;
+                }
+                $title = get_the_title($pid);
+                $img = get_the_post_thumbnail(
+                    $pid,
+                    'thumbnail',
+                    [
+                        'class'   => 'myClass',
+                        'alt' => esc_attr($title),
+                        'loading' => 'lazy',
+                    ]
+                );
+                $date = get_comment_date('(Y/n/d)', $comment->comment_ID);
+                $text = get_comment_text($comment->comment_ID);
+                // $user_id = $comment->comment_author;
+                // デフォルト値で初期化して
+                // $user_id = '名無しさん(anonymous)';
+
+                /* if (!empty($comment->comment_author)) {
                     $user_id = $comment->comment_author;
                 } elseif (!empty($comment->user_id)) {
                     $user_id = $comment->user_id;
-                }
+                }*/
             ?>
                 <div class="recentcomment">
                     <ul class="mycomment">
                         <li class="imgcomment">
-                            <a class="commentheight" href="<?= $url ?>">
-                                <?= $img ?>
+                            <a class="commentheight" href="<?php echo esc_url($url); ?>">
+                                <?php echo wp_kses_post($img); ?>
                             </a>
-                            <a class="com_title" href="<?= $url ?>">
-                                <?= $title ?>
+
+                            <a class="com_title" href="<?php echo esc_url($url); ?>">
+                                <?php echo esc_html($title); ?>
                             </a>
+
                             <div class="commentnumber">
                                 <p class="comment">
-                                    <?= mb_strimwidth($text, 0, 38, "･･･") ?>
+                                    <?php echo esc_html(mb_strimwidth(wp_strip_all_tags($text), 0, 38, '･･･')); ?>
                                 </p>
+
                                 <p class="my_author">
-                                    <?= $date ?>
+                                    <?php echo esc_html($date); ?>
                                 </p><br>
                             </div>
                         </li>
@@ -455,7 +646,7 @@ function display_comment()
         </div>
     <?php
     } else {
-        echo 'コメントなし';
+        echo esc_html('コメントなし');
     }
     ?>
 <?php
@@ -496,20 +687,41 @@ function display_rss_post_1()
                 break;
             }
             $item = $rss_items[$item_index];
-            $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
-            if (empty($item->img)) {
-                $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
+            $title = '<strong><a href="' . esc_url($item->link) . '">' . esc_html($item->title) . '</a></strong>';
+            if (empty($item->img) || !filter_var($item->img, FILTER_VALIDATE_URL)) {
+
+                // ※RSS画像が空、またはURL形式ではない場合はダミー画像を表示
+                $img = home_url('/wp-content/themes/sample_theme/images/noimage.png');
             } else {
+
+                // ※RSS画像がある場合はRSS画像を表示
                 $img = $item->img;
             }
-            $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
-            $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
+
+            $dummy_img = esc_url(
+                home_url('/wp-content/themes/sample_theme/images/noimage.png')
+            );
+
+            $image = '<a href="' . esc_url($item->link) . '">
+            <img
+                src="' . esc_url($img) . '"
+                class="rss-image"
+                onerror="this.onerror=null; this.src=\'' . $dummy_img . '\';"
+                alt="">
+            </a>';
+            $subject = '<a href="' . esc_url($item->link) . '">' . esc_html(mb_substr($item->subject, 0, 10)) . '</a>';
             if ($j < $limitSect1) {
                 $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
             } elseif ($j < $limitSect1 + $limitSect2) {
                 $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
             } else {
-                $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
+                $contentC .= "
+                <li class=\"sitelink3\">
+                    <div class=\"sitelink3-inner\">
+                        <div class=\"sitelink3-image\">{$image}</div>
+                        <div class=\"sitelink3-title\">{$title}</div>
+                    </div>
+                </li>";
             }
         }
         echo '<div class="rssBlock">';
@@ -531,27 +743,27 @@ function display_rss_post_1()
                 // タイトルの保存は省略
                 // ここから追加
                 echo '<div class="entry-post">'; // 記事1つ1つ
-                echo "<figure class=\"entry-thumnail\"><a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})</figure>"; // サムネイル画像
+                echo '<figure class="entry-thumnail"><a href="' . esc_url($item->guid) . '"><img src="' . esc_url($item->thumbnail) . '" alt=""></a>(' . (int)$item->ID . ')</figure>'; // サムネイル画像
                 echo '<div class="entry-card-content">';
                 echo '<header class="entry-header">';
-                echo "<h2 class=\"entry-title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
+                echo '<h2 class="entry-title"><a href="' . esc_url($item->guid) . '">' . esc_html($item->post_title) . '</a></h2>'; // タイトル
                 echo '<p class="post-meta">'; // 日付け、カテゴリー、コメント数
                 echo '<span class="fa-clock fa-fw"></span>'; // 日付けのマーク fontawesomeをbeforeで読み込む
-                echo "<span class=\"published\">{$item->post_date}</span>"; // 日付け
+                echo '<span class="published">' . esc_html($item->post_date) . '</span>'; // 日付け
                 echo '<span class="fa-folder fa-fw"></span>'; // カテゴリーのマーク fontawesomeをbeforeで読み込む
                 echo '<span class="category-link">';
                 if ($item->categories) {
                     foreach ($item->categories as $cat_ID) {
                         $category = $categories[$cat_ID];
-                        echo "<a href=\"{$category->category_link}?tn={$tn}\">{$category->cat_name}</a>";
+                        echo '<a href="' . esc_url($category->category_link . '?tn=' . rawurlencode((string)$tn)) . '">' . esc_html($category->cat_name) . '</a>';
                     }
                 }
                 echo '</span>'; // カテゴリー
                 echo '<span class="fa-comment fa-fw"></span>'; // コメント数のマーク fontawesomeをbeforeで読み込む
-                echo "<span class=\"comment-count\"><a href=\"{$item->guid}\">{$item->comments}</a></span>"; // コメント数
+                echo '<span class="comment-count"><a href="' . esc_url($item->guid) . '">' . esc_html($item->comments) . '</a></span>'; // コメント数
                 echo '</p>';
                 echo '</header>';
-                echo "<p class=\"entry-snippet\">{$item->post_excerpt}</p>"; // 抜粋
+                echo '<p class="entry-snippet">' . esc_html($item->post_excerpt) . '</p>'; // 抜粋
                 echo '</div>';
                 echo '</div>';
             }
@@ -584,20 +796,41 @@ function display_rss_post_2()
                 break;
             }
             $item = $rss_items[$item_index];
-            $title = "<strong><a href=\"{$item->link}\">{$item->title}</a></strong>";
-            if (empty($item->img)) {
-                $img = 'http://www.last.cfbx.jp/wp-content/uploads/2022/08/9404141699102.jpg';
+            $title = '<strong><a href="' . esc_url($item->link) . '">' . esc_html($item->title) . '</a></strong>';
+            if (empty($item->img) || !filter_var($item->img, FILTER_VALIDATE_URL)) {
+
+                // ※RSS画像が空、またはURL形式ではない場合はダミー画像を表示
+                $img = home_url('/wp-content/themes/sample_theme/images/noimage.png');
             } else {
+
+                // ※RSS画像がある場合はRSS画像を表示
                 $img = $item->img;
             }
-            $image = "<a href=\"{$item->link}\"><img src=\"{$img}\" width=\"100\"></a>";
-            $subject = '<a href="' . $item->link . '">' . mb_substr($item->subject, 0, 10) . '</a>';
+
+            $dummy_img = esc_url(
+                home_url('/wp-content/themes/sample_theme/images/noimage.png')
+            );
+
+            $image = '<a href="' . esc_url($item->link) . '">
+            <img
+                src="' . esc_url($img) . '"
+                class="rss-image"
+                onerror="this.onerror=null; this.src=\'' . $dummy_img . '\';"
+                alt="">
+            </a>';
+            $subject = '<a href="' . esc_url($item->link) . '">' . esc_html(mb_substr($item->subject, 0, 10)) . '</a>';
             if ($j < $limitSect1) {
                 $contentA .= "<li class=\"sitelink\">{$title}</li>"; // タイトルのみ
             } elseif ($j < $limitSect1 + $limitSect2) {
                 $contentB .= "<li class=\"sitelink2\"><figure class=\"snip\"><figcaption>{$image}<br>{$title}<p class=\"btn\">{$subject}</p></figcaption></figure></li>"; // 画像と画像の下にタイトル
             } else {
-                $contentC .= "<li class=\"sitelink3\">{$image}{$title}</li>"; // 画像と画像の右にタイトル
+                $contentC .= "
+                <li class=\"sitelink3\">
+                    <div class=\"sitelink3-inner\">
+                        <div class=\"sitelink3-image\">{$image}</div>
+                        <div class=\"sitelink3-title\">{$title}</div>
+                    </div>
+                </li>";
             }
         }
         echo '<div class="rssBlock">';
@@ -623,7 +856,7 @@ function display_rss_post_2()
                     $keep_item = $item;
                 }
                 /* 画像をため込む */
-                $images .= "<a href=\"{$item->guid}\"><img src=\"{$item->thumbnail}\"></a>({$item->ID})";
+                $images .= '<a href="' . esc_url($item->guid) . '"><img src="' . esc_url($item->thumbnail) . '" alt=""></a>(' . (int)$item->ID . ')';
             }
             if ($item_index >= count($post_items)) {
                 break;
@@ -636,24 +869,24 @@ function display_rss_post_2()
             echo "<figure class=\"itemThumnail\">{$images}</figure>"; // サムネイル画像
             echo '<div class="item-outer">';
             echo '<header class="itemHead">';
-            echo "<h2 class=\"entry-Title\"><a href=\"{$item->guid}\">{$item->post_title}</a></h2>"; // タイトル
+            echo '<h2 class="entry-title"><a href="' . esc_url($item->guid) . '">' . esc_html($item->post_title) . '</a></h2>'; // タイトル
             echo '<p class="itemInfo">'; // 日付け、カテゴリー、コメント数
             echo '<span class="fa-clock fa-fw"></span>'; // 日付けのマーク fontawesomeをbeforeで読み込む
-            echo "<span class=\"itemDate\">{$item->post_date}</span>"; // 日付け
+            echo '<span class="itemDate">' . esc_html($item->post_date) . '</span>'; // 日付け
             echo '<span class="fa-folder fa-fw"></span>'; // カテゴリーのマーク fontawesomeをbeforeで読み込む
             echo '<span class="itemCategory">';
             if ($item->categories) {
                 foreach ($item->categories as $cat_ID) {
                     $category = $categories[$cat_ID];
-                    echo "<a href=\"{$category->category_link}?tn={$tn}\">{$category->cat_name}</a>";
+                    echo '<a href="' . esc_url($category->category_link . '?tn=' . rawurlencode((string)$tn)) . '">' . esc_html($category->cat_name) . '</a>';
                 }
             }
             echo '</span>'; // カテゴリー
             echo '<span class="fa-comment fa-fw"></span>'; // コメント数のマーク fontawesomeをbeforeで読み込む
-            echo "<span class=\"clickCnt\"><a href=\"{$item->guid}\">{$item->comments}</a></span>"; // コメント数
+            echo '<span class="clickCnt"><a href="' . esc_url($item->guid) . '">' . esc_html($item->comments) . '</a></span>'; // コメント数
             echo '</p>';
             echo '</header>';
-            echo "<p class=\"itemSnippet\">{$item->post_excerpt}</p>"; // 抜粋
+            echo '<p class="itemSnippet">' . esc_html($item->post_excerpt) . '</p>'; // 抜粋
             echo '</div>';
             echo '</div>';
         }
@@ -703,7 +936,13 @@ function display_main_banner()
     foreach ($banner_data as $tmp) {
         list($img1, $img2, $title, $link) = $tmp;
         if (intval(date('H')) >= 12) $img1 = $img2;
-        $buf[] = sprintf('<li><a href="%s"><img src="%s" title="%s"></a></li>', $link, $img1, $title);
+        $buf[] = sprintf(
+            '<li><a href="%s"><img src="%s" title="%s" alt="%s"></a></li>',
+            esc_url($link),
+            esc_url($img1),
+            esc_attr($title),
+            esc_attr($title)
+        );
     }
 ?>
     <!-- 表示部分 -->
