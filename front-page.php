@@ -14,7 +14,7 @@ set_template_info();
 ?>
 <?php get_header(); ?>
 <!--ここから自作-->
-<?php display_other_template(); ?>
+<!-- php display_other_template(); -->
 <div id="blog-box" class="clearfix">
   <!-- ブログ開始 -->
   <!-- ▼　週間ランキング ▼ -->
@@ -120,7 +120,6 @@ echo __DIR__;*/
 
       $post_items = get_posts($args);
 
-      //表示
       display_rss_post_1();
 
       //ページリンク

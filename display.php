@@ -350,7 +350,7 @@ function display_3day_ranking()
 
         <div class="side-title">3days ranking</div>
 
-        <div class="AMvertical black" style="width: 300px;">
+        <div class="AMvertical black">
 
             <section class="popular-box">
 
@@ -465,63 +465,66 @@ function display_3day_ranking()
 
 function display_week_ranking()
 {
-    global $post;
+    $ranking_posts = get_posts([
+        'posts_per_page'      => 6,
+        'post_status'         => 'publish',
+        'ignore_sticky_posts' => true,
+        'meta_key'            => 'pv_count_week',
+        'orderby'             => 'meta_value_num',
+        'order'               => 'DESC',
+        'no_found_rows'       => true,
+    ]);
 ?>
-    <!-- ▼　週間ランキング ▼ -->
-    <div class="week-ranking">
-        <div class="main-wrap">
-            <section class="column-inner">
-                <?php
-                $args = array(
-                    'numberposts' => 6, //表示数
-                    'meta_key' => 'pv_count_week',
-                    'orderby' => 'meta_value_num',
-                    'order' => 'DESC',
-                );
 
-                $posts = get_posts($args);
-                if ($posts) : ?>
-                    <ul class="parent_box">
-                        <?php foreach ($posts as $post) : setup_postdata($post); ?>
-                            <li class="child_box">
-                                <header class="week-ranking-header">
-                                    <div class="week-ranking date-outer"> <time datetime="<?php the_time('Y-m-d'); ?>T<?php the_time('H:i:sP'); ?>">
-                                            <span class="week-ranking-date"><?php the_time('Y/m/d'); ?></span>
-                                            <span class="week-ranking-time"><?php the_time('H:i'); ?></span>
-                                        </time> </div>
-                                    <a href="<?php echo esc_url(get_permalink()); ?>" style="width:100px;height:130px;">
-                                        <!--div class="week-ranking masking"-->
-                                        <!--<h3 class="week-ranking masktext">-->
-                                        <?php  //the_title(); 
-                                        ?><!--<span id="likeCount3"></span></h3>
-                    </div>-->
-                                </header>
-                                <div class="week-ranking mosaic-backdrop">
-                                    <div class="index_commentbox">
-                                        <?php if (function_exists("the_ratings")) the_ratings(); ?></div>
-                                    <?php
-                                    if (has_post_thumbnail()) {
-                                        echo '<div class="week-ranking list-thumbnail">';
-                                        the_post_thumbnail(array(200, 200), array('class' => 'week-ranking mosaic-backdrop'));
-                                        echo '</div>';
-                                    }
-                                    ?>
-                                </div>
-                                </a>
-                                <div class="week-ranking info topinfo">
-                                    <?php echo getPostViewsWeek(get_the_ID()); // 記事閲覧回数表示 */
-                                    ?>
-                                </div>
-                            <?php endforeach;
-                        wp_reset_postdata(); ?>
-                            </li>
-                    </ul>
-                <?php else : ?>
-                    <p>アクセスランキングはまだ集計されていません。</p>
-                <?php endif; ?>
-            </section>
-        </div>
+    <div class="week-ranking">
+        <div class="side-title">week ranking</div>
+
+        <?php if (!empty($ranking_posts)) : ?>
+            <ul class="week-ranking-list">
+
+                <?php foreach ($ranking_posts as $ranking_post) : ?>
+                    <?php
+                    setup_postdata($ranking_post);
+
+                    $post_id = (int) $ranking_post->ID;
+                    $title   = get_the_title($post_id);
+                    $url     = get_permalink($post_id);
+                    ?>
+
+                    <li class="week-ranking-item">
+                        <a href="<?php echo esc_url($url); ?>" class="week-ranking-link">
+
+                            <?php
+                            if (has_post_thumbnail($post_id)) {
+                                echo get_the_post_thumbnail(
+                                    $post_id,
+                                    [200, 130],
+                                    [
+                                        'class'   => 'week-ranking-img',
+                                        'alt'     => esc_attr($title),
+                                        'loading' => 'lazy',
+                                    ]
+                                );
+                            }
+                            ?>
+
+                            <div class="week-ranking-title">
+                                <?php echo esc_html($title); ?>
+                            </div>
+
+                        </a>
+                    </li>
+
+                <?php endforeach; ?>
+
+                <?php wp_reset_postdata(); ?>
+
+            </ul>
+        <?php else : ?>
+            <p><?php echo esc_html('アクセスランキングはまだ集計されていません。'); ?></p>
+        <?php endif; ?>
     </div>
+
 <?php
 }
 

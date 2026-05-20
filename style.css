@@ -1,6 +1,128 @@
-/* ヘッダー画像の配置位置 */
+/*
+Theme Name: monomode
+Theme URL: https://nijiematome.net
+Description: secondary picture summary blog of cute anime game characters
+Author: 作者の名前 Takuya Inoue
+Version: 0.1
+*/
+/* ヘッダー全体 */
 ul.header-box {
+    width: 1140px;
+    height: 255px;
     margin: 0 auto;
+    padding: 0;
+
+    display: grid;
+    grid-template-columns: 555px 585px;
+    list-style: none;
+}
+
+/* ヘッダー直下の左右li */
+ul.header-box > li {
+    height: 255px;
+    float: none;
+    overflow: hidden;
+}
+
+/* 左のメイン画像 */
+ul.header-box > li:first-child > a > img {
+    width: 555px;
+    height: 230px;
+    display: block;
+    object-fit: cover;
+}
+
+/* メニューバー */
+ul#menu_bar {
+    height: 25px;
+    margin: 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* メニュー横並び */
+#menu_bar li {
+    float: left;
+    height: 25px;
+    line-height: 25px;
+}
+
+/* 右側ランキング */
+.header-rank-area,
+#modernentryrank {
+    width: 585px;
+    height: 255px;
+    overflow: hidden;
+}
+
+/* 右側ランキング一覧 */
+#modernentryrank ul {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 127.5px);
+    width: 100%;
+    height: 255px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* 右側ランキング1件 */
+#modernentryrank li.custom {
+    position: relative;
+    width: 100%;
+    height: 127.5px;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+/* 画像リンク */
+#modernentryrank .header-rank-link {
+    display: block;
+    width: 100%;
+    height: 127.5px;
+    overflow: hidden;
+}
+
+/* ヘッダー右側の画像だけ指定 */
+#modernentryrank .img-wrap,
+#modernentryrank .img-wrap img,
+#modernentryrank .wp-post-image {
+    width: 100%;
+    height: 127.5px;
+    display: block;
+    object-fit: cover;
+    object-position: center top;
+}
+
+/* No Comments */
+#modernentryrank .count.comment {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: auto;
+    height: auto;
+    padding: 3px 5px;
+    background: #e52d77;
+    color: #fff;
+    z-index: 3;
+}
+
+/* タイトル黒帯 */
+#modernentryrank div.titlewrap {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 35px;
+    padding: 3px 5px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    line-height: 16px;
+    font-size: 13px;
+    box-sizing: border-box;
+    z-index: 2;
 }
 
 /* メニューバーの色と縦幅 */
@@ -34,27 +156,10 @@ div#modernentryrank ul {
     padding: 0;
 }
 
-/* ヘッダーランダム記事 */
-#modernentryrank li {
-    position: relative;
-    display: inline-block;
-    vertical-align: top;
-    text-align: center;
-}
-
 /* ヘッダーランダム記事ホバー */
 #modernentryrank li:hover {
     text-decoration: underline;
     opacity: 0.65;
-}
-
-/* ヘッダーテーブルボックス */
-li.custom {
-    float: none;
-    position: relative;
-    display: inline-block;
-    vertical-align: top;
-    text-align: center;
 }
 
 /* ヘッダーテーブルボックスタイトル */
@@ -84,16 +189,16 @@ li.custom {
     z-index: 1;
 }
 
-/* ヘッダーテーブルボックス左寄せ */
-ul.header-box li {
-    float: left;
-}
-
-/* ヘッダーテーブルボックス高さ調節 */
-#header-box,
-ul.header-box {
-    height: 0px;
-    position: relative;
+/* No Comments は元の小さいラベルに戻す */
+#modernentryrank li > a.count.comment {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: auto;
+    width: auto;
+    padding: 3px 5px;
+    display: block;
+    z-index: 3;
 }
 
 /* 要らない */
@@ -131,16 +236,21 @@ ul.header-box {
 
 /* 左右のコンテンツを並べる */
 #main-box {
-    float: left;
-    width: 830px;
-    margin-left: 310px;
-}
+    max-width: 1140px;
+    width: 100%;
+    margin: 0 auto;
 
+    display: grid;
+    grid-template-columns: 305px 1fr;
+    gap: 0;
+
+    font-size: 16px;
+    box-sizing: border-box;
+}
 /* 右のコンテンツを左と並べる */
 #left-box {
-    float: left;
-    width: 305px;
-    margin-left: -310px;
+    width: 100%;
+    box-sizing: border-box;
     margin-top: 5px;
 }
 
@@ -154,24 +264,32 @@ ul.header-box {
 /* 人気キーワード全体の間隔 */
 ul.category-ranking.clearfix {
     padding: 7px;
-    display: block;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
     font-size: 0;
+    box-sizing: border-box;
 }
 
 /* 人気キーワード文字間隔 */
 ul.category-ranking.clearfix li {
-    display: inline-block;
-    padding: 4px 3px;
+    padding: 0;
+    max-width: 100%;
 }
 
 /* 人気キーワード文字装飾 */
 #left-box ul.category-ranking.clearfix li a {
-    padding: 2px;
+    display: inline-block;
+    max-width: 100%;
+    padding: 2px 4px;
     font-size: 12px;
     border-radius: 3px;
     background-color: #2bc912;
     color: #fff;
     transition: 0.6s;
+    box-sizing: border-box;
+    white-space: nowrap;
 }
 
 /* 人気キーワード文字ホバー色 */
@@ -215,14 +333,17 @@ body.post-template {
 }
 
 /* 右側のボックス */
-div#right-box {
+#right-box {
+    width: 100%;
     border: 2px solid #999;
     margin-top: 5px;
     padding: 20px 27px;
     background-color: #fff;
+
+    box-sizing: border-box;
 }
 
-/* 3日間ランキング並べ方 */
+/* 3日間ランキングのリンク枠 */
 .AMhorizontal li a,
 .AMvertical li a {
     position: relative;
@@ -230,26 +351,31 @@ div#right-box {
     text-decoration: none;
     color: #fff;
     overflow: hidden;
-    width: 97px;
+
+    width: 100%;
     height: 120px;
 }
 
 .AMvertical {
+    width: 100%;
     height: auto;
-    margin: 0 auto;
-    text-align: center;
+    margin: 0;
+    padding: 4px;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
-/* 3日間ランキング画像の配置位置 */
 .AMhorizontal li img,
 .AMvertical li img {
     position: absolute;
     top: 50%;
     left: 50%;
-    -moz-transform: translate(-50%, -50%);
-    -webkit-transform: translate(-50%, -50%);
-    -o-transform: translate(-50%, -50%);
-    -ms-transform: translate(-50%, -50%);
+
+    transform: translate(-50%, -50%);
+
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 /* 3日間ランキング画像の拡大比率 */
@@ -261,11 +387,13 @@ div#right-box {
     height: 100%;
 }
 
-/* 3日間ランキング */
-.\33 day-ranking {
+/* 3日間ランキング全体 */
+.three-day-ranking {
     margin-bottom: 5px;
     border: 1.5px solid #999;
     background: #FFF;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 /* 3日間ランキングたいとる */
@@ -286,23 +414,41 @@ div#right-box {
     z-index: 1;
 }
 
-/* 3日間ランキング数字 */
+/* 3日間ランキング */
 .AMvertical ul {
+
+    /* ランキング番号初期化 */
     counter-reset: wpp-ranking;
-    padding-top: 2px;
-    padding-bottom: 3px;
+
+    /* 横並び */
+    display: flex;
+
+    /* 折り返し */
+    flex-wrap: wrap;
+
+    /* 左寄せ */
+    justify-content: flex-start;
+
+    /* 余白 */
+    gap: 3px;
+
+    margin: 0;
+    padding: 2px 0 3px;
+
+    list-style: none;
 }
 
-/* 3日間ランキング3列 */
+/* ランキングカード */
 .AMvertical li {
-    float: none;
+
     position: relative;
-    display: inline-block;
-    vertical-align: top;
-    text-align: center;
-    margin: 1.5px;
-    list-style-type: none;
-    position: relative;
+
+    /* 2列 */
+    width: calc(50% - 3px);
+
+    margin: 0;
+
+    list-style: none;
 }
 
 /* 3日間ランキング色 大きさ */
@@ -807,68 +953,222 @@ span.fa-fw {
     font-size: 12px;
 }
 
-/* 週間ランキングデザイン */
-.main-wrap li {
-    position: relative;
-    width: 175px;
-    height: 150px;
-    display: inline-block;
-    padding: 0;
-    margin: 10px 14px 0 0;
-}
+/* =========================================
+   週間ランキング全体
+   ========================================= */
+.week-ranking {
 
-/* 週間ランキングデザインホバー */
-.main-wrap li:hover {
-    opacity: 0.65;
-}
-
-/* 週間ランキング相対位置 */
-.main-wrap .week-ranking.mosaic-backdrop {
-    height: 150px;
+    /* 横幅いっぱい */
     width: 100%;
-    overflow: hidden;
+
+    /* float回り込み解除 */
+    clear: both;
 }
 
-/* 週間ランキング星デザイン */
-.post-ratings {
-    background: rgba(0, 0, 0, 0.6) none repeat scroll 0 0;
-    border-radius: 15px 0 0 15px;
-    position: absolute;
-    right: 0;
-    text-align: center;
-    top: 4px;
-    width: 70px;
-    height: 30px;
-}
 
-/* 週間ランキング画像デザイン*/
-.main-wrap li img {
-    /*width: 228px; */
-    /* position: absolute; */
-    top: 30%;
-    /* left: 50%; */
-    -ms-transform: translate(-50%, -30%);
-    height: auto;
-}
+/* =========================================
+   week ranking 緑バー非表示
+   HTMLは残してCSSだけで消す
+   ========================================= */
+.week-ranking > .side-title {
 
-/* 週間ランキングタイトルデザイン*/
-header.week-ranking-header {
-    /*background: #2bc912;
-    margin: -1px 0 0;
-	*/
-}
-
-/* 週間ランキング日付け*/
-.week-ranking.date-outer {
-    color: #fff;
-    font-size: 85%;
-    font-weight: bold;
-    margin: 1px;
-    padding: 2px 5px;
+    /* 非表示 */
     display: none;
 }
 
+
+/* =========================================
+   ランキング一覧
+   横並び
+   ========================================= */
+.week-ranking-list {
+
+    /* 横並び */
+    display: flex;
+
+    /* 折り返し許可 */
+    flex-wrap: wrap;
+
+    /* 画像間余白 */
+    gap: 4px;
+
+    /* ulデフォルト余白削除 */
+    margin: 0;
+    padding: 0;
+
+    /* ・削除 */
+    list-style: none;
+
+    /* 画像分だけ横幅確保 */
+    width: 100%;
+}
+
+
+/* =========================================
+   各ランキングカード
+   ========================================= */
+.week-ranking-item {
+
+    /* カードサイズ */
+    width: calc((100% - 20px) / 6);
+    height: 120px;
+
+    /* absolute基準 */
+    position: relative;
+
+    /* はみ出し非表示 */
+    overflow: hidden;
+
+    /* リストマーク防止 */
+    list-style: none;
+}
+
+
+/* =========================================
+   リンク全体
+   ========================================= */
+.week-ranking-link {
+
+    /* カード全体クリック可能 */
+    display: block;
+
+    /* 親いっぱい */
+    width: 100%;
+    height: 100%;
+
+    /* absolute基準 */
+    position: relative;
+
+    /* タイトル文字色 */
+    color: #fff;
+
+    /* リンク下線削除 */
+    text-decoration: none;
+}
+
+
+/* =========================================
+   サムネイル画像
+   ========================================= */
+.week-ranking-img {
+
+    /* カードいっぱい */
+    width: 100%;
+    height: 100%;
+
+    /* 比率維持しながらトリミング */
+    object-fit: cover;
+
+    /* img下余白防止 */
+    display: block;
+
+    /* hoverアニメーション */
+    transition: transform 0.25s ease;
+}
+
+
+/* =========================================
+   hover時画像少し拡大
+   ========================================= */
+.week-ranking-link:hover .week-ranking-img {
+
+    /* 少し拡大 */
+    transform: scale(1.05);
+}
+
+
+/* =========================================
+   黒オーバーレイ
+   hover時に画像全体を暗くする
+   ========================================= */
+.week-ranking-link::before {
+
+    /* 疑似要素生成 */
+    content: "";
+
+    /* カード全体へ配置 */
+    position: absolute;
+
+    /* 全面配置 */
+    inset: 0;
+
+    /* 半透明黒 */
+    background: rgba(0, 0, 0, 0.45);
+
+    /* 初期は透明 */
+    opacity: 0;
+
+    /* タイトルより下 */
+    z-index: 1;
+
+    /* hover時アニメ */
+    transition: opacity 0.25s ease;
+}
+
+
+/* =========================================
+   hover時オーバーレイ表示
+   ========================================= */
+.week-ranking-link:hover::before {
+
+    /* 表示 */
+    opacity: 1;
+}
+
+
+/* =========================================
+   タイトル
+   初期状態では非表示
+   ========================================= */
+.week-ranking-title {
+
+    /* カード上へ重ねる */
+    position: absolute;
+
+    /* 左右いっぱい */
+    left: 0;
+    right: 0;
+
+    /* 下配置 */
+    bottom: 0;
+
+    /* タイトルを前面へ */
+    z-index: 2;
+
+    /* 背景透明 */
+    background: transparent;
+
+    /* 文字色 */
+    color: #fff;
+
+    /* 内側余白 */
+    padding: 8px;
+
+    /* 文字サイズ */
+    font-size: 14px;
+
+    /* 太字 */
+    font-weight: bold;
+
+    /* 初期は透明 */
+    opacity: 0;
+
+    /* hover時アニメ */
+    transition: opacity 0.25s ease;
+}
+
+
+/* =========================================
+   hover時タイトル表示
+   ========================================= */
+.week-ranking-link:hover .week-ranking-title {
+
+    /* 表示 */
+    opacity: 1;
+}
+
 /* 週間ランキング日付け*/
+/* 
 div.week-ranking.info.topinfo {
     color: #FFF;
     background: rgba(223, 39, 113, 0.5) none repeat scroll 0 0;
@@ -879,6 +1179,7 @@ div.week-ranking.info.topinfo {
     position: absolute;
     width: 100%;
 }
+*/
 
 /* メインバナー配置位置 */
 .row {
@@ -1083,24 +1384,42 @@ li {
 
 /* 雑談掲示板 本体定義 */
 #js_board_form_partial {
-    padding: 23px 0px 23px 19px;
+    padding: 23px 0px 23px 16px;
 }
 
 /* 雑談掲示板ヘッダー装飾 */
 .board_form_partial .questionHeader-partial h2 {
-    font-size: 150%;
+    font-size: 170%;
     font-weight: 700;
     letter-spacing: .1em;
     margin: 0 0 10px;
-    overflow: hidden;
+    /* overflow: hidden; ← 削除 */
     text-align: left;
+}
+
+.fa-stack {
+    display: inline-block;
+    width: 2.5em;
+    height: 2em;
+    line-height: 2em;
+    position: relative;
+    vertical-align: middle;
+}
+
+.fa-stack-1x {
+    position: absolute;
+    inset: 0;               /* 上下左右0で中央固定 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
 }
 
 /* 雑談掲示板ヘッダー配置位置 */
 .questionHeader-partial {
     position: relative;
     height: 36px;
-    margin-bottom: 20px;
+    margin-bottom: 33px;
 }
 
 /* 雑談掲示板ヘッダーステップバー */
@@ -1132,7 +1451,7 @@ li {
 /* 雑談掲示板 入力画面ファイルアップロードアイコン */
 .board_form_partial div#input_area .image-partial .image-selector-button {
     text-align: center;
-    margin-right: 20px;
+    margin-right: 15px;
     margin-left: 5px;
     margin-bottom: 20px;
     display: inline-block !important;
@@ -1273,42 +1592,42 @@ input[type=radio]+label:before {
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="1"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/22789936.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/1.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="2"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/22789937.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/2.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="3"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/22789938.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/3.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="4"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/22789939.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/4.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="5"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/227899310.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/5.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="6"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/227899311.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/6.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="7"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/227899312.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/7.png');
 }
 
 /* 雑談掲示板スタンプ画像 */
 input[type=radio][value="8"]+label:before {
-    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/227899313.png');
+    background-image: url('http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/stamp/8.png');
 }
 
 /* 雑談掲示板スタンプ画像装飾 */
@@ -1451,14 +1770,6 @@ div#confirm_area .user-partial-Header {
     width: 1090px !important;*/
 }
 
-/* 雑談掲示板 確認画面ファイルアップロードを並べる */
-.board_form_partial div#confirm_area .image-partial .image-camera-icon {
-    /* display: inline-block; */
-    /* margin - right: 24px; */
-    margin-bottom: 25px;
-    padding: 0px 18px 0px 5px;
-}
-
 /* 雑談掲示板 確認画面コメント装飾 */
 .board_form_partial div#confirm_area .text-partial-parts {
     color: #e52d77;
@@ -1497,33 +1808,6 @@ div#confirm_area .user-partial-Header {
 	display: inline-block;
 }
 
-/* 雑談掲示板 確認画面アイコン画像配置位置 */
-.board_form_partial div#confirm_area .name-partial-parts img {
-    display: inline-block;
-	height: 85px;
-    width: 85px;
-}
-
-/* 雑談掲示板 確認画面名前配置位置 */
-.board_form_partial div#confirm_area .name-partial-parts {
-    /* display: inline-block; */
-    /* margin-top: 5px; */
-}
-
-/* 雑談掲示板 確認画面名前配置位置 */
-.board_form_partial div#confirm_area .name-partial-parts p {
-    border: 2px solid #F7859C;
-    font-size: 150%;
-    font-weight: 700;
-    letter-spacing: .1em;
-    vertical-align: top;
-    margin-left: 20px;
-    padding: 10px;
-    width: 89%; 
-    overflow: hidden;
-    text-align: left;
-}
-
 /* 雑談掲示板 確認画面ボタン配置位置 */
 .board_form_partial div#confirm_area .post-button button {
     color: #fff;
@@ -1531,7 +1815,7 @@ div#confirm_area .user-partial-Header {
     border: none;
     font-size: 150%;
     font-weight: 700;
-    margin: 38px 38px 5px 1px;
+    margin: 38px 38px 5px 10px;
     width: 280px;
     text-align: center;
     line-height: 49px;
@@ -1544,7 +1828,7 @@ div#confirm_area .user-partial-Header {
     border: none;
     font-size: 150%;
     font-weight: 700;
-    margin: 38px 38px 5px 1px;
+    margin: 38px 38px 5px 10px;
     width: 280px;
     text-align: center;
     line-height: 49px;
@@ -1552,7 +1836,6 @@ div#confirm_area .user-partial-Header {
 
 /* 雑談掲示板 確認画面ファイルアップロードボタンアンダーライン */
 .board_form_partial div#confirm_area .post-button {
-    border-bottom: 1px solid #F7859C;
     width: 1070px;
 }
 
@@ -1935,14 +2218,6 @@ textarea.rich-label:hover {
     margin-top: 33px;
 }
 
-/* 雑談掲示板 回答画面確認画面ファイルアップロードアイコン配置位置
-.board_respond div#confirm_area .uploadfile-area .image-camera-icon {
-    margin-top: 10px;
-    margin-right: 20px;
-    margin-bottom: 20px;
-    display: inline-block;
-} */
-
 /* 雑談掲示板 回答画面確認画面ファイルアップロードアイコン配置位置 */
 .board_respond div#confirm_area .uploadfile-area {
 	width: fit-content;
@@ -1986,15 +2261,173 @@ textarea.rich-label:hover {
     line-height: 49px;
 }
 
-/* 初期状態（未いいね） */
-.likeButton-icon {
-    fill: #ffffff;
-    stroke: #000000;
-    transition: fill 0.3s ease, stroke 0.3s ease;
+/* プレースホルダー（カメラ/アイコン）を隠す */
+.hideItems { display: none !important; }
+
+/* 質問掲示板 質問画面確認画面 タイトル配置位置 */
+.board_form_partial div#confirm_area .confirm-title-box .confirm-title-text {
+    margin: 0 0 10px 0;
+    padding: 10px;
+    width: 100%;
+    font-size: 180%;
+    font-weight: 700;
+    letter-spacing: .1em;
+    /* float: left; */
+    overflow: hidden;
+    text-align: left;
 }
 
-/* いいね済み状態 */
-.liked .likeButton-icon {
-    fill: #ff6b6b;
-    stroke: #ff6b6b;
+/* 質問掲示板 質問画面確認画面　画像・動画・PDF を囲む枠（1つ分） */
+.board_form_partial #confirm_area .confirm-media-frame {
+    width: 535px;   /* 入力画面と揃えるならここを530x350など好きな値に */
+    height: 301px;
+    overflow: hidden;
+}
+
+/* 質問掲示板 質問画面確認画面　質問文の見た目を以前に近づける：太字 & ピンク寄り */
+.board_form_partial div#confirm_area .confirm-text-box {
+	position: relative;         /* ←これが必須 */
+    color: #e52d77;
+    font-weight: 700;
+    /* 以前 width:1098px !important; だったので、ほぼ全幅に */
+    width: 100%;
+    margin-top: 25px;
+    margin-left: 10px;
+	padding-right: 20px;
+    font-size: 160%; /* お好みで */
+}
+
+/* 質問掲示板 質問画面確認画面　質問文を「右上」に固定する */
+.board_form_partial div#confirm_area .confirm-text-box > div {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      #fffacd 0,
+      #fffacd 32px,
+      #fff 32px,
+      #fff 64px
+    );
+  color:#e52d77;
+  /* “行間”を完全固定（ここが最重要） */
+  font-size: 20px;              /* 固定推奨 */
+  line-height: 32px;            /* 固定推奨（pxで固定） */
+  letter-spacing: 5px;            /* まず0で安定させる */
+  white-space: pre-wrap;        /* 既存のままでOK */
+	
+  /* padding: 10px 14px; */        /* 枠の内側余白 */
+  border-radius:8px;
+  position:relative;
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+}
+
+/* 質問掲示板 質問画面確認画面　スタンプ画像（img）を右下固定 */
+/* コメント本文の中に入ったスタンプを右に回り込ませる */
+.board_form_partial div#confirm_area .confirm-text-box > div > img.confirm-stamp {
+  float: right;
+  width: 80px;
+  height: 80px;
+  margin: 0 10px 0 0;  /* 左に余白を作る（文字がくっつかない） */
+}
+
+/* 質問掲示板 質問画面確認画面　float を含む要素の高さが潰れないように */
+.board_form_partial div#confirm_area .confirm-text-box > div::after {
+  content:"";
+  display:block;
+  clear: both;
+}
+
+/* 質問掲示板　質問画面確認画面：画像＋質問文エリアの2カラムレイアウト */
+.board_form_partial #confirm_area .confirm-first-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 1fr 1fr */
+    column-gap: 24px;
+    row-gap: 24px;
+	margin-left: 15px;
+    margin-right: 30px;
+    /* justify-content: center; */
+}
+
+/* 質問掲示板 質問画面確認画面　1枚分の枠：入力画面と同じ 530×350 に固定 */
+.board_form_partial #confirm_area .confirm-media-wrap {
+    width: 100%;        /* カラムの幅いっぱい */
+    /* height は指定しない → 画像の高さに応じて伸びる */
+}
+
+/* 質問掲示板 質問画面確認画面 枠の中の画像／動画／PDF 本体 */
+.board_form_partial div#confirm_area img.confirm-media-content,
+.board_form_partial div#confirm_area video.confirm-media-content,
+.board_form_partial div#confirm_area iframe.confirm-media-content {
+	display: block;
+    width: 100%;     /* 横幅はカラムにフィットさせる（拡大・縮小OK） */
+    height: auto;    /* ← ここがポイント：縦は自動で比率維持 */
+    object-fit: contain; /* いざというとき枠からはみ出さない保険用 */
+    max-height: 70vh;    /* （任意）画面の 70% より縦に長くならないようにする */
+}
+
+/* 質問掲示板 質問画面確認画面 タイトル配置位置 */
+.board_form_partial div#confirm_area .confirm-title-box {
+    display: inline-block;
+    /* width: 89%; */
+}
+
+/* 質問掲示板 質問画面確認画面 スタンプ配置位置 */
+.board_form_partial div#confirm_area .confirm-title-box img {
+    float: right; 
+    /* margin-top: 25px; */ 
+    margin-right: 22px; 
+    display: inline-block;
+}
+
+/* 雑談掲示板 質問画面確認画面　スタンプ配置位置 */
+.board_form_partial div#confirm_area .confirm-title-row img {
+    float: right;
+    /* margin-top: 25px; */
+    margin-right: 22px;
+    display: inline-block;
+	background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 雑談掲示板 質問画面確認画面 名前配置位置 */
+.board_form_partial div#confirm_area .confirm-name-box .confirm-name-text{
+  font-size: 160%;
+  font-weight: 700;
+  letter-spacing: .1em;
+  padding: 5px 10px 10px 10px;
+  width: 98%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-align: left;
+}
+
+/* 雑談掲示板 質問画面確認画面　アイコン画像配置位置 */
+.board_form_partial div#confirm_area .confirm-usericon-wrap img {
+	display: inline-block;
+    height: 85px;
+    width: 85px;
+}
+
+/* 雑談掲示板 質問画面確認画面　名前配置位置 */
+.board_form_partial div#confirm_area .confirm-user-row {
+  display: flex;
+  align-items: flex-start;   /* 中央にしたければ center */
+  gap: 10px;
+  margin-left: 10px;
+}
+
+/* 雑談掲示板 質問画面確認画面 アイコン画像配置位置 */
+.board_form_partial div#confirm_area .confirm-usericon-wrap {
+  flex: 0 0 auto;
+}
+
+/* 雑談掲示板 質問画面確認画面 アイコン画像配置位置 */
+.board_form_partial div#confirm_area .confirm-usericon-img {
+  width: 85px;
+  height: 85px;
+  object-fit: cover;
+  display: block;
+}
+
+/* 雑談掲示板 質問画面確認画面 名前配置位置 */
+.board_form_partial div#confirm_area .confirm-name-box {
+  flex: 1 1 auto;
 }
