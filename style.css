@@ -11,11 +11,11 @@ ul.header-box {
     height: 255px;
     margin: 0 auto;
     padding: 0;
-
     display: grid;
     grid-template-columns: 555px 585px;
     list-style: none;
 }
+
 
 /* ヘッダー直下の左右li */
 ul.header-box > li {
@@ -24,12 +24,24 @@ ul.header-box > li {
     overflow: hidden;
 }
 
+/* =========================================
+   左のメイン画像
+   ========================================= */
+ul.header-box > li:first-child > a {
+    display: block;
+    width: 555px;
+    height: 255px;
+}
+
 /* 左のメイン画像 */
 ul.header-box > li:first-child > a > img {
     width: 555px;
-    height: 230px;
+    height: 255px;
     display: block;
+    /* 余白なしで枠いっぱい表示 */
     object-fit: cover;
+    /* 上寄せ */
+    object-position: center top;
 }
 
 /* メニューバー */
@@ -62,9 +74,6 @@ ul#menu_bar {
     grid-template-rows: repeat(2, 127.5px);
     width: 100%;
     height: 255px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
 }
 
 /* 右側ランキング1件 */
@@ -72,9 +81,6 @@ ul#menu_bar {
     position: relative;
     width: 100%;
     height: 127.5px;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden;
 }
 
 /* 画像リンク */
@@ -285,7 +291,7 @@ ul.category-ranking.clearfix li {
     padding: 2px 4px;
     font-size: 12px;
     border-radius: 3px;
-    background-color: #2bc912;
+    background-color: #e52d77;
     color: #fff;
     transition: 0.6s;
     box-sizing: border-box;
@@ -311,7 +317,7 @@ ul.category-ranking.clearfix li {
     text-align: center;
     font-weight: 700;
     padding: 2px;
-    background: #2bc912;
+    background: #e52d77;
     font-size: 120%;
 }
 
@@ -337,9 +343,8 @@ body.post-template {
     width: 100%;
     border: 2px solid #999;
     margin-top: 5px;
-    padding: 20px 27px;
+    padding: 27px 27px 20px;
     background-color: #fff;
-
     box-sizing: border-box;
 }
 
@@ -401,17 +406,22 @@ body.post-template {
     position: absolute;
     left: 0;
     bottom: 0;
-    height: 35px;
     width: 100%;
-    padding: 3px;
+    height: 45px;
+    padding: 6px 8px;
     background-color: rgba(0, 0, 0, 0.6);
     color: #fff;
-    font-size: 16px;
-    line-height: 16px;
-    text-align: left;
-    overflow: hidden;
     font-size: 13px;
     z-index: 1;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+}
+
+/* name に変な line-height や display が入ってると位置が下がるため */
+.modelName .name {
+    line-height: 1.4;
+    display: block;
 }
 
 /* 3日間ランキング */
@@ -517,9 +527,15 @@ ul.newarrival_list {
     /* margin: auto; */
 }
 
+ul.archive-list,
 ul.archive-list ul {
-    /* アコーディオン部 */
-    margin: 5px 0 30px 15px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+ul.archive-list ul {
+    margin: 5px 0 20px 12px;
+    padding-left: 0;
 }
 
 ul.archive-list ul.hide {
@@ -527,11 +543,10 @@ ul.archive-list ul.hide {
     display: none;
 }
 
-ul.archive-list li {
-    /* リセット */
-    list-style: none;
-    background: none;
-    padding: 0;
+ul.archive-list ul li {
+    margin-left: 12px;
+    position: relative;
+    word-break: keep-all;
 }
 
 ul.archive-list li p {
@@ -598,8 +613,8 @@ ul.archive-list ul li::after {
     left: -1em;
     width: 6px;
     height: 6px;
-    border-right: 3px solid #2bc912;
-    border-bottom: 3px solid #2bc912;
+    border-right: 3px solid #e52d77;
+    border-bottom: 3px solid #e52d77;
     -webkit-transform: rotate(-45deg);
     transform: rotate(-45deg);
 }
@@ -625,13 +640,32 @@ ul.archive-list>li:not(.acv_open)::before {
 /* 年別アーカイブリストの装飾 */
 ul.archive-list {
     font-size: 16px;
-    padding: 6px 10px;
-    color: #2bc912;
+    padding: 8px 10px;
+    margin: 0;
+    color: #e52d77;
+    box-sizing: border-box;
 }
 
+/* RSS全体 */
 .rssBlock {
-    margin-top: 30px;
-    margin-bottom: 30px;
+    margin: 30px 0;
+}
+
+/* RSSのul */
+.rssBlock ul.wiget-rss {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    /* ここを変更：上下の余白を消す */
+    margin: 0 0 4px 0;
+    padding: 0;
+    list-style: none;
+    box-sizing: border-box;
+}
+
+/* タイトルのみRSSは1列 */
+.rssBlock ul.wiget-rss:first-child {
+    display: block;
 }
 
 .rssBlock li.sitelink:nth-child(odd) {
@@ -649,8 +683,19 @@ ul.archive-list {
     margin: 5px 0 5px;
     padding-left: 20px;
     width: 780px;
-    font-size: 16px;
+    font-size: 20px;
     color: #e52d77;
+}
+
+/* =========================================
+   RSS文字リンク hover
+   下線＋少し透明にする
+   ========================================= */
+.rssBlock ul li.sitelink a:hover {
+    /* 少し薄くする */
+    opacity: 0.65;
+    /* 下線を出す */
+    text-decoration: underline;
 }
 
 .rssBlock ul {
@@ -677,33 +722,188 @@ article h1 {
     margin-bottom: 20px;
     font-size: 35px;
     line-height: 117%;
-    color: #2bc912;
+    color: #e52d77;
 }
 
-/* 記事メタコンテンツあとで */
-.post-meta {
-    margin-bottom: 0.5em;
-    text-align: right;
-    background-color: #F7F7F7;
-    color: #555;
-    font-size: 16px;
+/* =========================================
+   記事タイトル
+   ========================================= */
+/* 記事タイトル */
+.postpage-title {
+    margin: 25px 0 0;
+    padding: 20px 18px;
+
+    background: #F79FBE;
+    border: 4px solid #F79FBE;
+    border-bottom: none;
+    border-radius: 0;
+
+    color: #333;
+    font-size: 32px;
+    line-height: 1.4;
+    font-weight: 700;
+
+    box-sizing: border-box;
+}
+
+/* =========================================
+   タイトルリンク
+   ========================================= */
+.postpage-title a {
+
+    color: #333;
+
+    text-decoration: none;
+}
+
+/* hover */
+.postpage-title a:hover {
+
+    opacity: 0.7;
+}
+
+/* 記事ページ専用：タイトル */
+.postpage-title {
+    margin: 25px 0 0;
+    padding: 20px 18px;
+
+    background: #F79FBE;
+    border: 4px solid #F79FBE;
+    border-bottom: none;
+    border-radius: 0;
+
+    color: #333;
+    font-size: 32px;
+    line-height: 1.4;
+    font-weight: 700;
+
+    box-sizing: border-box;
+}
+
+/* 記事ページ専用：タイトル下メタ情報 */
+.postpage-meta {
     display: flex;
-    justify-content: flex-end;
-    margin: auto;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 10px 15px;
+    background: #fff7fa;
+    border: 4px solid #F79FBE;
+    border-top: none;
+    color: #666;
+}
+
+.postpage-meta .meta-item {
+    display: inline-flex;
+    align-items: center;
+
+    /* ← ここをかなり狭く */
+    margin-right: 12px;
+
+    font-size: 16px;
+}
+
+/* アイコンと文字の距離 */
+.postpage-meta .fa-fw {
+    margin-right: 3px;
+}
+
+/* ホーム画面の記事一覧メタ情報 */
+.entry-post .post-meta,
+.entry-card-content .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+/* 日付・カテゴリ・コメントの間隔 */
+.entry-post .post-meta > span,
+.entry-card-content .post-meta > span {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 12px;
+}
+
+/* アイコンと文字の間隔 */
+.entry-post .post-meta .fa-fw,
+.entry-card-content .post-meta .fa-fw {
+    margin-right: 3px;
+}
+
+/* ホーム画面 コメント数 */
+.entry-post .post-meta .comment-count,
+.entry-card-content .post-meta .comment-count {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* ホーム画面 カテゴリーリンク */
+.entry-post .post-meta .category-link a,
+.entry-card-content .post-meta .category-link a {
+    color: #555;
+    text-decoration: underline;
+}
+
+/* ホーム画面 カテゴリーリンク hover */
+.entry-post .post-meta .category-link a:hover,
+.entry-card-content .post-meta .category-link a:hover {
+    color: #e52d77;
+}
+
+/* ホーム画面 コメント数 hover */
+.entry-post .post-meta .comment-count a:hover,
+.entry-card-content .post-meta .comment-count a:hover {
+    color: #e52d77;
+}
+
+/* コメント数字 */
+.entry-post .post-meta .comment-count a,
+.entry-card-content .post-meta .comment-count a {
+    text-decoration: underline;
+    color: #555;
+}
+
+/* 吹き出し */
+.entry-post .post-meta .comment-count .fa-comment,
+.entry-card-content .post-meta .comment-count .fa-comment {
+    margin-right: 3px;
+    text-decoration: none;
+}
+
+.postpage-meta a {
+    color: #555;
+    text-decoration: none;
+}
+
+/* hover時は色だけ変える */
+.postpage-meta a:hover {
+    color: #e52d77;
+}
+
+/* カテゴリー */
+.postpage-meta .category-link a {
+    text-decoration: underline;
+}
+
+/* コメント数 */
+.postpage-meta .comment-count a {
+    text-decoration: underline;
+}
+
+/* 吹き出しアイコン */
+.postpage-meta .comment-count .fa-comment {
+    text-decoration: none;
+}
+
+/* 抜粋文 */
+.entry-card-content p {
+    font-size: 16px;
+    color: #666;
 }
 
 /* 固定ページサムネイル後で */
 .img-wrap img {
     width: 285px;
     height: 300px;
-}
-
-#main-box h2 {
-    color: #e52d77;
-    border: solid 5px #F79FBE;
-    padding: 0.5em;
-    border-radius: 0.5em;
-    margin: 0px 8px 0px 1px;
 }
 
 /* 固定記事メタコンテンツあとで */
@@ -727,8 +927,9 @@ article h1 {
 }
 
 /* 固定記事最近のコメント */
+/* 最近のコメント画像 */
 .recentcomment li a img {
-    width: 35%;
+    width: 100px;
     height: auto;
     padding: 0 5px;
 }
@@ -776,10 +977,100 @@ article h1 {
     padding: 5px 0;
 }
 
-/* 固定記事最近のコメントタイトル */
-a.com_title {
+/* =========================================
+   最近のコメント
+   投稿全体クリックリンク
+   ========================================= */
+.recentcomment-link {
+    /* 投稿全体をクリック可能に */
+    display: block;
+    /* 親の文字色を継承 */
+    color: inherit;
+    /* リンク下線削除 */
+    text-decoration: none;
+    /* はみ出し防止 */
+    overflow: hidden;
+    /* カーソルを指マーク */
+    cursor: pointer;
+    /* 内側余白 */
+    padding: 5px;
+}
+
+/* =========================================
+   hover時背景色
+   ========================================= */
+.recentcomment-link:hover {
+    /* 薄いピンク */
+    background: #fff8fb;
+}
+
+/* 最近のコメント 画像を左に回り込ませる */
+.commentheight {
+    float: left;
+}
+
+/* 最近のコメント 画像サイズ */
+.commentheight img {
+    width: 100px;
+    height: auto;
+    display: block;
+}
+
+/* =========================================
+   最近のコメントタイトル
+   ========================================= */
+.com_title {
+    position: relative;
+    /* タイトルを右へ */
     float: right;
-    width: 60%;
+    /* 横幅 */
+    width: 64%;
+    /* 上余白 */
+    margin-top: 18px;
+    /* 左右余白 */
+    padding-left: 8px;
+    padding-right: 34px;
+    /* 文字サイズ */
+    font-size: 120%;
+    /* 文字色 */
+    color: #333;
+}
+
+/* =========================================
+   右側の丸矢印
+   ========================================= */
+.com_title::after {
+    content: "›";
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #f58aaa;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* =========================================
+   hover時タイトル色変更
+   ========================================= */
+.recentcomment-link:hover .com_title {
+    color: #e52d77;
+}
+
+
+/* =========================================
+   hover時丸矢印色変更
+   ========================================= */
+.recentcomment-link:hover .com_title::after {
+    background: #e52d77;
 }
 
 /* 固定記事最近のコメントのcom */
@@ -799,23 +1090,33 @@ a.com_title {
 
 /* 検索ブロック配置位置 */
 form#searchform {
-    padding: 10px;
+    padding: 0;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    box-sizing: border-box;
+    width: 100%;
 }
 
-/* 検索欄デザイン */
+/* 入力欄 */
 .text-form {
-    width: 500px;
-    display: inline-block;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: block;
 }
 
 /* 検索ブロック装飾 */
 #s {
+    height: 64px;
     padding: 10px;
     width: 100%;
     background-color: #FCF2F4;
     border: 2px solid #F7859C;
+    color: #777;
     font-size: 160%;
     font-weight: 550;
+    box-sizing: border-box;
 }
 
 /* 検索欄デザインホバー */
@@ -823,9 +1124,10 @@ form#searchform {
     border: 2px solid #000;
 }
 
-/* 検索欄ボタンデザイン */
+/* Qボタン側 */
 .form-bottom {
-    display: inline-block;
+    flex: 0 0 60px;
+    display: block;
 }
 
 /* 検索欄ボタンデザインホバー */
@@ -835,30 +1137,50 @@ form#searchform {
 
 /* 検索欄ボタンデザイン */
 #searchsubmit {
-    padding: 10px;
+    width: 100%;
+    height: 64px;
+    padding: 0;
     background-color: #FCF2F4;
+    color: #777;
     border: 2px solid #F7859C;
-    font-size: 160%;
+    font-size: 220%;
+    font-weight: 700;
+    line-height: 60px;
+    text-align: center;
+    box-sizing: border-box;
+    cursor: pointer;
+    appearance: none;
 }
 
-/* RSS画像とタイトル */
+/* =========================================
+   RSS画像枠
+   ========================================= */
 .sitelink2 {
     position: relative;
-    width: 48.5%;
-    padding: 1%;
-    float: left;
-    padding: 0.1em 0;
-    margin-right: 1px;
-    margin-bottom: 1px;
-    font-weight: bold;
-    color: #e52d77;
-    background: #FFF;
+    overflow: hidden;
+    border: solid 3px #F79FBE;
+    border-radius: 10px;
+    box-sizing: border-box;
 }
-
-/* RSS画像とタイトルの画像 */
+/* =========================================
+   RSS画像
+   ========================================= */
 .sitelink2 img {
     width: 100%;
     height: 300px;
+    object-fit: cover;
+    object-position: center top;
+    /* transform競合防止 */
+    will-change: transform;
+    transition: scale .6s ease;
+}
+
+/* =========================================
+   hover時画像拡大
+   transformを使わない
+   ========================================= */
+.sitelink2:hover img {
+    scale: 1.1;
 }
 
 /* RSS画像とタイトルのタイトル */
@@ -878,55 +1200,68 @@ form#searchform {
     line-height: 1em;
 }
 
+/* =========================================
+   RSS横並びカード
+   ========================================= */
 .sitelink3 {
-    background-image: -webkit-gradient(linear, 0% 0%, 0% 0%, from(#fff), to(#f0f0f0));
-    background: linear-gradient(#fff, #f0f0f0);
-    border-top: 1px px solid #ccc;
-    height: 100px;
-    margin: 0px;
-    position: relative;
-    width: 48%;
-    padding: 1%;
-    float: left;
-    padding: 0.1em 0;
-    margin-right: 1px;
-    margin-bottom: 1px;
-    font-weight: bold;
-    color: #e52d77;
-    background: #FFF;
-}
-
-.sitelink3 a {
-    background: url(https://i1.wp.com/pioncoooo.net/wp-content/uploads/2016/12/list_mark11.png) no-repeat 100% 50%;
-    color: #666;
-    display: block;
-    height: 100px;
-    margin: 0;
-    padding: 0 0 0 0;
+    width: 100%;
     overflow: hidden;
-    white-space: break-word;
-    text-overflow: ellipsis;
-    text-decoration: none;
+    border: solid 3px #F79FBE;
+    border-radius: 10px;
+    background: linear-gradient(#fff, #f0f0f0);
+    box-sizing: border-box;
 }
 
-.sitelink3 img {
-    float: left;
-    height: 100px;
-    width: 120px;
-    margin-left: 0px;
-}
-
-.sitelink3 a strong {
-    color: #807979;
-    font-size: 16px;
-    font-weight: bold;
+.sitelink3-link {
     display: flex;
     align-items: center;
+    width: 100%;
+    height: 120px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: opacity .25s ease;
+    background:
+    url(https://web.archive.org/web/20190705155250im_/https://i1.wp.com/pioncoooo.net/wp-content/uploads/2016/12/list_mark11.png)
+    no-repeat 98% 50%;
 }
 
+/* hover */
+.sitelink3-link:hover {
+    opacity: 0.65;
+}
+
+/* 左画像 */
+.sitelink3-link img {
+    width: 170px;
+    height: 120px;
+    flex-shrink: 0;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+}
+
+/* 右文字 */
+.sitelink3-link strong {
+    display: block;
+    /* 文字幅を残りいっぱい使う */
+    flex: 1;
+    min-width: 0;
+    /* 右の矢印分だけ余白 */
+    padding: 15px 0 15px 5px;
+    color: #333;
+    font-size: 22px;
+    line-height: 1.4;
+    font-weight: 700;
+    /* 複数行表示して、はみ出した分だけ隠す */
+    height: 120px;
+    overflow: hidden;
+    word-break: break-all;
+    box-sizing: border-box;
+}
+
+/* RSS青ボタン */
 figure.snip p {
-    background: #0f6abe;
-    text-align: left;
+    background: #e52d77;
     bottom: 87px;
     font-size: 13px;
     font-weight: 100;
@@ -939,6 +1274,73 @@ figure.snip p {
     width: 65px;
     padding-bottom: 3px;
     opacity: 0.9;
+
+    /* 追加 */
+    animation: rssTagScroll 2.8s cubic-bezier(0.15, 0.1, 0.9, 1) infinite;
+}
+
+/* 上から下へ流れて消える */
+@keyframes rssTagScroll {
+
+    0% {
+    transform: translateY(-55px);
+    opacity: 0;
+    }
+
+    15% {
+    transform: translateY(-25px);
+    opacity: 1;
+    }
+
+    65% {
+        transform: translateY(35px);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(120px);
+        opacity: 0;
+    }
+}
+
+/* =========================================
+   ページナビ全体
+   ========================================= */
+.page-navi {
+    margin-top: 30px;
+    text-align: center;
+}
+
+/* ページナビリンク */
+.page-nav-link {
+
+    display: inline-block;
+
+    min-width: 42px;
+    padding: 10px 14px;
+
+    margin: 0 4px;
+
+    background: #F79FBE;
+
+    color: #fff;
+
+    font-size: 18px;
+    font-weight: 700;
+
+    text-decoration: none;
+
+    border-radius: 6px;
+
+    transition: 0.2s;
+}
+
+/* hover */
+.page-nav-link:hover {
+
+    background: #e52d77;
+
+    color: #fff;
 }
 
 /* 記事装飾アイコン */
@@ -951,6 +1353,392 @@ span.fa-fw {
     font-family: 'Material Icons';
     content: '\e5da';
     font-size: 12px;
+}
+
+/* =========================================
+   コメント全体
+   ========================================= */
+#comments ol {
+    margin: 0;
+    padding: 0;
+}
+
+#comments li {
+    margin-bottom: 25px;
+}
+
+/* =========================================
+   コメントカード
+   ========================================= */
+#comments article {
+    padding: 18px;
+    border: 2px solid #f3c8d6;
+    border-radius: 18px;
+    background: #fff;
+}
+
+/* 名前 */
+#comments article p:first-child {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+/* コメント本文 */
+#comments article p:nth-child(3) {
+    margin: 0 0 15px;
+    font-size: 24px;
+    line-height: 1.8;
+    font-weight: 700;
+    color: #333 !important;
+}
+
+/* =========================================
+   Replyボタン
+   ========================================= */
+.comment-reply-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    padding: 6px 14px;
+
+    border-radius: 999px;
+
+    background: #f3f3f3;
+
+    color: #555;
+    text-decoration: none;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    transition: .25s;
+}
+
+/* hover */
+.comment-reply-link:hover {
+    background: #e52d77;
+    color: #fff;
+}
+
+/* =========================================
+   返信フォーム
+   ========================================= */
+#respond {
+    margin: 40px 0;
+    padding: 0;
+
+    border: none;
+    background: transparent;
+}
+
+#cancel-comment-reply-link {
+    display: none !important;
+}
+
+/* textarea */
+#respond textarea {
+
+    width: 100%;
+
+    height: 250px;
+
+    padding: 12px;
+
+    border: 2px solid #F79FBE;
+    border-radius: 6px;
+
+    box-sizing: border-box;
+
+    font-size: 18px;
+
+    transition: .25s;
+
+    color: #333;
+
+    resize: none;
+}
+
+#respond textarea:hover,
+#respond textarea:focus {
+
+    border: 2px solid #000;
+
+    outline: none;
+}
+
+/* ボタン */
+#respond input[type="submit"] {
+
+    display: block;
+
+    width: 65%;
+
+    margin: 40px auto 0;
+
+    padding: 16px;
+
+    border: none;
+
+    border-radius: 6px;
+
+    background: #F79FBE;
+
+    color: #fff;
+
+    font-size: 24px;
+    font-weight: 700;
+
+    cursor: pointer;
+    text-align: center;
+}
+
+#author {
+    width: 60%;
+    padding: 15px;
+
+    border: 2px solid #F79FBE;
+    border-radius: 6px;
+
+    background: #fff;
+
+    box-sizing: border-box;
+
+    font-size: 20px;
+    font-weight: 700;
+
+    color: #333;
+
+    transition: .25s;
+}
+
+#author::placeholder {
+    color: #777;
+    opacity: 1;
+}
+
+#author:hover,
+#author:focus {
+    border: 2px solid #000;
+    outline: none;
+}
+
+.comment-form-author input {
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    font-size: 32px;
+    border: 2px solid #000;
+    border-radius: 10px;
+    background: #fff;
+    color: #777;
+    transition: 0.3s;
+    box-sizing: border-box;
+}
+
+.comment-form-author input::placeholder {
+    color: #777;
+}
+
+.comment-form-author input:hover,
+.comment-form-author input:focus {
+    border: 2px solid #F79FBE;
+    outline: none;
+}
+
+/* hover */
+#respond input[type="submit"]:hover {
+    opacity: 0.8;
+}
+
+.comment-section-title {
+    margin: 40px 0 40px;
+    padding: 20px;
+
+    border-left: 5px solid #F79FBE;
+
+    background: #eee;
+    color: #F79FBE;
+
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.comment-form-comment label,
+.comment-form-author label {
+    display: block;
+    margin-top: 25px;
+    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* =========================================
+   返信一覧
+   ========================================= */
+
+.reply-list {
+
+    margin-top: 20px;
+    margin-left: 60px;
+
+    padding-left: 20px;
+
+    border-left: 3px solid #F79FBE;
+}
+
+/* 返信カード */
+.reply-item {
+
+    margin-bottom: 15px;
+
+    padding: 15px;
+
+    background: #fff7fa;
+
+    border: 2px solid #f3c8d6;
+
+    border-radius: 14px;
+}
+
+/* 名前 */
+.reply-author {
+
+    margin-bottom: 8px;
+
+    font-size: 16px;
+    font-weight: 700;
+
+    color: #333;
+}
+
+/* 本文 */
+.reply-content {
+
+    font-size: 18px;
+
+    line-height: 1.7;
+
+    color: #333;
+}
+
+.comment-meta-line {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 700;
+    color: #000;
+}
+
+.comment-number,
+.comment-name-label,
+.comment-date-label,
+.comment-date {
+    color: #000;
+}
+
+.comment-author-name {
+    color: green;
+    font-weight: 700;
+}
+
+.comment-body-text {
+    margin: 6px 0 12px;
+    font-size: 24px;
+    line-height: 1.7;
+    font-weight: 700;
+    color: #333;
+}
+
+/* ========================================
+   コメント欄のボタン横並び
+======================================== */
+.comment-action-row {
+    display: flex;          /* 横並び */
+    align-items: center;   /* 縦中央揃え */
+    gap: 10px;             /* ボタン間の余白 */
+    margin-top: 10px;      /* 上余白 */
+}
+
+
+/* ========================================
+   Good / Bad ボタン共通デザイン
+======================================== */
+.comment-good-button,
+.comment-bad-button {
+    display: inline-flex;   /* アイコンと数字を横並び */
+    align-items: center;    /* 縦中央揃え */
+    gap: 4px;               /* アイコンと数字の間 */
+    
+    padding: 4px 6px;       /* 内側余白 */
+    
+    border: none;           /* 枠線削除 */
+    background: transparent;/* 背景透明 */
+
+    color: #333;            /* 文字色 */
+    cursor: pointer;        /* マウスカーソル */
+
+    font-size: 14px;        /* 文字サイズ */
+}
+
+
+/* ========================================
+   Good / Bad アイコンサイズ
+======================================== */
+.comment-good-button .material-icons,
+.comment-bad-button .material-icons {
+    font-size: 18px;
+}
+
+
+/* ========================================
+   マウスを乗せた時の色変更
+======================================== */
+.comment-good-button:hover,
+.comment-bad-button:hover {
+    color: #e52d77;
+}
+
+
+/* ========================================
+   Good数表示
+======================================== */
+.comment-good-count {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+
+/* ========================================
+   返信ボタンデザイン
+======================================== */
+.comment-reply-link {
+    display: inline-flex;
+    align-items: center;
+
+    padding: 6px 14px;
+
+    border-radius: 30px;
+
+    background: #f3f3f3;
+
+    color: #333;
+
+    text-decoration: none;
+
+    font-size: 14px;
+    font-weight: bold;
+}
+
+
+/* ========================================
+   返信ボタン hover
+======================================== */
+.comment-reply-link:hover {
+    background: #e52d77;
+    color: #fff;
 }
 
 /* =========================================
@@ -1011,7 +1799,9 @@ span.fa-fw {
 
     /* カードサイズ */
     width: calc((100% - 20px) / 6);
-    height: 120px;
+
+    /* ← 高さを大きくする */
+    height: 170px;
 
     /* absolute基準 */
     position: relative;
@@ -1058,6 +1848,9 @@ span.fa-fw {
 
     /* 比率維持しながらトリミング */
     object-fit: cover;
+
+    /* ← 顔を上寄りで表示 */
+    object-position: center top;
 
     /* img下余白防止 */
     display: block;
@@ -1121,42 +1914,21 @@ span.fa-fw {
    初期状態では非表示
    ========================================= */
 .week-ranking-title {
-
-    /* カード上へ重ねる */
     position: absolute;
-
-    /* 左右いっぱい */
     left: 0;
     right: 0;
-
-    /* 下配置 */
-    bottom: 0;
-
-    /* タイトルを前面へ */
+    /* 下ではなく上に固定 */
+    top: 0;
+    bottom: auto;
     z-index: 2;
-
-    /* 背景透明 */
     background: transparent;
-
-    /* 文字色 */
     color: #fff;
-
-    /* 内側余白 */
-    padding: 8px;
-
-    /* 文字サイズ */
-    font-size: 14px;
-
-    /* 太字 */
+    padding: 10px;
+    font-size: 24px;
     font-weight: bold;
-
-    /* 初期は透明 */
     opacity: 0;
-
-    /* hover時アニメ */
     transition: opacity 0.25s ease;
 }
-
 
 /* =========================================
    hover時タイトル表示
@@ -1210,19 +1982,77 @@ div.week-ranking.info.topinfo {
     height: auto;
 }
 
+/* 右本文 */
 .entry-card-content {
-    margin-left: 160px;
-}
-
-.entry-thumnail {
-    float: left;
-    margin-right: 10px;
-    margin-top: 3px;
     margin-left: 0;
+    flex: 1;
+    min-width: 0;
 }
 
+/* タイトル枠 */
+.entry-title {
+    margin: 0 0 10px;
+    padding: 12px 18px;
+    border: 5px solid #f58aaa;
+    border-radius: 12px;
+    font-size: 24px;
+    line-height: 1.4;
+    font-weight: 700;
+    box-sizing: border-box;
+}
+
+.entry-title a {
+    color: #333;
+    text-decoration: none;
+    /* 追加 */
+    transition: color .25s ease;
+}
+
+/* hover時文字色 */
+.entry-title a:hover {
+    color: #F79FBE;
+}
+
+/* 左画像 */
+.entry-thumnail {
+    float: none;
+    width: 180px;
+    margin: 0;
+    flex: 0 0 180px;
+    /* 追加 */
+    overflow: hidden;
+}
+
+.entry-thumnail img {
+    width: 180px;
+    height: 170px;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+    /* 追加 */
+    transition: transform .35s ease;
+}
+
+/* hover時画像拡大 */
+.entry-thumnail:hover img {
+    transform: scale(1.08);
+}
+
+/* 記事一覧1件 */
 .entry-post {
-    margin-bottom: 100px;
+    display: flex;
+    gap: 18px;
+    margin-bottom: 35px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid #f3c8d6;
+    box-sizing: border-box;
+}
+
+.entry-snippet{
+    margin-top:10px;
+    color:#666;
+    line-height:1.7;
+    font-size:15px;
 }
 
 #my_image {
@@ -2431,3 +3261,33 @@ textarea.rich-label:hover {
 .board_form_partial div#confirm_area .confirm-name-box {
   flex: 1 1 auto;
 }
+
+/* =========================================
+   5chまとめ風レス
+   ========================================= */
+
+/* 全体 */
+.matome-lines {
+    margin: 25px 0;
+}
+
+/* 1レスごと */
+.matome-line {
+
+    padding: 18px 12px;
+
+    border-top: 2px dashed #f7a3c0;
+
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.7;
+
+    word-break: break-word;
+}
+
+/* 最後だけ下線 */
+.matome-line:last-child {
+    border-bottom: 2px dashed #f7a3c0;
+}
+
+

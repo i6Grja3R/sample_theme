@@ -34,7 +34,7 @@ if (function_exists('register_sidebar')) {
     register_sidebar(array(
         'name' => 'ウィジェット１',
         'id' => 'widget01',
-        'before_widget' => '<div class=”widget”>',
+        'before_widget' => '<div class="widget">',
         'after_widget' => '</div>',
         'before_title' => '<h3>',
         'after_title' => '</h3>'
@@ -64,7 +64,7 @@ function custom_print_scripts()
         wp_deregister_script('jquery');
 
         //GoogleCDNから読み込む
-        wp_enqueue_script('jquery-js', '//ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js');
+        wp_enqueue_script('jquery-js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',);
         wp_enqueue_script('archive-js', get_template_directory_uri() . '/js/archive.js');
     }
 }
@@ -180,7 +180,9 @@ add_filter('preprocess_comment', function ($commentdata) {
 
     if (get_transient($key)) {
 
-        wp_die('短時間での連続投稿はできません。');
+        wp_send_json_error([
+            'errors' => ['短時間での連続投稿はできません。']
+        ]);
     }
 
     set_transient($key, 1, 60);
@@ -414,7 +416,9 @@ function isBot()
     );
     $is_bot = false;
     foreach ($bot_list as $bot) {
-        if (stripos($_SERVER['HTTP_USER_AGENT'], $bot) !== false) {
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+        if (stripos($user_agent, $bot) !== false) {
             $is_bot = true;
             break;
         }
@@ -632,6 +636,7 @@ function bbs_answer_submit()
                 $original_name = sanitize_file_name($_FILES['attach']['name'][$i]);
                 // MIMEチェック強化
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                finfo_close($finfo);
 
                 if ($finfo === false) {
                     $error[] = '・ファイル形式の確認に失敗しました';
@@ -1317,9 +1322,7 @@ if (!function_exists('bbs_duplicate_commit_guard')) {
         );
 
         if (get_transient($key)) {
-            wp_send_json_error([
-                'errors' => ['同じ内容の投稿は連続して送信できません。少し時間をおいてから再度お試しください。']
-            ]);
+            wp_die('短時間での連続投稿はできません。');
         }
 
         set_transient($key, 1, $ttl);
@@ -1968,3 +1971,105 @@ add_action('wp_head', function () {
         echo '<meta name="robots" content="noindex,follow">' . "\n";
     }
 });
+
+// 記事コメント（未入力送信 → DBには「名無し」で保存）
+add_filter('preprocess_comment', function ($commentdata) {
+
+    // 名前未入力なら「名無し」
+    if (empty(trim($commentdata['comment_author']))) {
+        $commentdata['comment_author'] = '名無し';
+    }
+
+    return $commentdata;
+});
+
+/* 記事コメント投稿制限 */
+add_filter('preprocess_comment', function ($commentdata) {
+
+    /* 名前 */
+    $author = isset($commentdata['comment_author'])
+        ? trim($commentdata['comment_author'])
+        : '';
+
+    /* コメント */
+    $comment = isset($commentdata['comment_content'])
+        ? trim($commentdata['comment_content'])
+        : '';
+
+    /* 名前50文字 */
+    if (mb_strlen($author) > 50) {
+
+        wp_die('名前は50文字以内です。');
+    }
+
+    /* コメント800文字（全角基準） */
+    if (mb_strlen($comment) > 800) {
+
+        wp_die('コメントは800文字以内です。');
+    }
+
+    return $commentdata;
+});
+
+// ======================================================
+// コメント欄バリデーション
+// ======================================================
+
+// コメント基本バリデーション
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $author = isset($commentdata['comment_author'])
+        ? trim(wp_strip_all_tags($commentdata['comment_author']))
+        : '';
+
+    $comment = isset($commentdata['comment_content'])
+        ? trim(wp_strip_all_tags($commentdata['comment_content']))
+        : '';
+
+    // 名前未入力なら「名無し」
+    if ($author === '') {
+        $author = '名無し';
+    }
+
+    // 名前50文字まで
+    if (mb_strlen($author, 'UTF-8') > 50) {
+        wp_die('名前は50文字以内で入力してください。');
+    }
+
+    // コメント未入力
+    if ($comment === '') {
+        wp_die('コメントを入力してください。');
+    }
+
+    // コメント800文字まで
+    if (mb_strlen($comment, 'UTF-8') > 800) {
+        wp_die('コメントは800文字以内で入力してください。');
+    }
+
+    // NGワード
+    $ng_words = [
+        '死ね',
+        '殺す',
+        'アホ',
+        'バカ',
+    ];
+
+    foreach ($ng_words as $ng) {
+
+        if (mb_stripos($comment, $ng, 0, 'UTF-8') !== false) {
+
+            wp_die('使用できない言葉が含まれています。');
+        }
+    }
+
+    // 日本語を含まないコメントを拒否
+    if (!preg_match('/[ぁ-んァ-ヶ一-龠]/u', $comment)) {
+
+        wp_die('日本語を含めてコメントしてください。');
+    }
+
+    $commentdata['comment_author']  = $author;
+    $commentdata['comment_content'] = $comment;
+
+    return $commentdata;
+}, 20);

@@ -13,7 +13,7 @@
       <ul class="header-box" itemscope="" itemtype="https://schema.org/SiteNavigationElement">
         <li>
           <!-- ▼　トップ画像を変更して、あなたのブログにオリジナリティーを出してみましょう ▼ --><a href="http://www.anige-sokuhouvip.com/">
-            <img src="http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/main-banner.png" alt="" style="height:230px;width:555px;"></a>
+            <img src="http://www.irasuto.cfbx.jp/wp-content/themes/sample_theme/images/main-banner.png" alt=""></a>
           <!-- ▲　画像の推奨サイズは "1100px×200px" となっております。 横幅だけでも合わせておきましょう ▲ -->
           <!--▼ メニューバー ▼-->
           <ul id="menu_bar">
