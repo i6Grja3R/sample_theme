@@ -346,6 +346,7 @@ body.post-template {
     padding: 27px 27px 20px;
     background-color: #fff;
     box-sizing: border-box;
+    position: relative;
 }
 
 /* 3日間ランキングのリンク枠 */
@@ -1555,14 +1556,11 @@ span.fa-fw {
 
 .comment-section-title {
     margin: 40px 0 40px;
-    padding: 20px;
-
-    border-left: 5px solid #F79FBE;
-
-    background: #eee;
-    color: #F79FBE;
-
-    font-size: 28px;
+    padding: 15px;
+    border-left: 5px solid #333;
+    background: #fff7fa;
+    color: #333;
+    font-size: 20px;
     font-weight: 700;
 }
 
@@ -1577,31 +1575,72 @@ span.fa-fw {
 }
 
 /* =========================================
-   返信一覧
+   返信一覧 Reddit風ツリー
    ========================================= */
 
+/* 返信全体 */
 .reply-list {
-
-    margin-top: 20px;
-    margin-left: 60px;
-
-    padding-left: 20px;
-
-    border-left: 3px solid #F79FBE;
+    margin-top: 12px;
+    margin-left: 18px;
+    padding-left: 22px;
+    border-left: none;
 }
 
-/* 返信カード */
+/* 返信1件 */
 .reply-item {
+    position: relative;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
 
-    margin-bottom: 15px;
+/* 縦線 */
+.reply-list > .reply-item::before {
+    content: "";
+    position: absolute;
+    left: -22px;
+    top: -8px;
+    bottom: -8px;
+    width: 0;
+    border-left: 1.5px solid #999;
+}
 
-    padding: 15px;
+.reply-list > .reply-item.has-next-sibling::before {
+    bottom: -8px;
+    height: auto;
+}
 
-    background: #fff7fa;
+.reply-list > .reply-item.is-last-sibling::before {
+    bottom: auto;
+    height: 22px;
+}
 
-    border: 2px solid #f3c8d6;
+/* 名前の横だけ短い線 */
+.reply-list > .reply-item::after {
+    content: "";
+    position: absolute;
 
-    border-radius: 14px;
+    left: -22px;
+    top: 0;
+
+    width: 14px;
+    height: 24px;
+
+    border-left: 1.5px solid #999;
+    border-bottom: 1.5px solid #999;
+
+    border-radius: 0 0 0 10px;
+}
+
+/* 文字は線より前面 */
+.reply-meta-line,
+.reply-content,
+.reply-action-row,
+.reply-toggle-button,
+.reply-more-button,
+.reply-children {
+    position: relative;
+    z-index: 2;
 }
 
 /* 名前 */
@@ -1627,26 +1666,26 @@ span.fa-fw {
 
 .comment-meta-line {
     margin: 0 0 8px;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
-    color: #000;
+    color: #333;
 }
 
 .comment-number,
 .comment-name-label,
 .comment-date-label,
 .comment-date {
-    color: #000;
+    color: #333;
 }
 
 .comment-author-name {
-    color: green;
+    color: #e52d77;
     font-weight: 700;
 }
 
 .comment-body-text {
     margin: 6px 0 12px;
-    font-size: 24px;
+    font-size: 18px;
     line-height: 1.7;
     font-weight: 700;
     color: #333;
@@ -1660,8 +1699,8 @@ span.fa-fw {
     align-items: center;   /* 縦中央揃え */
     gap: 10px;             /* ボタン間の余白 */
     margin-top: 10px;      /* 上余白 */
+    margin-bottom: 12px;
 }
-
 
 /* ========================================
    Good / Bad ボタン共通デザイン
@@ -1672,7 +1711,7 @@ span.fa-fw {
     align-items: center;    /* 縦中央揃え */
     gap: 4px;               /* アイコンと数字の間 */
     
-    padding: 4px 6px;       /* 内側余白 */
+    padding: 0 10px 0 0;       /* 内側余白 */
     
     border: none;           /* 枠線削除 */
     background: transparent;/* 背景透明 */
@@ -1739,6 +1778,61 @@ span.fa-fw {
 .comment-reply-link:hover {
     background: #e52d77;
     color: #fff;
+}
+
+/* 「〇〇さんに返信」などのタイトルエリアを非表示にする */
+#reply-title {
+    display: none;
+}
+
+.is-hidden-reply,
+.is-hidden-children {
+    display: none;
+}
+
+.reply-more-button,
+.reply-toggle-button {
+    margin: 3px 0 8px;
+    padding: 4px 10px;
+    border: none;
+    background: transparent;
+    color: #065fd4;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.reply-list.depth-1,
+.reply-list.depth-2,
+.reply-list.depth-3 {
+    margin-left: 18px;
+}
+
+/* =========================================
+   返信ツリー：4階層目以降は3階層目と同じ位置に固定
+   画面右にはみ出すのを防ぐ
+   ========================================= */
+.reply-list.depth-3 .reply-list {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    border-left: none !important;
+}
+
+/* 長文が右にはみ出さないようにする */
+.reply-item,
+.reply-content,
+.comment-body-text {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+#commentform-top-spacer{
+    height:25px;
+}
+
+#commentform-bottom-spacer {
+    height: 30px;
 }
 
 /* =========================================
@@ -3290,4 +3384,310 @@ textarea.rich-label:hover {
     border-bottom: 2px dashed #f7a3c0;
 }
 
+/* =========================================
+   5ch風まとめレス表示
+   ========================================= */
 
+.matome-res-list {
+    margin: 30px 0;
+}
+
+.matome-res {
+    margin: 0 0 38px;
+}
+
+.matome-res-meta {
+    padding: 4px 6px;
+    background: #fff7fa;
+    border: 1px solid #d6e3ed;
+    font-size: 18px;
+    font-weight: 700;
+    color: #777;
+}
+
+.matome-res-no {
+    color: #333;
+}
+
+.matome-res-name {
+    color: #e52d77;
+}
+
+.matome-res-date,
+.matome-res-id {
+    color: #777;
+}
+
+.matome-res-body {
+    padding: 22px 28px;
+    font-size: 24px;
+    line-height: 1.8;
+    font-weight: 700;
+    color: #333;
+}
+
+.matome-anchor {
+    color: #333;
+    font-weight: 700;
+}
+
+/* 返信フォームがツリー内で縮まないようにする */
+#respond {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#right-box > ol > li {
+    margin-bottom: 0;
+}
+
+#right-box > ol > li > article {
+    margin-bottom: 15px;
+}
+
+/* =========================================
+   お問い合わせフォーム
+========================================= */
+
+.contact-form {
+    width: 900px;
+    margin: 30px auto;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.contact-title {
+    margin-bottom: 20px;
+    padding: 10px 15px;
+    background: #F79FBE;
+    color: #fff;
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* 外枠：上・左・右のみ線を引く */
+.contact-table {
+    border-top: 1px solid #F79FBE;
+    border-left: 1px solid #F79FBE;
+    border-right: 1px solid #F79FBE;
+    border-bottom: none; /* 外枠の下線は一旦オフにする */
+    box-sizing: border-box;
+    background: #fff;
+}
+
+/* 各行：下線を引く */
+.contact-row {
+    display: grid;
+    grid-template-columns: 315px 1fr;
+    border-bottom: 1px solid #F79FBE;
+    box-sizing: border-box;
+}
+
+/* ★ここがキモ：最後の行の「下線なし」をやめて、最後の行に下線を引かせる */
+.contact-row:last-child {
+    border-bottom: 1px solid #F79FBE; 
+}
+
+/* 左側 */
+.contact-label {
+    background: #fff7fa;
+    padding: 14px 16px;
+    font-size: 20px;
+    font-weight: bold;
+    border-right: 1px solid #F79FBE;
+    box-sizing: border-box;
+}
+
+/* 右側 */
+/* 件名・名前・メール */
+.contact-field input {
+    width: 420px;
+    height: 56px;
+    margin: 15px;
+    padding: 0 8px;
+
+    font-size: 20px;
+    font-weight: 700;
+
+    box-sizing: border-box;
+}
+
+/* メッセージ */
+.contact-field textarea {
+    font-size: 24px;
+    width: 500px;
+    max-width: 600px;
+    height: 260px;
+    margin: 15px;
+    padding: 10px;
+    line-height: 1.6;
+    box-sizing: border-box;
+}
+
+.message-row .contact-label {
+    min-height: 160px;
+}
+
+.contact-bottom {
+    text-align: center;
+    margin-top: 15px;
+}
+
+.contact-bottom .cf-turnstile {
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.contact-bottom input[type="submit"] {
+    width: 680px;
+    padding: 18px;
+    background: #F79FBE;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.contact-bottom input[type="submit"]:hover {
+    opacity: 0.8;
+}
+
+/* 枠線とはみ出しの強制クリア設定 */
+.contact-table {
+    border: 1px solid #F79FBE !important; /* 上下左右すべての線を強制 */
+    box-sizing: border-box !important;
+    background: #fff;
+    overflow: hidden; /* 内側の要素が線を隠すのを防ぐ */
+}
+
+/* 各入力フィールドが右側にはみ出さないようにガード */
+.contact-field input, 
+.contact-field textarea {
+    color: #333;
+    font-weight: 700;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* =========================================
+   「必須」ラベルのバッジデザイン
+========================================= */
+.contact-label span {
+    background-color: #F79FBE !important; /* 背景をピンクに */
+    color: #fff !important;               /* 文字を白に */
+    font-size: 14px !important;           /* 文字の大きさ（元の26pxからバッジ用に小さく調整） */
+    font-weight: bold !important;         /* 太字 */
+    padding: 4px 8px !important;          /* バッジの内側の余白（上下・左右） */
+    border-radius: 4px !important;        /* 角を少し丸くする */
+    margin-left: 12px !important;         /* 左の文字（件名など）との隙間 */
+    display: inline-block !important;     /* きれいに並べるための設定 */
+    vertical-align: middle !important;    /* 縦方向の真ん中寄せ */
+}
+
+/* 確認画面 */
+.contact-confirm-form {
+    width: 900px;
+    margin: 30px auto;
+    background: #fff;
+}
+
+.contact-confirm-message {
+    text-align: center;
+    font-size: 26px;
+    margin: 40px 0 30px;
+}
+
+.contact-confirm-table {
+    border: 1px solid #F79FBE;
+}
+
+.contact-confirm-row {
+    display: grid;
+    grid-template-columns: 270px 1fr;
+    border-bottom: 1px solid #F79FBE;
+}
+
+.contact-confirm-row:last-child {
+    border-bottom: none;
+}
+
+.contact-confirm-label {
+    background: #fff7fa;
+    padding: 10px 16px;
+    font-size: 20px;
+    font-weight: bold;
+    border-right: 1px solid #F79FBE;
+}
+
+.contact-confirm-value {
+    padding: 10px 16px;
+    font-size: 20px;
+    word-break: break-word;
+}
+
+/* 確認画面：前に戻る・送信するボタン */
+.contact-confirm-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 35px;
+}
+
+.contact-confirm-buttons input {
+    width: 320px;
+    padding: 18px;
+    background: #F79FBE;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+}
+
+.contact-confirm-buttons input:hover {
+    opacity: 0.8;
+}
+
+.contact-complete {
+    max-width: 1000px;
+    margin: 40px auto;
+    text-align: center;
+}
+
+.contact-complete-message {
+    font-size: 32px;
+    line-height: 2;
+    font-weight: bold;
+    margin-bottom: 60px;
+}
+
+.contact-finish-btn {
+    display: block;
+    width: 680px;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 18px;
+    background: #f3a3c2;
+    color: #fff;
+    text-decoration: none;
+    font-size: 24px;
+    font-weight: bold;
+    border-radius: 15px;
+}
+
+.contact-finish-btn:hover {
+    opacity: 0.9;
+}
+
+.contact-wrap,
+.contact-confirm-wrap,
+.contact-complete {
+    width: 900px;
+    max-width: 100%;
+    margin: 30px auto;
+}

@@ -61,11 +61,17 @@ function custom_print_scripts()
 {
     if (!is_admin()) {
         //デフォルトjquery削除
-        wp_deregister_script('jquery');
+        // wp_deregister_script('jquery'); は消す
+        wp_enqueue_script('jquery');
 
         //GoogleCDNから読み込む
-        wp_enqueue_script('jquery-js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',);
+        wp_enqueue_script('jquery-js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js');
         wp_enqueue_script('archive-js', get_template_directory_uri() . '/js/archive.js');
+
+        wp_localize_script('jquery-js', 'comment_reaction_vars', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('comment_reaction_nonce'),
+        ]);
     }
 }
 add_action('wp_print_scripts', 'custom_print_scripts');
@@ -179,10 +185,7 @@ add_filter('preprocess_comment', function ($commentdata) {
     $key = 'comment_rate_' . md5($ip);
 
     if (get_transient($key)) {
-
-        wp_send_json_error([
-            'errors' => ['短時間での連続投稿はできません。']
-        ]);
+        wp_die('短時間での連続投稿はできません。');
     }
 
     set_transient($key, 1, 60);
@@ -208,11 +211,6 @@ add_filter('pre_comment_approved', function ($approved, $commentdata) {
 
     // 英数字URLが多い
     if (preg_match_all('/https?:\/\//i', $text) >= 1) {
-        return 0;
-    }
-
-    // 長すぎる
-    if (mb_strlen($text) > 300) {
         return 0;
     }
 
@@ -518,14 +516,14 @@ function getToken()
 
 function enquiry_sample()
 {
-    header('Content-type: application/json; charset=UTF-8');
-    $result = [];
-    $result['name'] = $_POST['name'];
-    $result['title'] = $_POST['title'];
-    $result['text'] = $_POST['text'];
-    $result['stamp'] = $_POST['stamp'];
-    echo json_encode($result);
-    exit;
+    check_ajax_referer('enquiry_sample_nonce', 'nonce');
+
+    wp_send_json([
+        'name'  => sanitize_text_field($_POST['name'] ?? ''),
+        'title' => sanitize_text_field($_POST['title'] ?? ''),
+        'text'  => sanitize_textarea_field($_POST['text'] ?? ''),
+        'stamp' => sanitize_text_field($_POST['stamp'] ?? ''),
+    ]);
 }
 add_action('wp_ajax_enquiry_sample', 'enquiry_sample');
 add_action('wp_ajax_nopriv_enquiry_sample', 'enquiry_sample');
@@ -579,6 +577,7 @@ add_action('wp_enqueue_scripts', function () {
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_submit()
 {
+    check_ajax_referer('bbs_quest_submit', 'nonce');
     // AFTER（submit / confirm 共通）
     $user_id = get_secure_guest_user_id();
 
@@ -731,6 +730,7 @@ function CheckUrl($str, $mes, array &$error)
 /* 回答タイトルとスタンプ画像なし（回答掲示板) */
 function bbs_answer_confirm()
 {
+    check_ajax_referer('bbs_quest_confirm', 'nonce');
     // UUID形式かを必ず検証する
     function is_valid_uuid($uuid)
     {
@@ -2073,3 +2073,183 @@ add_filter('preprocess_comment', function ($commentdata) {
 
     return $commentdata;
 }, 20);
+
+add_action('wp_ajax_comment_reaction', 'bbs_comment_reaction');
+add_action('wp_ajax_nopriv_comment_reaction', 'bbs_comment_reaction');
+
+function bbs_comment_reaction()
+{
+    check_ajax_referer('comment_reaction_nonce', 'nonce');
+
+    global $wpdb;
+
+    $comment_id = isset($_POST['comment_id']) ? (int) $_POST['comment_id'] : 0;
+    $reaction   = sanitize_text_field($_POST['reaction'] ?? '');
+
+    if ($comment_id <= 0 || !in_array($reaction, ['good', 'bad'], true)) {
+        wp_send_json_error(['message' => '不正なリクエストです。']);
+    }
+
+    $user_key = $_COOKIE['user_id'] ?? '';
+    $user_key = hash_hmac('sha256', $user_key . '|' . bbs_get_client_ip(), wp_salt('auth'));
+
+    $table = $wpdb->prefix . 'comment_reactions';
+
+    $exists = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT reaction_type FROM {$table} WHERE comment_id = %d AND user_key = %s",
+            $comment_id,
+            $user_key
+        )
+    );
+
+    if ($exists === $reaction) {
+        $wpdb->delete(
+            $table,
+            [
+                'comment_id' => $comment_id,
+                'user_key'   => $user_key,
+            ],
+            ['%d', '%s']
+        );
+    } else {
+        $wpdb->replace(
+            $table,
+            [
+                'comment_id'    => $comment_id,
+                'user_key'      => $user_key,
+                'reaction_type' => $reaction,
+                'created_at'    => current_time('mysql'),
+            ],
+            ['%d', '%s', '%s', '%s']
+        );
+    }
+
+    $good_count = (int) $wpdb->get_var(
+        $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE comment_id = %d AND reaction_type = 'good'", $comment_id)
+    );
+
+    $bad_count = (int) $wpdb->get_var(
+        $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE comment_id = %d AND reaction_type = 'bad'", $comment_id)
+    );
+
+    wp_send_json_success([
+        'good' => $good_count,
+        'bad'  => $bad_count,
+    ]);
+}
+
+// コメント good / bad 用 nonce
+add_action('wp_enqueue_scripts', function () {
+    wp_localize_script('jquery-js', 'comment_reaction_vars', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('comment_reaction_nonce'),
+    ]);
+});
+
+add_action('wp_ajax_comment_reaction', 'bbs_comment_reaction');
+add_action('wp_ajax_nopriv_comment_reaction', 'bbs_comment_reaction');
+
+/* =========================================
+   コメント上限・返信階層上限
+   コメント総数：3000件
+   返信階層：20階層まで
+   ========================================= */
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $post_id = isset($commentdata['comment_post_ID'])
+        ? (int) $commentdata['comment_post_ID']
+        : 0;
+
+    if ($post_id <= 0) {
+        return $commentdata;
+    }
+
+    /* コメント総数上限 */
+    $comment_count = get_comments([
+        'post_id' => $post_id,
+        'status'  => ['approve', 'hold'],
+        'count'   => true,
+    ]);
+
+    if ((int) $comment_count >= 3000) {
+        wp_die('このスレッドはコメント上限に達しました。');
+    }
+
+    /* 返信階層上限 */
+    $parent_id = isset($commentdata['comment_parent'])
+        ? (int) $commentdata['comment_parent']
+        : 0;
+
+    if ($parent_id > 0) {
+        $depth = 1;
+        $current_parent = $parent_id;
+
+        while ($current_parent > 0) {
+            $parent_comment = get_comment($current_parent);
+
+            if (!$parent_comment) {
+                break;
+            }
+
+            $current_parent = (int) $parent_comment->comment_parent;
+            $depth++;
+
+            if ($depth > 20) {
+                wp_die('返信階層の上限に達しました。');
+            }
+        }
+    }
+
+    return $commentdata;
+});
+
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $text = trim($commentdata['comment_content']);
+
+    // 空コメント禁止
+    if ($text === '') {
+        wp_die('コメントを入力してください。');
+    }
+
+    // 1600文字制限
+    if (mb_strlen($text) > 1600) {
+        wp_die('コメントが長すぎます。');
+    }
+
+    return $commentdata;
+});
+
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $key = 'comment_rate_' . md5($ip);
+
+    if (get_transient($key)) {
+        wp_die('連続投稿は少し時間を空けてください。');
+    }
+
+    set_transient($key, 1, 30);
+
+    return $commentdata;
+});
+
+add_filter('preprocess_comment', function ($commentdata) {
+
+    $text = $commentdata['comment_content'];
+
+    if (preg_match_all('/https?:\/\//i', $text) > 2) {
+        wp_die('URLが多すぎます。');
+    }
+
+    return $commentdata;
+});
+
+// クリックジャッキング対策
+add_action('send_headers', function () {
+    header('X-Frame-Options: SAMEORIGIN');
+    header("Content-Security-Policy: frame-ancestors 'self';");
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+});
