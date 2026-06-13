@@ -65,10 +65,10 @@ function custom_print_scripts()
         wp_enqueue_script('jquery');
 
         //GoogleCDNから読み込む
-        wp_enqueue_script('jquery-js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js');
+        // wp_enqueue_script('jquery-js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js');
         wp_enqueue_script('archive-js', get_template_directory_uri() . '/js/archive.js');
 
-        wp_localize_script('jquery-js', 'comment_reaction_vars', [
+        wp_localize_script('jquery', 'comment_reaction_vars', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('comment_reaction_nonce'),
         ]);
@@ -167,7 +167,7 @@ add_filter('comment_form_default_fields', 'custom_comment_form_fields');
 // ----------------------------------------------------------------------------
 // コメント欄の名前が未入力の場合の投稿者名
 // ----------------------------------------------------------------------------
-function default_author_name($author, $comment_ID, $comment)
+/* function default_author_name($author, $comment_ID, $comment)
 {
     if ($author == __('Anonymous')) {
         $author = '名無しさん';
@@ -175,43 +175,24 @@ function default_author_name($author, $comment_ID, $comment)
 
     return $author;
 }
+*/
 add_filter('get_comment_author', 'default_author_name', 10, 3);
 
-// コメント投稿レート制限
-add_filter('preprocess_comment', function ($commentdata) {
-
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-
-    $key = 'comment_rate_' . md5($ip);
-
-    if (get_transient($key)) {
-        wp_die('短時間での連続投稿はできません。');
-    }
-
-    set_transient($key, 1, 60);
-
-    return $commentdata;
-});
-
-// URL混入禁止
-add_filter('preprocess_comment', function ($commentdata) {
-
-    if (preg_match('/https?:\/\/|www\./i', $commentdata['comment_content'])) {
-
-        wp_die('URLを含むコメントは禁止されています。');
-    }
-
-    return $commentdata;
-});
-
-// 承認待ち化
+// --------------------------------------------------------
+// 2. URL混入時は自動的に「承認待ち（保留）」にする
+// --------------------------------------------------------
 add_filter('pre_comment_approved', function ($approved, $commentdata) {
+
+    // サイト管理者（あなた）のコメントなら、URLが入っていても最初から「承認（即表示）」にする
+    if (current_user_can('manage_options')) {
+        return $approved;
+    }
 
     $text = $commentdata['comment_content'];
 
-    // 英数字URLが多い
-    if (preg_match_all('/https?:\/\//i', $text) >= 1) {
-        return 0;
+    // 本文にURL（http://, https://, www.）が含まれているかチェック
+    if (preg_match('/https?:\/\/|www\./i', $text)) {
+        return 0; // 「0」を返すことで、一般画面には表示せず、管理画面の「承認待ち」に安全に保管します
     }
 
     return $approved;
@@ -1972,108 +1953,6 @@ add_action('wp_head', function () {
     }
 });
 
-// 記事コメント（未入力送信 → DBには「名無し」で保存）
-add_filter('preprocess_comment', function ($commentdata) {
-
-    // 名前未入力なら「名無し」
-    if (empty(trim($commentdata['comment_author']))) {
-        $commentdata['comment_author'] = '名無し';
-    }
-
-    return $commentdata;
-});
-
-/* 記事コメント投稿制限 */
-add_filter('preprocess_comment', function ($commentdata) {
-
-    /* 名前 */
-    $author = isset($commentdata['comment_author'])
-        ? trim($commentdata['comment_author'])
-        : '';
-
-    /* コメント */
-    $comment = isset($commentdata['comment_content'])
-        ? trim($commentdata['comment_content'])
-        : '';
-
-    /* 名前50文字 */
-    if (mb_strlen($author) > 50) {
-
-        wp_die('名前は50文字以内です。');
-    }
-
-    /* コメント800文字（全角基準） */
-    if (mb_strlen($comment) > 800) {
-
-        wp_die('コメントは800文字以内です。');
-    }
-
-    return $commentdata;
-});
-
-// ======================================================
-// コメント欄バリデーション
-// ======================================================
-
-// コメント基本バリデーション
-add_filter('preprocess_comment', function ($commentdata) {
-
-    $author = isset($commentdata['comment_author'])
-        ? trim(wp_strip_all_tags($commentdata['comment_author']))
-        : '';
-
-    $comment = isset($commentdata['comment_content'])
-        ? trim(wp_strip_all_tags($commentdata['comment_content']))
-        : '';
-
-    // 名前未入力なら「名無し」
-    if ($author === '') {
-        $author = '名無し';
-    }
-
-    // 名前50文字まで
-    if (mb_strlen($author, 'UTF-8') > 50) {
-        wp_die('名前は50文字以内で入力してください。');
-    }
-
-    // コメント未入力
-    if ($comment === '') {
-        wp_die('コメントを入力してください。');
-    }
-
-    // コメント800文字まで
-    if (mb_strlen($comment, 'UTF-8') > 800) {
-        wp_die('コメントは800文字以内で入力してください。');
-    }
-
-    // NGワード
-    $ng_words = [
-        '死ね',
-        '殺す',
-        'アホ',
-        'バカ',
-    ];
-
-    foreach ($ng_words as $ng) {
-
-        if (mb_stripos($comment, $ng, 0, 'UTF-8') !== false) {
-
-            wp_die('使用できない言葉が含まれています。');
-        }
-    }
-
-    // 日本語を含まないコメントを拒否
-    if (!preg_match('/[ぁ-んァ-ヶ一-龠]/u', $comment)) {
-
-        wp_die('日本語を含めてコメントしてください。');
-    }
-
-    $commentdata['comment_author']  = $author;
-    $commentdata['comment_content'] = $comment;
-
-    return $commentdata;
-}, 20);
-
 add_action('wp_ajax_comment_reaction', 'bbs_comment_reaction');
 add_action('wp_ajax_nopriv_comment_reaction', 'bbs_comment_reaction');
 
@@ -2090,8 +1969,20 @@ function bbs_comment_reaction()
         wp_send_json_error(['message' => '不正なリクエストです。']);
     }
 
-    $user_key = $_COOKIE['user_id'] ?? '';
-    $user_key = hash_hmac('sha256', $user_key . '|' . bbs_get_client_ip(), wp_salt('auth'));
+    $user_id = $_COOKIE['user_id'] ?? '';
+
+    if (
+        !is_string($user_id) ||
+        !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $user_id)
+    ) {
+        wp_send_json_error(['message' => 'ユーザー識別情報がありません。ページを再読み込みしてください。']);
+    }
+
+    $user_key = hash_hmac(
+        'sha256',
+        $user_id . '|' . bbs_get_client_ip(),
+        wp_salt('auth')
+    );
 
     $table = $wpdb->prefix . 'comment_reactions';
 
@@ -2147,36 +2038,73 @@ add_action('wp_enqueue_scripts', function () {
     ]);
 });
 
-add_action('wp_ajax_comment_reaction', 'bbs_comment_reaction');
-add_action('wp_ajax_nopriv_comment_reaction', 'bbs_comment_reaction');
-
-/* =========================================
-   コメント上限・返信階層上限
-   コメント総数：3000件
-   返信階層：20階層まで
-   ========================================= */
 add_filter('preprocess_comment', function ($commentdata) {
+
+    if (current_user_can('manage_options')) {
+        return $commentdata;
+    }
+
+    $author = isset($commentdata['comment_author'])
+        ? trim(wp_strip_all_tags($commentdata['comment_author']))
+        : '';
+
+    $comment = isset($commentdata['comment_content'])
+        ? trim(wp_strip_all_tags($commentdata['comment_content']))
+        : '';
+
+    if ($author === '') {
+        $author = '名無しさん';
+    }
+
+    if (mb_strlen($author, 'UTF-8') > 50) {
+        wp_die('名前は50文字以内で入力してください。');
+    }
+
+    if ($comment === '') {
+        wp_die('コメントを入力してください。');
+    }
+
+    if (mb_strlen($comment, 'UTF-8') > 800) {
+        wp_die('コメントは800文字以内で入力してください。');
+    }
+
+    $ng_words = [
+        '死ね',
+        '殺す',
+        'アホ',
+        'バカ',
+    ];
+
+    foreach ($ng_words as $ng) {
+        if (mb_stripos($comment, $ng, 0, 'UTF-8') !== false) {
+            wp_die('使用できない言葉が含まれています。');
+        }
+    }
+
+    if (!preg_match('/[ぁ-んァ-ヶ一-龠]/u', $comment)) {
+        wp_die('日本語を含めてコメントしてください。');
+    }
+
+    if (preg_match_all('/https?:\/\//i', $comment) > 2) {
+        wp_die('URLが多すぎます。');
+    }
 
     $post_id = isset($commentdata['comment_post_ID'])
         ? (int) $commentdata['comment_post_ID']
         : 0;
 
-    if ($post_id <= 0) {
-        return $commentdata;
+    if ($post_id > 0) {
+        $comment_count = get_comments([
+            'post_id' => $post_id,
+            'status'  => ['approve', 'hold'],
+            'count'   => true,
+        ]);
+
+        if ((int) $comment_count >= 3000) {
+            wp_die('このスレッドはコメント上限に達しました。');
+        }
     }
 
-    /* コメント総数上限 */
-    $comment_count = get_comments([
-        'post_id' => $post_id,
-        'status'  => ['approve', 'hold'],
-        'count'   => true,
-    ]);
-
-    if ((int) $comment_count >= 3000) {
-        wp_die('このスレッドはコメント上限に達しました。');
-    }
-
-    /* 返信階層上限 */
     $parent_id = isset($commentdata['comment_parent'])
         ? (int) $commentdata['comment_parent']
         : 0;
@@ -2201,30 +2129,11 @@ add_filter('preprocess_comment', function ($commentdata) {
         }
     }
 
-    return $commentdata;
-});
+    $ip = function_exists('bbs_get_client_ip')
+        ? bbs_get_client_ip()
+        : ($_SERVER['REMOTE_ADDR'] ?? '');
 
-add_filter('preprocess_comment', function ($commentdata) {
-
-    $text = trim($commentdata['comment_content']);
-
-    // 空コメント禁止
-    if ($text === '') {
-        wp_die('コメントを入力してください。');
-    }
-
-    // 1600文字制限
-    if (mb_strlen($text) > 1600) {
-        wp_die('コメントが長すぎます。');
-    }
-
-    return $commentdata;
-});
-
-add_filter('preprocess_comment', function ($commentdata) {
-
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    $key = 'comment_rate_' . md5($ip);
+    $key = 'comment_rate_' . hash_hmac('sha256', $ip, wp_salt('auth'));
 
     if (get_transient($key)) {
         wp_die('連続投稿は少し時間を空けてください。');
@@ -2232,19 +2141,11 @@ add_filter('preprocess_comment', function ($commentdata) {
 
     set_transient($key, 1, 30);
 
-    return $commentdata;
-});
-
-add_filter('preprocess_comment', function ($commentdata) {
-
-    $text = $commentdata['comment_content'];
-
-    if (preg_match_all('/https?:\/\//i', $text) > 2) {
-        wp_die('URLが多すぎます。');
-    }
+    $commentdata['comment_author']  = $author;
+    $commentdata['comment_content'] = $comment;
 
     return $commentdata;
-});
+}, 20);
 
 // クリックジャッキング対策
 add_action('send_headers', function () {

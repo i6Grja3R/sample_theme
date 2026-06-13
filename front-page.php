@@ -128,3 +128,5 @@ echo __DIR__;*/
   </div>
 </div>
 <!--ここまで-->
+
+<?php get_footer(); ?>

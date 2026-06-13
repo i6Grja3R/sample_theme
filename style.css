@@ -3691,3 +3691,318 @@ textarea.rich-label:hover {
     max-width: 100%;
     margin: 30px auto;
 }
+
+.contact-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    background: #e52d77;
+    color: #fff;
+    padding: 15px 25px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    opacity: 0;
+    transform: translateX(30px);
+    transition: .3s;
+}
+
+.contact-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* =========================
+   Footer
+========================= */
+
+.footer{
+    background:#f5f5f5;
+    padding:50px 20px;
+    text-align:center;
+    margin-top:50px;
+}
+
+.footer-inner{
+    max-width:1200px;
+    margin:0 auto;
+}
+
+.footer-logo{
+    margin-bottom:25px;
+}
+
+.footer-logo img{
+    max-width:220px;
+    height:auto;
+}
+
+.footer-sns{
+    display:flex;
+    justify-content:center;
+    gap:15px;
+    margin-bottom:30px;
+}
+
+.footer-x,
+.footer-rss{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:160px;
+    height:42px;
+    border-radius:4px;
+    color:#fff;
+    text-decoration:none;
+    font-weight:bold;
+}
+
+.footer-x{
+    background:#000;
+}
+
+.footer-rss{
+    background:#f7931a;
+}
+
+.footer-menu{
+    margin-bottom:20px;
+}
+
+.footer-menu a{
+    color:#333;
+    text-decoration:none;
+    margin:0 15px;
+}
+
+.footer-menu a:hover{
+    color:#f58aaa;
+}
+
+.footer-text{
+    color:#444;
+    font-size:16px;
+    margin-bottom:10px;
+}
+
+.footer-copy{
+    color:#333;
+    font-size:16px;
+}
+
+.footer-x,
+.footer-rss{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+}
+
+.footer-icon{
+    width:18px;
+    height:18px;
+    fill:#fff;
+    flex-shrink:0;
+}
+
+/* =========================
+   Footer 全文字16px統一
+========================= */
+
+.footer,
+.footer a,
+.footer button,
+.footer-copy,
+.footer-text,
+.footer-menu a,
+.footer-x,
+.footer-rss {
+    font-size: 16px;
+}
+
+.footer-menu{
+    display:flex;
+    justify-content:center;
+    gap:30px;
+    flex-wrap:wrap;
+}
+
+/* =========================
+   Q&A
+========================= */
+
+.qa-section{
+    margin:30px 0;
+}
+
+.qa-item{
+    border-bottom:1px solid #ccc;
+}
+
+.qa-item summary{
+    position:relative;
+    cursor:pointer;
+    padding:15px 40px 15px 0;
+    list-style:none;
+    font-size:16px;
+    font-weight:700;
+}
+
+.qa-item summary::-webkit-details-marker{
+    display:none;
+}
+
+.qa-item summary::after{
+    content:"+";
+    position:absolute;
+    right:10px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:24px;
+    color:#999;
+}
+
+.qa-item[open] summary::after{
+    content:"−";
+}
+
+.qa-answer{
+    padding:0 0 15px 0;
+    line-height:1.8;
+}
+
+.about-section-title{
+    margin:40px 0 40px;
+    padding:15px;
+    border-left:5px solid #333;
+    background:#fff7fa;
+    color:#333;
+    font-size:20px;
+    font-weight:700;
+}
+
+.qa-category{
+    margin:30px 0 10px;
+    padding:10px 15px;
+    background:#fff7fa;
+    border-left:5px solid #333;
+    font-size:18px;
+    font-weight:700;
+    color:#333;
+}
+
+.qa-category-title{
+    margin:35px 0 10px;
+    padding:12px 15px;
+    background:#fff7fa;
+    border-left:5px solid #333;
+    color:#333;
+    font-size:20px;
+    font-weight:700;
+    line-height:1.4;
+    box-sizing:border-box;
+}
+
+.qa-category-title i{
+    margin-right:6px;
+    color:#777;
+}
+
+/* =========================
+   Q&A Q / A マーク
+========================= */
+
+.q-mark {
+    display: inline-block;
+    margin-right: 6px;
+    color: #e52d77;
+    font-weight: 700;
+}
+
+.a-mark {
+    display: inline-block;
+    margin-right: 6px;
+    color: #2CCB8E;
+    font-weight: 700;
+}
+
+/* =========================================
+   プライバシーポリシー専用デザイン
+   ※ style.css の一番下に追加
+========================================= */
+
+/* 全体を1つの文書として見せる */
+.privacy-policy-section {
+    margin: 30px 0;
+    padding: 0 0 10px;
+    color: #555;
+}
+
+/* ページタイトル：第○条とは別格にする */
+.privacy-policy-title {
+    margin: 30px 0 25px;
+    padding: 18px 20px;
+
+    background: #fff7fa;
+    border-left: 6px solid #333;
+
+    color: #333;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+/* 本文・日付・運営者 */
+.privacy-policy-meta,
+.privacy-policy-text,
+.privacy-policy-list li {
+    color: #555;
+    font-size: 16px;
+    line-height: 1.9;
+    font-weight: 600;
+}
+
+/* 第○条の見出し */
+.privacy-policy-heading {
+    margin: 32px 0 14px;
+    padding: 12px 16px;
+
+    background: #fff7fa;
+    border-left: 5px solid #333;
+
+    color: #333;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+/* =========================================
+   プライバシーポリシー リストの右ズレ修正
+========================================= */
+
+.privacy-policy-list {
+    margin: 0 0 18px 0;
+    padding-left: 0;
+}
+
+.privacy-policy-list li {
+    margin: 0 0 8px 0;
+    padding-left: 0;
+
+    list-style: none;
+
+    color: #555;
+    font-size: 16px;
+    line-height: 1.9;
+    font-weight: 600;
+}
+
+/* お問い合わせリンク */
+.privacy-policy-section a {
+    color: #e52d77;
+}
+
+.privacy-policy-section a:hover {
+    opacity: 0.7;
+}
