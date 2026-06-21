@@ -166,16 +166,26 @@ add_filter('comment_form_default_fields', 'custom_comment_form_fields');
 
 // ----------------------------------------------------------------------------
 // コメント欄の名前が未入力の場合の投稿者名
+// Anonymous や空文字の投稿者名を「名無しさん」に置き換える
 // ----------------------------------------------------------------------------
-/* function default_author_name($author, $comment_ID, $comment)
-{
-    if ($author == __('Anonymous')) {
-        $author = '名無しさん';
-    }
+// 「もし default_author_name という名前の関数がまだ存在していなければ、以下の関数を作る」
+if (!function_exists('default_author_name')) {
+    // $author：これから画面に表示されようとしている「現在の投稿者名」（文字列）
+    // $comment_ID：そのコメントのID番号
+    // $comment：コメントの全データが入ったオブジェクト
+    function default_author_name($author, $comment_ID = 0, $comment = null)
+    {
+        // $author === '' ： 名前欄が完全に空っぽ（未入力）のとき
+        // $author === 'Anonymous' ： 英語の「Anonymous（匿名）」という文字が入っているとき
+        // $author === __('Anonymous') ： WordPressのシステムやテーマの翻訳機能によって、環境に応じて「匿名」などの文字に変換された Anonymous が入っているとき
+        if ($author === '' || $author === 'Anonymous' || $author === __('Anonymous')) {
+            return '名無しさん';
+        }
 
-    return $author;
+        return $author;
+    }
 }
-*/
+
 add_filter('get_comment_author', 'default_author_name', 10, 3);
 
 // --------------------------------------------------------
@@ -2153,4 +2163,31 @@ add_action('send_headers', function () {
     header("Content-Security-Policy: frame-ancestors 'self';");
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: strict-origin-when-cross-origin');
+});
+
+/* ===================================================
+   スマホ＋タブレット用JSの読み込み
+   置き場所：
+   /wp-content/themes/sample_theme/js/mobile_tablet_home_target.js
+
+   ポイント：
+   ・JS名は mobile_tablet_home_target.js で固定
+   ・filemtime() を使い、JS更新時にブラウザキャッシュを残しにくくする
+   ・送信処理はJSで自作しない。WordPress標準コメントフォームを使う
+=================================================== */
+add_action('wp_enqueue_scripts', function () {
+    if (is_admin()) {
+        return;
+    }
+
+    $script_path = get_template_directory() . '/js/mobile_tablet_home_target.js';
+    $script_uri  = get_template_directory_uri() . '/js/mobile_tablet_home_target.js';
+
+    wp_enqueue_script(
+        'mobile-tablet-home-target',
+        $script_uri,
+        [],
+        file_exists($script_path) ? filemtime($script_path) : '1.0',
+        true
+    );
 });

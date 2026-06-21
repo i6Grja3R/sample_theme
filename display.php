@@ -377,6 +377,130 @@ function display_pagenavi()
     echo '<a class="page-nav-link" href="' . esc_url($make_page_url($pages)) . '">' . esc_html('＞＞') . '</a> ';
 
     echo '</div>';
+
+    // スマホ・タブレット用：ページナビ直下にRSSを追加
+    display_pagenavi_bottom_rss();
+}
+
+if (!function_exists('display_pagenavi_bottom_rss')) {
+    function display_pagenavi_bottom_rss()
+    {
+        global $block_per_page;
+        global $limitSect1;
+        global $limitSect2;
+        global $limitSect3;
+        global $rss_per_block;
+        global $rss_items;
+
+        // RSSデータが空、または配列ではない場合は何も表示しない
+        // ここで return することで、RSS未取得時のエラーを防ぐ
+        if (empty($rss_items) || !is_array($rss_items)) {
+            return;
+        }
+
+        // 件数系の値を整数に変換して安全化する
+        // max() を使って、マイナス値や0による表示崩れを防ぐ
+        $limitSect1     = max(0, (int) $limitSect1);
+        $limitSect2     = max(0, (int) $limitSect2);
+        $limitSect3     = max(0, (int) $limitSect3);
+        $rss_per_block  = max(1, (int) $rss_per_block);
+        $block_per_page = max(0, (int) $block_per_page);
+
+        // 既に通常表示で使ったRSSの次から表示するための開始位置
+        // 例：1ページ内に2ブロック表示しているなら、
+        // その2ブロック分のRSSを飛ばした位置から追加RSSを出す
+        $start_index = $block_per_page * $rss_per_block;
+
+        // 追加分のRSSが足りない場合は、先頭のRSSから表示する
+        // これにより、ページナビ下のRSSが空になるのを防ぐ
+        if ($start_index >= count($rss_items)) {
+            $start_index = 0;
+        }
+
+        $contentA = '';
+        $contentB = '';
+        $contentC = '';
+
+        // 1ブロック分のRSS件数だけループしてHTMLを作る
+        for ($j = 0; $j < $rss_per_block; ++$j) {
+            $item_index = $start_index + $j;
+
+            // RSS配列の件数を超えたらループを終了する
+            if ($item_index >= count($rss_items)) {
+                break;
+            }
+
+            // 表示するRSSデータを1件取得
+            $item = $rss_items[$item_index];
+
+            // RSSタイトルをリンク付きで作成
+            // URLは esc_url()、タイトル文字は esc_html() で安全に出力する
+            $title = '<strong><a href="' . esc_url($item->link) . '">' . esc_html($item->title) . '</a></strong>';
+
+            // RSS画像が空、またはURLとして不正な場合は自サイト内の noimage.png を使う
+            if (empty($item->img) || !filter_var($item->img, FILTER_VALIDATE_URL)) {
+                $img = home_url('/wp-content/themes/sample_theme/images/noimage.png');
+            } else {
+                $img = $item->img;
+            }
+
+            // 画像読み込み失敗時に使うダミー画像
+            // 自サイト内の固定画像なので、リンク切れ時の安全な代替画像として使う
+            $dummy_img = esc_url(
+                home_url('/wp-content/themes/sample_theme/images/noimage.png')
+            );
+
+            // $dummy_img は自サイト内の固定 noimage.png なので、onerror 内に入れても外部入力は混入しない。
+            // 将来、ユーザー入力や外部RSS由来のURLを入れる場合は data-fallback + 外部JS に変更する。
+            $image = '<a href="' . esc_url($item->link) . '">
+            <img
+                src="' . esc_url($img) . '"
+                class="rss-image"
+                onerror="this.onerror=null; this.src=\'' . $dummy_img . '\';"
+                alt="">
+            </a>';
+
+            // RSSのサブジェクトを10文字で切り、ボタン表示用にする
+            $subject = '<a href="' . esc_url($item->link) . '">' . esc_html(mb_substr($item->subject, 0, 10)) . '</a>';
+
+            // $limitSect1 まではタイトルのみRSS
+            if ($j < $limitSect1) {
+                $contentA .= '<li class="sitelink">' . $title . '</li>';
+
+                // $limitSect1 + $limitSect2 までは大きい画像RSS
+            } elseif ($j < $limitSect1 + $limitSect2) {
+                $contentB .= '<li class="sitelink2"><figure class="snip"><figcaption>' . $image . '<br>' . $title . '<p class="btn">' . $subject . '</p></figcaption></figure></li>';
+
+                // それ以降は画像＋文字RSS
+            } else {
+                $contentC .= '
+                <li class="sitelink3">
+                    <a class="sitelink3-link" href="' . esc_url($item->link) . '">
+                        <img
+                            src="' . esc_url($img) . '"
+                            class="rss-image"
+                            onerror="this.onerror=null; this.src=\'' . $dummy_img . '\';"
+                            alt="">
+                        <strong>' . esc_html($item->title) . '</strong>
+                    </a>
+                </li>';
+            }
+        }
+
+        // 3種類のRSSがすべて空なら何も表示しない
+        if ($contentA === '' && $contentB === '' && $contentC === '') {
+            return;
+        }
+
+        // ページナビ下専用のRSSブロックを出力する
+        // 通常の .rssBlock に加えて .pagenavi-bottom-rss を付けることで、
+        // CSS側で「ページナビ下RSSだけ」を個別に調整できる
+        echo '<div class="rssBlock pagenavi-bottom-rss">';
+        echo '<ul class="wiget-rss">' . $contentA . '</ul>';
+        echo '<ul class="wiget-rss">' . $contentB . '</ul>';
+        echo '<ul class="wiget-rss">' . $contentC . '</ul>';
+        echo '</div>';
+    }
 }
 
 // 3日間ランキングを表示
@@ -620,113 +744,128 @@ function display_search_form()
             <input type="submit" id="searchsubmit" value="Q">
         </div>
     </form>
-    <?php
+<?php
 }
 
 //最近のコメント
 function display_comment()
 {
-    // 【データ取得設定】コメントを取得するための条件（パラメーター）を指定
+    // 【データ取得設定】コメントを取得するための条件を指定
     $args = array(
-        'author__not_in' => [1],       // ユーザーID「1」（通常はサイト管理者）のコメントを除外
-        'number'         => 5,         // 最新のコメントを最大5件まで取得
-        'status'         => 'approve', // 承認済みのコメントのみ取得（スパムや未承認を除外）
-        'type'           => 'comment', // 純粋なコメントのみ取得（トラックバックやピンバックを除外）
-        'no_found_rows'  => true,      // ページ送り（ページネーション）をしないため、総件数取得を省略してSQLを軽量化
+        'author__not_in' => [1],       // 管理者のコメントを除外
+        'number'         => 5,         // 最新コメントを最大5件取得
+        'status'         => 'approve', // 承認済みコメントのみ表示
+        'type'           => 'comment', // 通常コメントのみ取得
+        'no_found_rows'  => true,      // 件数取得を省略して軽量化
     );
 
-    // WordPressのコメントクエリ用のインスタンスを作成
+    // コメント取得
     $comments_query = new WP_Comment_Query();
-    // 設定した条件でデータベースからコメントデータを取得
     $comments = $comments_query->query($args);
 
-    // 【条件分岐】コメントが1件以上存在する場合の処理
-    if ($comments) {
-    ?>
-        <!-- 表示部分 -->
-        <div class="commentlist">
-            <div class="side-title">最近のコメント(comments)</div>
-            <?php
-            foreach ($comments as $comment) {
-                // 記述が長いので $pid に入れておく
-                // 投稿IDなので整数に固定した方が安全
-                $pid = (int) $comment->comment_post_ID;
-                // 【プライバシー保護】そのコメントがついている親記事が、現在「公開中（publish）」であるかチェック
-                // 下書き、非公開、ゴミ箱にある記事のコメントなら、表示をスキップ（continue）して次のコメントへ行く
-                if (get_post_status($pid) !== 'publish') {
-                    continue;
-                }
-                // コメントがついている記事の詳細ページURLを取得
-                $url = get_permalink($pid);
-
-                // 【エラー防止】何らかの理由でURLが正常に取得できなかった場合は表示をスキップ
-                if (!$url) {
-                    continue;
-                }
-                // コメントがついている記事のタイトルを取得
-                $title = get_the_title($pid);
-                // 記事のサムネイル（アイキャッチ画像）を取得
-                // alt属性には記事のタイトルを安全に（esc_attr）適用し、loading="lazy"で遅延読み込みを有効化
-                $img = get_the_post_thumbnail(
-                    $pid,
-                    'thumbnail',
-                    [
-                        'class'   => 'myClass',
-                        'alt' => esc_attr($title),
-                        'loading' => 'lazy',
-                    ]
-                );
-                // コメントが投稿された日付を指定したフォーマット「(年/月/日)」で取得
-                $date = get_comment_date('(Y/n/d)', $comment->comment_ID);
-                // コメントの本文（生データ）を取得
-                $text = get_comment_text($comment->comment_ID);
-                // $user_id = $comment->comment_author;
-                // デフォルト値で初期化して
-                // $user_id = '名無しさん(anonymous)';
-
-                /* if (!empty($comment->comment_author)) {
-                    $user_id = $comment->comment_author;
-                } elseif (!empty($comment->user_id)) {
-                    $user_id = $comment->user_id;
-                }*/
-            ?>
-                <div class="recentcomment">
-                    <ul class="mycomment">
-                        <li class="imgcomment">
-                            <a class="recentcomment-link" href="<?php echo esc_url($url); ?>">
-                                <div class="commentheight">
-                                    <?php echo wp_kses_post($img); ?>
-                                </div>
-                                <div class="com_title">
-                                    <?php echo esc_html($title); ?>
-                                </div>
-                                <div class="commentnumber">
-                                    <p class="comment">
-                                        <?php
-                                        // 【安全対策＆文字数制限】
-                                        // 1. wp_strip_all_tags() でコメント本文内のHTMLタグを完全に消去
-                                        // 2. mb_strimwidth() で、長文のコメントを先頭から「38バイト（日本語で約19文字）」に切り詰め、末尾に「･･･」を付与
-                                        // 3. 最後に esc_html() で完全にエスケープ処理をしてから出力（非常に堅牢な設計です）
-                                        echo esc_html(mb_strimwidth(wp_strip_all_tags($text), 0, 38, '･･･'));
-                                        ?>
-                                    </p>
-                                    <p class="my_author">
-                                        <?php echo esc_html($date); ?>
-                                    </p><br>
-                                </div>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            <?php
-            }
-            ?>
-        </div>
-    <?php
-    } else {
-        echo esc_html('コメントなし');
+    // コメントが1件もない場合は何も表示しない
+    if (empty($comments)) {
+        return;
     }
-    ?>
+
+    // 表示できるコメントだけを事前に整理する
+    $display_comments = [];
+
+    foreach ($comments as $comment) {
+        $pid = (int) $comment->comment_post_ID;
+
+        // 親記事が公開中でないコメントは表示しない
+        if (get_post_status($pid) !== 'publish') {
+            continue;
+        }
+
+        $url = get_permalink($pid);
+
+        // URLが取れない場合は表示しない
+        if (!$url) {
+            continue;
+        }
+
+        $display_comments[] = [
+            'comment' => $comment,
+            'pid'     => $pid,
+            'url'     => $url,
+        ];
+    }
+
+    // 取得はできたが、表示できるコメントがない場合も何も表示しない
+    if (empty($display_comments)) {
+        return;
+    }
+?>
+    <!-- 最近のコメント：表示部分 -->
+    <div class="commentlist">
+        <div class="side-title">最近のコメント(comments)</div>
+
+        <?php
+        foreach ($display_comments as $item) {
+            $comment = $item['comment'];
+            $pid     = $item['pid'];
+            $url     = $item['url'];
+
+            // コメントがついている記事のタイトル
+            $title = get_the_title($pid);
+
+            // 記事のサムネイル
+            $img = get_the_post_thumbnail(
+                $pid,
+                'thumbnail',
+                [
+                    'class'   => 'myClass',
+                    'alt'     => esc_attr($title),
+                    'loading' => 'lazy',
+                ]
+            );
+
+            // コメント投稿日
+            $date = get_comment_date('(Y/n/d)', $comment->comment_ID);
+
+            // コメント本文
+            $text = get_comment_text($comment->comment_ID);
+        ?>
+            <div class="recentcomment">
+                <ul class="mycomment">
+                    <li class="imgcomment">
+                        <a class="recentcomment-link" href="<?php echo esc_url($url); ?>">
+                            <div class="commentheight">
+                                <?php echo wp_kses_post($img); ?>
+                            </div>
+
+                            <div class="com_title">
+                                <?php echo esc_html($title); ?>
+                            </div>
+
+                            <div class="commentnumber">
+                                <p class="comment">
+                                    <?php
+                                    echo esc_html(
+                                        mb_strimwidth(
+                                            wp_strip_all_tags($text),
+                                            0,
+                                            38,
+                                            '･･･'
+                                        )
+                                    );
+                                    ?>
+                                </p>
+
+                                <p class="my_author">
+                                    <?php echo esc_html($date); ?>
+                                </p><br>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        <?php
+        }
+        ?>
+    </div>
 <?php
 }
 
@@ -883,7 +1022,14 @@ function display_rss_post_1()
                 // コメント数の出力（FontAwesomeアイコンとコメント件数）
                 echo '<span class="comment-count">';
                 echo '<span class="fa-comment fa-fw"></span>';
-                echo '<a href="' . esc_url($item->guid) . '">' . esc_html($item->comments) . '</a>';
+
+                /* コメント数をクリックしたら、投稿ページのコメント欄へ移動する */
+                $comment_url = !empty($item->comments_link)
+                    ? $item->comments_link
+                    : get_comments_link((int) $item->ID);
+
+                echo '<a href="' . esc_url($comment_url) . '">' . esc_html($item->comments) . '</a>';
+
                 echo '</span>';
                 echo '</p>';
                 echo '</header>';
@@ -1036,7 +1182,13 @@ function display_rss_post_2()
             echo '</span>'; // カテゴリー
             echo '<span class="fa-comment fa-fw"></span>'; // コメント数のマーク fontawesomeをbeforeで読み込む
             // 代表記事のコメント数を安全に出力
-            echo '<span class="clickCnt"><a href="' . esc_url($item->guid) . '">' . esc_html($item->comments) . '</a></span>'; // コメント数
+            // コメント数をクリックしたら、記事ページのコメント一覧へ移動する
+            // get_comments_link() で作った #comments 付きURLを使う
+            $comment_url = !empty($item->comments_link)
+                ? $item->comments_link
+                : get_comments_link((int) $item->ID);
+
+            echo '<span class="clickCnt"><a href="' . esc_url($comment_url) . '">' . esc_html($item->comments) . '</a></span>'; // コメント数
             echo '</p>';
             echo '</header>';
             // 代表記事の抜粋テキストを安全に出力
