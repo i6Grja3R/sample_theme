@@ -63,13 +63,30 @@ switch ($action):
         }
 
         // IPアドレス取得
-        // Cloudflare経由なら HTTP_CF_CONNECTING_IP を優先
-        $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
-            ?? $_SERVER['REMOTE_ADDR']
-            ?? 'unknown';
+        // 既に functions.php 側に bbs_get_client_ip() があるなら、それを優先して使う
+        if (function_exists('bbs_get_client_ip')) {
+            $ip = bbs_get_client_ip();
+        } else {
+            $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
+                ?? $_SERVER['REMOTE_ADDR']
+                ?? '0.0.0.0';
 
-        // 制限キー作成
-        $limit_key = 'contact_limit_' . md5($ip);
+            // 念のためIP形式を検証する
+            if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+                $ip = '0.0.0.0';
+            }
+        }
+
+        /*
+ * 制限キー作成
+ * md5() は弱いハッシュとして Snyk に警告されるため使わない。
+ * hash_hmac('sha256', ..., wp_salt('auth')) に変更する。
+ */
+        $limit_key = 'contact_limit_' . hash_hmac(
+            'sha256',
+            $ip,
+            wp_salt('auth')
+        );
 
         // 現在回数取得
         $limit_count = (int) get_transient($limit_key);
@@ -80,7 +97,7 @@ switch ($action):
         }
 
         // 回数加算（10分保持）
-        set_transient($limit_key, $limit_count + 1, 600);
+        set_transient($limit_key, $limit_count + 1, 10 * MINUTE_IN_SECONDS);
 
         include('contact-check.php');
 

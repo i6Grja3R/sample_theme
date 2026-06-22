@@ -65,13 +65,13 @@ if (!function_exists('bbs_quest_submit')) {
         $user_id = get_guest_uuid();                                             // 以降の識別・レート制限用（権限制御には使用しない）
 
         /* --- レート制限（IP + user_id、例：10分で20回まで） --------------- */
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';                              // 取得不可時はダミー
-        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);                     // 一意キー
-        $cnt = (int) get_transient($key);                                   // 現在カウント
-        if ($cnt >= 20) {                                                        // 閾値を超えたら拒否
-            wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
-        }
-        set_transient($rate_key, $cnt + 1, 10 * MINUTE_IN_SECONDS);              // 10分維持
+        /*
+        * md5() は弱いハッシュとして Snyk に警告されるため使わない。
+        * functions.php 側の bbs_rate_guard() に統一する。
+        * IP + user_id を hash_hmac('sha256', ..., wp_salt('auth')) でキー化するため、
+        * transient キーを推測されにくくできる。
+        */
+        bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
 
         /* --- 入力取得・サニタイズ ---------------------------------------- */
         $unique_id = sanitize_text_field($_POST['unique_id'] ?? '');             // 親スレ等のID
@@ -377,13 +377,11 @@ if (!function_exists('bbs_quest_confirm')) {
         $user_id = get_guest_uuid();
 
         // 3) レート制限（IP + user_id）10分で20回
-        $ip  = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);
-        $cnt = (int) get_transient($key);
-        if ($cnt >= 20) {
-            wp_send_json_error(['errors' => ['短時間に送信が多すぎます。時間をおいて再度お試しください。']]);
-        }
-        set_transient($key, $cnt + 1, 10 * MINUTE_IN_SECONDS);
+        /*
+        * submit 側と同じレート制限関数に統一する。
+        * md5() を使わないことで Snyk の CWE-916 警告を避ける。
+        */
+        bbs_rate_guard($user_id, 20, 10 * MINUTE_IN_SECONDS);
 
         // 3) パラメータ
         $mode = sanitize_text_field($_POST['mode'] ?? 'show'); // 'show' or 'commit'

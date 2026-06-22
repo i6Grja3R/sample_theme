@@ -146,8 +146,23 @@ if (!function_exists('bbs_rate_guard')) {
     function bbs_rate_guard(string $user_id, int $limit = 20, int $window = 600): void
     {
         // [101] IP + user_id でキーを構成（匿名でもある程度の粒度で抑制）
-        $ip  = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        $key = 'bbs_rate_' . md5($ip . '|' . $user_id);
+        // md5() は弱いハッシュとして Snyk に警告されるため使わない。
+        // hash_hmac('sha256', ..., wp_salt('auth')) で transient キーを作る。
+        if (function_exists('bbs_get_client_ip')) {
+            $ip = bbs_get_client_ip();
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+            if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+                $ip = '0.0.0.0';
+            }
+        }
+
+        $key = 'bbs_rate_' . hash_hmac(
+            'sha256',
+            $ip . '|' . $user_id,
+            wp_salt('auth')
+        );
         // [102] 現在カウントを取得（未設定なら 0）
         $cnt = (int) get_transient($key);
         // [103] 閾値を超過していれば即エラー応答

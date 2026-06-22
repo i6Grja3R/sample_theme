@@ -32,7 +32,14 @@ $user_id = sanitize_text_field($_COOKIE[$cookie_name]) ?? null;
 
 if (!$user_id) {
     $user_id = bin2hex(random_bytes(16));
-    setcookie($cookie_name, $user_id, time() + (10 * 365 * 24 * 60 * 60), '/'); // 10年
+    setcookie($cookie_name, $user_id, [
+        'expires'  => time() + (10 * YEAR_IN_SECONDS),
+        'path'     => COOKIEPATH ?: '/',
+        'domain'   => COOKIE_DOMAIN ?: '',
+        'secure'   => is_ssl(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
 }
 
 // ----------------------------
