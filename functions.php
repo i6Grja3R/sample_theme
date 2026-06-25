@@ -883,7 +883,9 @@ function bbs_que_list_items()
         $count = 0;
     }
 
-    $sql = "SELECT * FROM {$wpdb->prefix}sortable WHERE parent_id IS NULL AND is_confirmed = 1 ORDER BY id DESC LIMIT %d,10";
+    $table = bbs_questions_table();
+
+    $sql = "SELECT * FROM {$table} WHERE is_confirmed = 1 AND status = 'active' ORDER BY id DESC LIMIT %d,10";
     $query = $wpdb->prepare($sql, $count);
     $rows = $wpdb->get_results($query);
 
@@ -906,8 +908,8 @@ function bbs_que_list_items()
                 case 'png':
                     $type = 'img';
                     break;
-                case 'mp4':
-                    // case 'pdf':
+                //case 'mp4':
+                // case 'pdf':
                 default:
                     $type = '';
                     break;
@@ -918,7 +920,11 @@ function bbs_que_list_items()
             'title' => $row->title,
             'img1'  => $url,
             'type'  => $type,
-            'url'   => home_url('que-answer?' . $row->unique_id),
+            'url' => add_query_arg(
+                'id',
+                $row->unique_id,
+                home_url('/質問掲示板回答画面/')
+            ),
         ];
     }
 
@@ -1717,6 +1723,22 @@ add_action('wp_ajax_nopriv_bbs_quest_submit', 'bbs_quest_submit');           // 
 });
 */
 
+if (!function_exists('bbs_questions_table')) {
+    function bbs_questions_table(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'bbs_questions';
+    }
+}
+
+if (!function_exists('bbs_posts_table')) {
+    function bbs_posts_table(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'bbs_posts';
+    }
+}
+
 // ─────────────────────────────────────────────
 // 必要ならここで共通関数を require してください。
 // require_once __DIR__ . '/bbs_common.php';
@@ -1873,7 +1895,7 @@ if (!function_exists('bbs_quest_confirm')) {
             }
 
             // 2) DBへ INSERT（wp_sortable のみ）
-            $table = $wpdb->prefix . 'sortable';
+            $table = bbs_questions_table();
             $now   = current_time('mysql', true);
 
             // media(attach1〜3) だけ前詰め
@@ -1913,7 +1935,6 @@ if (!function_exists('bbs_quest_confirm')) {
             $ok = $wpdb->insert(
                 $table,
                 [
-                    'parent_id'    => null,
                     'unique_id'    => $unique_id,
                     'user_id'      => $user_id,
                     'name'         => $name,
@@ -1926,10 +1947,30 @@ if (!function_exists('bbs_quest_confirm')) {
                     'attach3'      => $attach3,
                     'usericon'     => $usericon,
                     'is_confirmed' => 1,
+                    'status'        => 'active',
                     'created_at'   => $now,
                     'confirmed_at' => $now,
                     'ip'           => $ip,
                     'ua'           => $ua,
+                ],
+                [
+                    '%s', // unique_id
+                    '%s', // user_id
+                    '%s', // name
+                    '%s', // title
+                    '%s', // text
+                    '%d', // stamp
+                    '%s', // files
+                    '%s', // attach1
+                    '%s', // attach2
+                    '%s', // attach3
+                    '%s', // usericon
+                    '%d', // is_confirmed
+                    '%s', // status
+                    '%s', // created_at
+                    '%s', // confirmed_at
+                    '%s', // ip
+                    '%s', // ua
                 ]
             );
 
@@ -2191,3 +2232,6 @@ add_action('wp_enqueue_scripts', function () {
         true
     );
 });
+
+// functions.php から読み込ませる
+require_once get_template_directory() . '/bbs_tree_functions_patch.php';

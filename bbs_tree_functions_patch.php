@@ -46,22 +46,28 @@ function bbs_tree_get_client_ip(): string
     return '';
 }
 
-function bbs_tree_table(): string
+function bbs_tree_questions_table(): string
 {
     global $wpdb;
-    return $wpdb->prefix . 'sortable';
+    return $wpdb->prefix . 'bbs_questions';
+}
+
+function bbs_tree_posts_table(): string
+{
+    global $wpdb;
+    return $wpdb->prefix . 'bbs_posts';
 }
 
 /** unique_id から質問スレ本体を取得。 */
 function bbs_tree_get_thread_by_unique_id(string $unique_id): ?object
 {
     global $wpdb;
-    $table = bbs_tree_table();
+    $table = bbs_tree_questions_table();
     $unique_id = sanitize_text_field($unique_id);
 
     $row = $wpdb->get_row(
         $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE unique_id = %s AND (parent_id IS NULL OR parent_id = 0) LIMIT 1",
+            "SELECT * FROM {$table} WHERE unique_id = %s AND is_confirmed = 1 AND status <> 'deleted' LIMIT 1",
             $unique_id
         )
     );
@@ -85,47 +91,79 @@ function bbs_tree_is_archived(object $thread): bool
 }
 
 /** 親投稿のdepthを取得して、次の投稿depthを計算。 */
-function bbs_tree_next_depth(int $parent_id): int
+function bbs_tree_next_depth(int $parent_post_id): int
 {
     global $wpdb;
-    $table = bbs_tree_table();
-    $parent_depth = (int) $wpdb->get_var($wpdb->prepare("SELECT depth FROM {$table} WHERE id = %d", $parent_id));
+    if ($parent_post_id <= 0) {
+        return 1;
+    }
+    $table = bbs_tree_posts_table();
+    $parent_depth = (int) $wpdb->get_var($wpdb->prepare("SELECT depth FROM {$table} WHERE id = %d", $parent_post_id));
     return $parent_depth + 1;
 }
 
 /** スレ内投稿数。質問本体も含む。 */
-function bbs_tree_count_thread_posts(int $thread_root_id): int
+function bbs_tree_count_thread_posts(int $question_id): int
 {
     global $wpdb;
-    $table = bbs_tree_table();
-    return (int) $wpdb->get_var(
+    $table = bbs_tree_posts_table();
+    $post_count = (int) $wpdb->get_var(
         $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE thread_root_id = %d AND (status IS NULL OR status <> 'deleted')",
-            $thread_root_id
+            "SELECT COUNT(*) FROM {$table} WHERE question_id = %d AND is_confirmed = 1 AND status <> 'deleted'",
+            $question_id
         )
     );
+
+    return 1 + $post_count;
 }
 
 /** 返信可能かまとめて判定。 */
-function bbs_tree_can_post(int $thread_root_id, int $parent_id): array
+function bbs_tree_can_post(int $question_id, int $parent_post_id): array
 {
     global $wpdb;
-    $table = bbs_tree_table();
 
-    $thread = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $thread_root_id));
+    $questions_table = bbs_tree_questions_table();
+    $posts_table     = bbs_tree_posts_table();
+
+    $thread = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT * FROM {$questions_table} WHERE id = %d LIMIT 1",
+            $question_id
+        )
+    );
+
     if (!$thread) {
         return [false, '親スレが見つかりません。'];
     }
+
     if (bbs_tree_is_archived($thread)) {
         return [false, 'このスレはアーカイブ済みのため投稿できません。'];
     }
 
-    $count = bbs_tree_count_thread_posts($thread_root_id);
+    $count = bbs_tree_count_thread_posts($question_id);
     if ($count >= BBS_THREAD_MAX_POSTS) {
         return [false, 'このスレは投稿上限に達しました。'];
     }
 
-    $depth = bbs_tree_next_depth($parent_id);
+    if ($parent_post_id > 0) {
+        $parent = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT *
+                 FROM {$posts_table}
+                 WHERE id = %d
+                   AND question_id = %d
+                 LIMIT 1",
+                $parent_post_id,
+                $question_id
+            )
+        );
+
+        if (!$parent) {
+            return [false, '返信先が不正です。'];
+        }
+    }
+
+    $depth = bbs_tree_next_depth($parent_post_id);
     if ($depth > BBS_TREE_MAX_DEPTH) {
         return [false, '返信階層の上限に達しました。'];
     }
@@ -169,12 +207,14 @@ function bbs_tree_render_comment_html(object $row): string
 }
 
 /** 回答20件読み込み。parent_id=root_id の直接回答だけ。 */
+/** 回答20件読み込み。直接回答だけ。 */
 function bbs_ajax_load_answers(): void
 {
     check_ajax_referer('bbs_tree_nonce', 'nonce');
     global $wpdb;
 
-    $table = bbs_tree_table();
+    $table = bbs_tree_posts_table();
+
     $thread_unique_id = sanitize_text_field($_POST['thread_unique_id'] ?? '');
     $cursor = max(0, (int) ($_POST['cursor'] ?? 0));
     $limit = min(BBS_ANSWER_PAGE_SIZE, max(1, (int) ($_POST['limit'] ?? BBS_ANSWER_PAGE_SIZE)));
@@ -183,85 +223,100 @@ function bbs_ajax_load_answers(): void
     if (!$thread) {
         wp_send_json_error(['message' => 'スレが見つかりません。']);
     }
-    $root_id = (int) $thread->id;
+
+    $question_id = (int) $thread->id;
 
     $where_cursor = $cursor > 0 ? $wpdb->prepare('AND id > %d', $cursor) : '';
+
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT * FROM {$table}
-             WHERE thread_root_id = %d AND parent_id = %d {$where_cursor}
+            "SELECT *
+             FROM {$table}
+             WHERE question_id = %d
+               AND parent_post_id IS NULL
+               AND is_confirmed = 1
+               {$where_cursor}
              ORDER BY id ASC
              LIMIT %d",
-            $root_id,
-            $root_id,
+            $question_id,
             $limit + 1
         )
     );
 
     $has_more = count($rows) > $limit;
     $rows = array_slice($rows, 0, $limit);
+
     $html = implode('', array_map('bbs_tree_render_comment_html', $rows));
     $next_cursor = $rows ? (int) end($rows)->id : $cursor;
 
     wp_send_json_success([
-        'html' => $html,
+        'html'        => $html,
         'next_cursor' => $next_cursor,
-        'has_more' => $has_more,
+        'has_more'   => $has_more,
     ]);
 }
 add_action('wp_ajax_bbs_load_answers', 'bbs_ajax_load_answers');
 add_action('wp_ajax_nopriv_bbs_load_answers', 'bbs_ajax_load_answers');
 
 /** 返信10件読み込み。直接返信だけをLazy Load。 */
+/** 返信10件読み込み。直接返信だけをLazy Load。 */
 function bbs_ajax_load_replies(): void
 {
     check_ajax_referer('bbs_tree_nonce', 'nonce');
     global $wpdb;
 
-    $table = bbs_tree_table();
-    $parent_id = max(0, (int) ($_POST['parent_id'] ?? 0));
+    $table = bbs_tree_posts_table();
+
+    $parent_post_id = max(0, (int) ($_POST['parent_id'] ?? 0));
     $cursor = max(0, (int) ($_POST['cursor'] ?? 0));
     $limit = min(BBS_REPLY_PAGE_SIZE, max(1, (int) ($_POST['limit'] ?? BBS_REPLY_PAGE_SIZE)));
 
-    if ($parent_id <= 0) {
+    if ($parent_post_id <= 0) {
         wp_send_json_error(['message' => '親IDが不正です。']);
     }
 
     $where_cursor = $cursor > 0 ? $wpdb->prepare('AND id > %d', $cursor) : '';
+
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT * FROM {$table}
-             WHERE parent_id = %d {$where_cursor}
+            "SELECT *
+             FROM {$table}
+             WHERE parent_post_id = %d
+               AND is_confirmed = 1
+               {$where_cursor}
              ORDER BY id ASC
              LIMIT %d",
-            $parent_id,
+            $parent_post_id,
             $limit + 1
         )
     );
 
     $has_more = count($rows) > $limit;
     $rows = array_slice($rows, 0, $limit);
+
     $html = implode('', array_map('bbs_tree_render_comment_html', $rows));
     $next_cursor = $rows ? (int) end($rows)->id : $cursor;
 
     wp_send_json_success([
-        'html' => $html,
+        'html'        => $html,
         'next_cursor' => $next_cursor,
-        'has_more' => $has_more,
+        'has_more'   => $has_more,
     ]);
 }
 add_action('wp_ajax_bbs_load_replies', 'bbs_ajax_load_replies');
 add_action('wp_ajax_nopriv_bbs_load_replies', 'bbs_ajax_load_replies');
 
 /** 回答・返信投稿。parent_id=root_idなら回答、それ以外なら返信。 */
+/** 回答・返信投稿。parent_id=0なら回答、それ以外なら返信。 */
 function bbs_ajax_tree_post_reply(): void
 {
     check_ajax_referer('bbs_tree_nonce', 'nonce');
     global $wpdb;
 
-    $table = bbs_tree_table();
+    $table = bbs_tree_posts_table();
+
     $thread_unique_id = sanitize_text_field($_POST['thread_unique_id'] ?? '');
-    $parent_id = max(0, (int) ($_POST['parent_id'] ?? 0));
+    $parent_post_id = max(0, (int) ($_POST['parent_id'] ?? 0));
     $text = sanitize_textarea_field($_POST['text'] ?? '');
     $name = sanitize_text_field($_POST['name'] ?? '匿名');
 
@@ -273,72 +328,109 @@ function bbs_ajax_tree_post_reply(): void
     if (!$thread) {
         wp_send_json_error(['message' => 'スレが見つかりません。']);
     }
-    $root_id = (int) $thread->id;
-    if ($parent_id <= 0) {
-        $parent_id = $root_id;
-    }
 
-    // 親投稿が同じスレに属しているか固定確認。開示請求時の「返信先ID固定」にも重要。
-    $parent = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $parent_id));
-    if (!$parent || (int) $parent->thread_root_id !== $root_id) {
-        wp_send_json_error(['message' => '返信先が不正です。']);
-    }
+    $question_id = (int) $thread->id;
 
-    [$ok, $message] = bbs_tree_can_post($root_id, $parent_id);
+    [$ok, $message] = bbs_tree_can_post($question_id, $parent_post_id);
     if (!$ok) {
         wp_send_json_error(['message' => $message]);
     }
 
-    $depth = bbs_tree_next_depth($parent_id);
+    $depth = bbs_tree_next_depth($parent_post_id);
     $now = current_time('mysql');
-    $ip = bbs_tree_get_client_ip();
-    $ua = sanitize_textarea_field($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+    $ip = function_exists('bbs_get_client_ip') ? bbs_get_client_ip() : bbs_tree_get_client_ip();
+    $ua = function_exists('bbs_get_user_agent')
+        ? bbs_get_user_agent()
+        : substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+
+    $user_id = function_exists('get_guest_uuid')
+        ? get_guest_uuid()
+        : sanitize_text_field($_COOKIE['user_id'] ?? '');
 
     $inserted = $wpdb->insert(
         $table,
         [
-            'thread_root_id' => $root_id,
-            'parent_id'      => $parent_id,
-            'depth'          => $depth,
-            'text'           => $text,
-            'name'           => $name ?: '匿名',
-            'ip'             => $ip,
-            'ip'         => $ip,
-            'ua'         => $ua,
-            'is_confirmed'   => 1,
-            'status'         => 'active',
-            'created_at'     => $now,
-            'updated_at'     => $now,
+            'question_id'     => $question_id,
+            'parent_post_id'  => $parent_post_id > 0 ? $parent_post_id : null,
+            'depth'           => $depth,
+            'replies_count'   => 0,
+            'user_id'         => $user_id,
+            'text'            => $text,
+            'name'            => $name ?: '匿名',
+            'ip'              => $ip,
+            'ua'              => $ua,
+            'is_confirmed'    => 1,
+            'status'          => 'active',
+            'created_at'      => $now,
+            'updated_at'      => $now,
         ],
-        ['%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
+        [
+            '%d', // question_id
+            '%d', // parent_post_id
+            '%d', // depth
+            '%d', // replies_count
+            '%s', // user_id
+            '%s', // text
+            '%s', // name
+            '%s', // ip
+            '%s', // ua
+            '%d', // is_confirmed
+            '%s', // status
+            '%s', // created_at
+            '%s', // updated_at
+        ]
     );
 
     if (!$inserted) {
+        error_log('[BBS TREE INSERT ERROR] ' . $wpdb->last_error);
+        error_log('[BBS TREE INSERT QUERY] ' . $wpdb->last_query);
         wp_send_json_error(['message' => '投稿に失敗しました。']);
     }
 
     $new_id = (int) $wpdb->insert_id;
-    $wpdb->query($wpdb->prepare("UPDATE {$table} SET replies_count = replies_count + 1 WHERE id = %d", $parent_id));
 
-    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $new_id));
-    wp_send_json_success(['html' => bbs_tree_render_comment_html($row), 'id' => $new_id]);
+    if ($parent_post_id > 0) {
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$table}
+                 SET replies_count = replies_count + 1
+                 WHERE id = %d",
+                $parent_post_id
+            )
+        );
+    }
+
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE id = %d",
+            $new_id
+        )
+    );
+
+    wp_send_json_success([
+        'html' => bbs_tree_render_comment_html($row),
+        'id'   => $new_id,
+    ]);
 }
 add_action('wp_ajax_bbs_tree_post_reply', 'bbs_ajax_tree_post_reply');
 add_action('wp_ajax_nopriv_bbs_tree_post_reply', 'bbs_ajax_tree_post_reply');
 
 /** 3ヶ月経過スレをアーカイブ扱いにする。WP-Cron用。 */
+/** 3ヶ月経過スレをアーカイブ扱いにする。WP-Cron用。 */
 function bbs_tree_archive_old_threads(): void
 {
     global $wpdb;
-    $table = bbs_tree_table();
+
+    $table = bbs_tree_questions_table();
     $border = gmdate('Y-m-d H:i:s', strtotime('-' . BBS_ARCHIVE_DAYS . ' days'));
 
     $wpdb->query(
         $wpdb->prepare(
             "UPDATE {$table}
-             SET status = 'archived', archived_at = %s
-             WHERE (parent_id IS NULL OR parent_id = 0)
-               AND status = 'active'
+             SET status = 'archived',
+                 archived_at = %s
+             WHERE status = 'active'
                AND created_at < %s",
             current_time('mysql'),
             $border
